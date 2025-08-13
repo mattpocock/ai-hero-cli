@@ -60,11 +60,15 @@ describe("LessonParserService", () => {
             num: 1,
             name: "introduction",
             sectionName: "1-introduction",
+            root: tmpDir,
+            path: "1-introduction",
           }),
           new Lesson({
             num: 2,
             name: "agentic-stuff",
             sectionName: "2-basics",
+            root: tmpDir,
+            path: "2-basics",
           }),
         ]);
       }).pipe(

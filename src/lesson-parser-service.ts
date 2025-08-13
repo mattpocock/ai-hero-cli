@@ -22,23 +22,42 @@ export class Lesson {
   readonly num: number;
   readonly name: string;
   readonly sectionName: string;
+  readonly root: string;
+  readonly path: string;
+  private readonly files: Array<string>;
 
   constructor(opts: {
     num: number;
     name: string;
+    path: string;
     sectionName: string;
+    root: string;
+    files?: Array<string>;
   }) {
     this.num = opts.num;
     this.name = opts.name;
+    this.path = opts.path;
     this.sectionName = opts.sectionName;
+    this.root = opts.root;
+    this.files = opts.files ?? [];
   }
 
-  absolutePath(root: string) {
-    return path.join(root, this.sectionName, this.name);
+  absolutePath() {
+    return path.resolve(this.root, this.sectionName, this.path);
   }
 
-  relativePathToRoot(root: string) {
-    return path.relative(root, this.absolutePath(root));
+  allFiles() {
+    return this.files.map((file) =>
+      path.resolve(this.absolutePath(), file)
+    );
+  }
+
+  topLevelFiles() {
+    return this.files
+      .filter((file) => {
+        return file.split(path.sep).length === 1;
+      })
+      .map((file) => path.resolve(this.absolutePath(), file));
   }
 }
 
@@ -83,21 +102,6 @@ const getNameAndNumberFromPath = (path: string) => {
   });
 };
 
-const parseLesson = Effect.fn("parseLesson")(function* (opts: {
-  lessonPath: string;
-  sectionPath: string;
-}) {
-  const { name, num } = yield* getNameAndNumberFromPath(
-    opts.lessonPath
-  );
-
-  return new Lesson({
-    name,
-    num,
-    sectionName: opts.sectionPath,
-  });
-});
-
 const parseSection = Effect.fn("parseSection")(function* (
   path: string
 ) {
@@ -118,14 +122,48 @@ export class LessonParserService extends Effect.Service<LessonParserService>()(
     effect: Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
 
-      const getLessonsFromRepo = (filePath: string) => {
+      const parseLesson = Effect.fn("parseLesson")(
+        function* (opts: {
+          lessonPath: string;
+          sectionPath: string;
+          root: string;
+        }) {
+          const { name, num } = yield* getNameAndNumberFromPath(
+            opts.lessonPath
+          );
+
+          const fullLessonPath = path.join(
+            opts.root,
+            opts.sectionPath,
+            opts.lessonPath
+          );
+
+          const allFiles = yield* fs.readDirectory(
+            fullLessonPath,
+            {
+              recursive: true,
+            }
+          );
+
+          return new Lesson({
+            name,
+            num,
+            sectionName: opts.sectionPath,
+            root: opts.root,
+            files: allFiles,
+            path: opts.lessonPath,
+          });
+        }
+      );
+
+      const getLessonsFromRepo = (root: string) => {
         return Effect.gen(function* () {
-          const rawSections = yield* fs.readDirectory(filePath);
+          const rawSections = yield* fs.readDirectory(root);
 
           const sections = yield* Effect.all(
             rawSections.map((section) => {
               return Effect.gen(function* () {
-                const sectionPath = path.join(filePath, section);
+                const sectionPath = path.join(root, section);
 
                 const stat = yield* fs.stat(sectionPath);
 
@@ -149,12 +187,12 @@ export class LessonParserService extends Effect.Service<LessonParserService>()(
           yield* Effect.forEach(sections, (section) => {
             return Effect.gen(function* () {
               const rawLessons = yield* fs.readDirectory(
-                path.join(filePath, section.path)
+                path.join(root, section.path)
               );
 
               for (const lesson of rawLessons) {
                 const lessonPath = path.join(
-                  filePath,
+                  root,
                   section.path,
                   lesson
                 );
@@ -166,6 +204,7 @@ export class LessonParserService extends Effect.Service<LessonParserService>()(
                 const parsedLesson = yield* parseLesson({
                   lessonPath: lesson,
                   sectionPath: section.path,
+                  root,
                 });
 
                 lessons.push(parsedLesson);

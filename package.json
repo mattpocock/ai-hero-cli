@@ -46,6 +46,7 @@
     "@eslint/eslintrc": "3.1.0",
     "@eslint/js": "9.10.0",
     "@types/node": "^22.5.2",
+    "@types/prompts": "^2.4.9",
     "@typescript-eslint/eslint-plugin": "^8.4.0",
     "@typescript-eslint/parser": "^8.4.0",
     "effect": "latest",
@@ -65,5 +66,8 @@
     "patchedDependencies": {
       "@changesets/get-github-info@0.6.0": "patches/@changesets__get-github-info@0.6.0.patch"
     }
+  },
+  "dependencies": {
+    "prompts": "^2.4.2"
   }
 }
