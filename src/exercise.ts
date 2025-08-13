@@ -52,6 +52,13 @@ class LessonEntrypointNotFoundError extends Data.TaggedError(
   message: string;
 }> {}
 
+const shortcuts = {
+  h: "Show all of the available shortcuts",
+  n: "Go to the next exercise",
+  q: "Quit the exercise",
+  p: "Go to the previous exercise",
+};
+
 const runLesson: (opts: {
   lesson: number;
   root: string;
@@ -139,7 +146,7 @@ const runLesson: (opts: {
 
   if (readmeFile) {
     yield* Console.log(
-      `${styleText("bold", "Readme File:")}\n  ${styleText(
+      `${styleText("bold", "Instructions:")}\n  ${styleText(
         "dim",
         readmeFile
       )}\n`
@@ -192,7 +199,14 @@ const runLesson: (opts: {
           );
 
           if (line === "h") {
-            console.log("Help!");
+            yield* Console.log(styleText("bold", "Shortcuts:"));
+            for (const [key, value] of Object.entries(
+              shortcuts
+            )) {
+              yield* Console.log(
+                `  ${key} ${styleText("dim", `- ${value}`)}`
+              );
+            }
           } else if (line === "q") {
             yield* Fiber.interrupt(exerciseProcessFork);
             break;
