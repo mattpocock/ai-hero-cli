@@ -9,5 +9,6 @@ import { LessonParserService } from "./lesson-parser-service.js";
 run(process.argv).pipe(
   Effect.provide(NodeContext.layer),
   Effect.provide(LessonParserService.Default),
+  Effect.scoped,
   NodeRuntime.runMain({ disableErrorReporting: true })
 );

@@ -3,7 +3,8 @@ import {
   Command as CLICommand,
   Options,
 } from "@effect/cli";
-import { Console, Data, Effect } from "effect";
+import type { Scope } from "effect";
+import { Console, Data, Effect, Fiber } from "effect";
 import type {
   InvalidPathError,
   PathNumberIsNaNError,
@@ -11,9 +12,15 @@ import type {
 import { LessonParserService } from "./lesson-parser-service.js";
 import * as path from "path";
 import prompt from "prompts";
-import type { CommandExecutor } from "@effect/platform";
-import { Command, Terminal } from "@effect/platform";
+import type {
+  CommandExecutor,
+  Terminal,
+} from "@effect/platform";
+import { Command } from "@effect/platform";
 import type { PlatformError } from "@effect/platform/Error";
+import { styleText } from "util";
+import type { NoSuchElementException } from "effect/Cause";
+import * as readline from "readline/promises";
 
 class PromptCancelledError extends Data.TaggedError(
   "PromptCancelledError"
@@ -59,8 +66,12 @@ const runLesson: (opts: {
   | PromptCancelledError
   | PlatformError
   | InvalidPathError
+  | NoSuchElementException
   | PathNumberIsNaNError,
-  LessonParserService | CommandExecutor.CommandExecutor
+  | LessonParserService
+  | CommandExecutor.CommandExecutor
+  | Terminal.Terminal
+  | Scope.Scope
 > = Effect.fn("runLesson")(function* (opts) {
   const { cwd, envFilePath, lesson, root } = opts;
   const service = yield* LessonParserService;
@@ -127,8 +138,26 @@ const runLesson: (opts: {
     );
 
   if (readmeFile) {
-    yield* Console.log(readmeFile);
+    yield* Console.log(
+      `${styleText("bold", "Readme File:")}\n  ${styleText(
+        "dim",
+        readmeFile
+      )}\n`
+    );
   }
+
+  yield* Console.log(
+    styleText(
+      "bold",
+      `Running ${foundLesson.num} ${exercise}...`
+    )
+  );
+  yield* Console.log(
+    styleText("dim", "  Press h + enter for help")
+  );
+  yield* Console.log(
+    styleText("dim", "  Press q + enter to quit\n")
+  );
 
   const command = Command.make(
     "pnpm",
@@ -142,11 +171,40 @@ const runLesson: (opts: {
     Command.workingDirectory(cwd)
   );
 
-  const processFork = yield* Effect.fork(
-    Command.exitCode(command)
-  );
+  const exitCode = yield* Effect.gen(function* () {
+    const exerciseProcessFork = yield* Effect.fork(
+      Command.exitCode(command)
+    ).pipe(Effect.onInterrupt(() => Effect.succeed(0)));
 
-  const exitCode = yield* processFork;
+    yield* Effect.fork(
+      Effect.gen(function* () {
+        const rl = readline.createInterface({
+          input: process.stdin,
+        });
+
+        yield* Effect.addFinalizer(() => {
+          return Effect.succeed(rl.close());
+        });
+
+        while (true) {
+          const line = yield* Effect.promise(() =>
+            rl.question("")
+          );
+
+          if (line === "h") {
+            console.log("Help!");
+          } else if (line === "q") {
+            yield* Fiber.interrupt(exerciseProcessFork);
+            break;
+          }
+        }
+      })
+    );
+
+    const exitCode = yield* exerciseProcessFork;
+
+    return exitCode;
+  }).pipe(Effect.scoped);
 
   // If the process failed, we don't need to do anything else.
   if (exitCode !== 0) {
@@ -155,7 +213,7 @@ const runLesson: (opts: {
   yield* Console.log("");
 
   const { choice } = yield* runPrompt<{
-    choice: "run-again" | "run-next" | "run-prev";
+    choice: "run-again" | "finish";
   }>(() =>
     prompt([
       {
@@ -167,10 +225,9 @@ const runLesson: (opts: {
             title: "Run the exercise again",
             value: "run-again",
           },
-          { title: "Run the next exercise", value: "run-next" },
           {
-            title: "Run the previous exercise",
-            value: "run-prev",
+            title: "Finish",
+            value: "finish",
           },
         ],
       },
@@ -178,7 +235,6 @@ const runLesson: (opts: {
   );
 
   if (choice === "run-again") {
-    yield* Console.log("");
     return yield* runLesson({
       lesson,
       root,
