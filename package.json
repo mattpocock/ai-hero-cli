@@ -1,13 +1,16 @@
 {
-  "name": "@template/cli",
+  "name": "ai-hero-cli",
   "version": "0.0.0",
   "type": "module",
   "packageManager": "pnpm@10.14.0",
   "license": "MIT",
   "description": "A basic Effect CLI application",
+  "bin": {
+    "ai-help": "dist/bin.js"
+  },
   "repository": {
     "type": "git",
-    "url": "<PLACEHOLDER>"
+    "url": "https://github.com/mattpocock/ai-hero-cli"
   },
   "publishConfig": {
     "access": "public",

@@ -3,24 +3,21 @@ import {
   Command as CLICommand,
   Options,
 } from "@effect/cli";
+import type { CommandExecutor } from "@effect/platform";
+import { Command } from "@effect/platform";
+import type { PlatformError } from "@effect/platform/Error";
 import type { Scope } from "effect";
-import { Console, Data, Effect, Fiber } from "effect";
+import { Console, Data, Effect, Option } from "effect";
+import type { NoSuchElementException } from "effect/Cause";
+import * as path from "path";
+import prompt from "prompts";
+import * as readline from "readline/promises";
+import { styleText } from "util";
 import type {
   InvalidPathError,
   PathNumberIsNaNError,
 } from "./lesson-parser-service.js";
 import { LessonParserService } from "./lesson-parser-service.js";
-import * as path from "path";
-import prompt from "prompts";
-import type {
-  CommandExecutor,
-  Terminal,
-} from "@effect/platform";
-import { Command } from "@effect/platform";
-import type { PlatformError } from "@effect/platform/Error";
-import { styleText } from "util";
-import type { NoSuchElementException } from "effect/Cause";
-import * as readline from "readline/promises";
 
 class PromptCancelledError extends Data.TaggedError(
   "PromptCancelledError"
@@ -53,10 +50,10 @@ class LessonEntrypointNotFoundError extends Data.TaggedError(
 }> {}
 
 const shortcuts = {
-  h: "Show all of the available shortcuts",
+  enter: "Choose a new exercise to run",
   n: "Go to the next exercise",
-  q: "Quit the exercise",
   p: "Go to the previous exercise",
+  q: "Quit the exercise",
 };
 
 type ExerciseInstruction = {
@@ -94,7 +91,6 @@ const runLesson: (opts: {
   | PathNumberIsNaNError,
   | LessonParserService
   | CommandExecutor.CommandExecutor
-  | Terminal.Terminal
   | Scope.Scope
 > = Effect.fn("runLesson")(function* (opts) {
   const { cwd, envFilePath, lesson, root } = opts;
@@ -133,7 +129,7 @@ const runLesson: (opts: {
           {
             type: "select",
             name: "subfolder",
-            message: "Select an exercise",
+            message: "Select a subfolder",
             choices: topLevelFiles.map((file, index) => ({
               title: file,
               value: index,
@@ -142,7 +138,7 @@ const runLesson: (opts: {
         ])
       );
 
-      subfolderIndex = result.subfolder;
+      subfolderIndex = Number(result.subfolder);
     }
   }
 
@@ -231,10 +227,13 @@ const runLesson: (opts: {
     )
   );
   yield* Console.log(
-    styleText("dim", "  Press h + enter for help")
+    styleText(
+      "dim",
+      "  Press n + enter to go to the next exercise"
+    )
   );
   yield* Console.log(
-    styleText("dim", "  Press q + enter to quit\n")
+    styleText("dim", "  Press h + enter for more shortcuts\n")
   );
 
   const command = Command.make(
@@ -249,55 +248,85 @@ const runLesson: (opts: {
     Command.workingDirectory(cwd)
   );
 
-  const exitCode = yield* Effect.gen(function* () {
-    const exerciseProcessFork = yield* Effect.fork(
-      Command.exitCode(command)
-    ).pipe(Effect.onInterrupt(() => Effect.succeed(0)));
+  const processOutcome:
+    | "next"
+    | "previous"
+    | "quit"
+    | "choose-exercise"
+    | "failed"
+    | "exit" = yield* Effect.raceAll([
+    Command.exitCode(command).pipe(
+      Effect.map((code) => (code === 0 ? "exit" : "failed"))
+    ),
+    Effect.gen(function* () {
+      const rl = readline.createInterface({
+        input: process.stdin,
+      });
 
-    yield* Effect.fork(
-      Effect.gen(function* () {
-        const rl = readline.createInterface({
-          input: process.stdin,
-        });
+      yield* Effect.addFinalizer(() => {
+        return Effect.succeed(rl.close());
+      });
 
-        yield* Effect.addFinalizer(() => {
-          return Effect.succeed(rl.close());
-        });
+      while (true) {
+        const line = yield* Effect.promise(() =>
+          rl.question("")
+        );
 
-        while (true) {
-          const line = yield* Effect.promise(() =>
-            rl.question("")
-          );
-
-          if (line === "h") {
-            yield* Console.log(styleText("bold", "Shortcuts:"));
-            for (const [key, value] of Object.entries(
-              shortcuts
-            )) {
-              yield* Console.log(
-                `  ${key} ${styleText("dim", `- ${value}`)}`
-              );
-            }
-          } else if (line === "q") {
-            yield* Fiber.interrupt(exerciseProcessFork);
-            break;
+        if (line === "h") {
+          yield* Console.log(styleText("bold", "Shortcuts:"));
+          for (const [key, value] of Object.entries(shortcuts)) {
+            yield* Console.log(
+              `  ${key} ${styleText("dim", `- ${value}`)}`
+            );
           }
+        } else if (line === "q") {
+          return "quit";
+        } else if (line === "n") {
+          return "next";
+        } else if (line === "p") {
+          return "previous";
+        } else if (line.trim() === "") {
+          return "choose-exercise";
         }
-      })
-    );
-
-    const exitCode = yield* exerciseProcessFork;
-
-    return exitCode;
-  }).pipe(Effect.scoped);
+      }
+    }),
+  ]).pipe(Effect.scoped);
 
   yield* Console.log("");
+
+  if (processOutcome === "next" && nextExerciseToRun) {
+    return yield* runLesson({
+      lesson: nextExerciseToRun.lessonNumber,
+      root,
+      envFilePath,
+      cwd,
+      subfolderIndex: nextExerciseToRun.subfolderIndex,
+    });
+  } else if (
+    processOutcome === "previous" &&
+    previousExerciseToRun
+  ) {
+    return yield* runLesson({
+      lesson: previousExerciseToRun.lessonNumber,
+      root,
+      envFilePath,
+      cwd,
+      subfolderIndex: previousExerciseToRun.subfolderIndex,
+    });
+  } else if (processOutcome === "choose-exercise") {
+    return yield* chooseLessonAndRunIt({
+      root,
+      envFilePath,
+      cwd,
+    });
+  }
 
   const { choice } = yield* runPrompt<{
     choice:
       | "run-again"
       | "next-exercise"
       | "previous-exercise"
+      | "choose-exercise"
       | "finish";
   }>(() =>
     prompt([
@@ -305,21 +334,21 @@ const runLesson: (opts: {
         type: "select",
         name: "choice",
         message:
-          exitCode === 0
+          processOutcome === "exit"
             ? "Exercise complete! What's next?"
             : "Looks like the exercise errored! What's next?",
         choices: [
           {
             title:
-              exitCode === 0
-                ? "Run the exercise again"
-                : "Try the exercise again",
+              processOutcome === "failed"
+                ? "🔄 Run the exercise again"
+                : "🔄 Try the exercise again",
             value: "run-again",
           },
           ...(nextExerciseToRun
             ? [
                 {
-                  title: `Run the next exercise: ${nextExerciseToRun?.lessonNumber} ${nextExerciseToRun?.subfolder}`,
+                  title: `➡️  Run the next exercise: ${nextExerciseToRun?.lessonNumber} ${nextExerciseToRun?.subfolder}`,
                   value: "next-exercise",
                 },
               ]
@@ -327,13 +356,17 @@ const runLesson: (opts: {
           ...(previousExerciseToRun
             ? [
                 {
-                  title: `Run the previous exercise: ${previousExerciseToRun?.lessonNumber} ${previousExerciseToRun?.subfolder}`,
+                  title: `⬅️  Run the previous exercise: ${previousExerciseToRun?.lessonNumber} ${previousExerciseToRun?.subfolder}`,
                   value: "previous-exercise",
                 },
               ]
             : []),
           {
-            title: "Finish",
+            title: "📋 Choose a new exercise",
+            value: "choose-exercise",
+          },
+          {
+            title: "✅ Finish",
             value: "finish",
           },
         ],
@@ -348,6 +381,12 @@ const runLesson: (opts: {
       envFilePath,
       cwd,
       subfolderIndex: undefined,
+    });
+  } else if (choice === "choose-exercise") {
+    return yield* chooseLessonAndRunIt({
+      root,
+      envFilePath,
+      cwd,
     });
   } else if (choice === "next-exercise" && nextExerciseToRun) {
     return yield* runLesson({
@@ -371,12 +410,58 @@ const runLesson: (opts: {
   }
 });
 
+const chooseLessonAndRunIt = (opts: {
+  root: string;
+  envFilePath: string;
+  cwd: string;
+}) =>
+  Effect.gen(function* () {
+    const lessonService = yield* LessonParserService;
+    const lessons = yield* lessonService.getLessonsFromRepo(
+      opts.root
+    );
+
+    const { lesson: lessonNumber } = yield* runPrompt<{
+      lesson: number;
+    }>(() =>
+      prompt([
+        {
+          type: "autocomplete",
+          name: "lesson",
+          message:
+            "Which exercise do you want to run? (type to search)",
+          choices: lessons.map((lesson) => ({
+            title: `${lesson.num}-${lesson.name}`,
+            value: lesson.num,
+          })),
+          suggest: async (input, choices) => {
+            return choices.filter((choice) =>
+              choice.title.includes(input)
+            );
+          },
+        },
+      ])
+    );
+
+    if (typeof lessonNumber === "undefined") {
+      return;
+    }
+
+    return yield* runLesson({
+      lesson: lessonNumber,
+      root: opts.root,
+      envFilePath: opts.envFilePath,
+      cwd: opts.cwd,
+      subfolderIndex: undefined,
+    });
+  });
+
 export const exercise = CLICommand.make(
   "exercise",
   {
     lesson: Args.float({
       name: "lesson-number",
-    }),
+    }).pipe(Args.optional),
     root: Options.text("root").pipe(
       Options.withDescription(
         "The directory to look for lessons"
@@ -398,13 +483,21 @@ export const exercise = CLICommand.make(
   },
   ({ cwd, envFilePath, lesson, root }) => {
     return Effect.gen(function* () {
-      yield* runLesson({
-        lesson,
+      if (Option.isSome(lesson)) {
+        return yield* runLesson({
+          lesson: lesson.value,
+          root,
+          envFilePath,
+          cwd,
+          subfolderIndex: undefined,
+        });
+      }
+
+      return yield* chooseLessonAndRunIt({
         root,
         envFilePath,
         cwd,
-        subfolder: undefined,
       });
-    }).pipe(Effect.catchAll(Console.log));
+    });
   }
 );
