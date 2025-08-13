@@ -53,11 +53,9 @@ export class Lesson {
   }
 
   topLevelFiles() {
-    return this.files
-      .filter((file) => {
-        return file.split(path.sep).length === 1;
-      })
-      .map((file) => path.resolve(this.absolutePath(), file));
+    return this.files.filter((file) => {
+      return file.split(path.sep).length === 1;
+    });
   }
 }
 
