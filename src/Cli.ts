@@ -1,21 +1,7 @@
-import { Args, Command, Options } from "@effect/cli";
-import { Console } from "effect";
+import { Command } from "@effect/cli";
 import { exercise } from "./exercise.js";
 
-const prefix = Options.boolean("prefix").pipe(
-  Options.withDescription("Apply a prefix to the message")
-);
-
-const log = Command.make(
-  "log",
-  { message: Args.text(), prefix },
-  ({ message, prefix }) =>
-    Console.log(prefix ? `[${message}]` : message)
-);
-
-const internal = Command.make("internal").pipe(
-  Command.withSubcommands([log])
-);
+const internal = Command.make("internal");
 
 const command = Command.make("ai-hero").pipe(
   Command.withSubcommands([internal, exercise])
