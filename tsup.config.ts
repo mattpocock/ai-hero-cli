@@ -5,6 +5,12 @@ export default defineConfig({
   clean: true,
   publicDir: true,
   treeshake: "smallest",
-  format: "esm",
-  external: ["@parcel/watcher"],
+  bundle: true,
+  format: "cjs",
+  external: [
+    "@parcel/watcher",
+    "node:readline/promises",
+    "node:process",
+    "process",
+  ],
 });

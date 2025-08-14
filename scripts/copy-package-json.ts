@@ -14,7 +14,7 @@ const program = Effect.gen(function* () {
     version: json.version,
     type: json.type,
     description: json.description,
-    bin: "bin.js",
+    bin: "bin.cjs",
     engines: json.engines,
     dependencies: json.dependencies,
     peerDependencies: json.peerDependencies,
