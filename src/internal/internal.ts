@@ -25,9 +25,9 @@ const upgradePackages = CLICommand.make(
       const updateCommand = Command.make(
         "pnpm",
         "upgrade",
-        "ai",
-        "@ai-sdk/*",
-        "ai-hero-cli"
+        "ai@latest",
+        "@ai-sdk/*@latest",
+        "ai-hero-cli@latest"
       ).pipe(
         verbose
           ? Command.stdout("inherit")
