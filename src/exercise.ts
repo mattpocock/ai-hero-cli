@@ -14,7 +14,7 @@ import { Console, Data, Effect, Option } from "effect";
 import type { NoSuchElementException } from "effect/Cause";
 import * as path from "path";
 import prompt from "prompts";
-import * as readline from "readline/promises";
+import * as readline from "node:readline/promises";
 import { styleText } from "util";
 import type {
   InvalidPathError,
