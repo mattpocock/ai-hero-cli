@@ -3,7 +3,10 @@ import {
   Command as CLICommand,
   Options,
 } from "@effect/cli";
-import type { CommandExecutor } from "@effect/platform";
+import type {
+  CommandExecutor,
+  FileSystem,
+} from "@effect/platform";
 import { Command } from "@effect/platform";
 import type { PlatformError } from "@effect/platform/Error";
 import type { Scope } from "effect";
@@ -79,7 +82,7 @@ const runLesson: (opts: {
   /**
    * The index of the subfolder to run the exercise in
    */
-  subfolderIndex: number | undefined;
+  forceSubfolderIndex: number | undefined;
 }) => Effect.Effect<
   void,
   | LessonNotFoundError
@@ -90,6 +93,7 @@ const runLesson: (opts: {
   | NoSuchElementException
   | PathNumberIsNaNError,
   | LessonParserService
+  | FileSystem.FileSystem
   | CommandExecutor.CommandExecutor
   | Scope.Scope
 > = Effect.fn("runLesson")(function* (opts) {
@@ -112,14 +116,24 @@ const runLesson: (opts: {
   const previousLesson = lessons[foundLessonIndex - 1];
   const nextLesson = lessons[foundLessonIndex + 1];
 
-  const topLevelFiles = foundLesson
-    .topLevelFiles()
-    .map((p) => path.basename(p));
+  const subfolders = yield* foundLesson
+    .subfolders()
+    .pipe(
+      Effect.map((files) => files.map((p) => path.basename(p)))
+    );
 
-  let subfolderIndex: number | undefined = opts.subfolderIndex;
+  if (subfolders.length === 0) {
+    return yield* new LessonEntrypointNotFoundError({
+      lesson,
+      message: `No subfolders found for lesson ${lesson}`,
+    });
+  }
+
+  let subfolderIndex: number | undefined =
+    opts.forceSubfolderIndex;
 
   if (subfolderIndex === undefined) {
-    if (topLevelFiles.length === 1) {
+    if (subfolders.length === 1) {
       subfolderIndex = 0;
     } else {
       const result = yield* runPrompt<{
@@ -130,7 +144,7 @@ const runLesson: (opts: {
             type: "select",
             name: "subfolder",
             message: "Select a subfolder",
-            choices: topLevelFiles.map((file, index) => ({
+            choices: subfolders.map((file, index) => ({
               title: file,
               value: index,
             })),
@@ -142,11 +156,11 @@ const runLesson: (opts: {
     }
   }
 
-  const subfolder = topLevelFiles[subfolderIndex]!;
+  const subfolder = subfolders[subfolderIndex]!;
 
   let nextExerciseToRun: ExerciseInstruction | undefined;
 
-  const nextSubfolder = topLevelFiles[subfolderIndex + 1];
+  const nextSubfolder = subfolders[subfolderIndex + 1];
 
   if (nextSubfolder) {
     nextExerciseToRun = {
@@ -158,7 +172,7 @@ const runLesson: (opts: {
     nextExerciseToRun = {
       lessonNumber: nextLesson.num,
       subfolderIndex: 0,
-      subfolder: nextLesson.topLevelFiles()[0],
+      subfolder: (yield* nextLesson.subfolders())[0],
     };
   } else {
     // We're at the last exercise in the course!
@@ -171,20 +185,20 @@ const runLesson: (opts: {
     previousExerciseToRun = {
       lessonNumber: foundLesson.num,
       subfolderIndex: subfolderIndex - 1,
-      subfolder: topLevelFiles[subfolderIndex - 1]!,
+      subfolder: subfolders[subfolderIndex - 1]!,
     };
   } else if (previousLesson) {
-    const previousLessonTopLevelFiles =
-      previousLesson.topLevelFiles();
+    const previousLessonSubfolders =
+      yield* previousLesson.subfolders();
 
     const previousLessonLastSubfolderIndex =
-      previousLessonTopLevelFiles.length - 1;
+      previousLessonSubfolders.length - 1;
 
     previousExerciseToRun = {
       lessonNumber: previousLesson.num,
       subfolderIndex: previousLessonLastSubfolderIndex,
       subfolder:
-        previousLessonTopLevelFiles[
+        previousLessonSubfolders[
           previousLessonLastSubfolderIndex
         ],
     };
@@ -192,10 +206,14 @@ const runLesson: (opts: {
     previousExerciseToRun = undefined;
   }
 
-  const mainFile = foundLesson
+  const mainFile = yield* foundLesson
     .allFiles()
-    .find((file) =>
-      file.includes(path.join(subfolder, "main.ts"))
+    .pipe(
+      Effect.map((files) =>
+        files.find((file) =>
+          file.includes(path.join(subfolder, "main.ts"))
+        )
+      )
     );
 
   if (!mainFile) {
@@ -205,20 +223,17 @@ const runLesson: (opts: {
     });
   }
 
-  const readmeFile = foundLesson
+  const readmeFile = yield* foundLesson
     .allFiles()
-    .find((file) =>
-      file.includes(path.join(subfolder, "readme.md"))
+    .pipe(
+      Effect.map((files) =>
+        files.find((file) =>
+          file.includes(path.join(subfolder, "readme.md"))
+        )
+      )
     );
 
-  if (readmeFile) {
-    yield* Console.log(
-      `${styleText("bold", "Instructions:")}\n  ${styleText(
-        "dim",
-        readmeFile
-      )}\n`
-    );
-  }
+  yield* Console.clear;
 
   yield* Console.log(
     styleText(
@@ -235,6 +250,15 @@ const runLesson: (opts: {
   yield* Console.log(
     styleText("dim", "  Press h + enter for more shortcuts\n")
   );
+
+  if (readmeFile) {
+    yield* Console.log(
+      `${styleText([], "Instructions:")}\n  ${styleText(
+        "dim",
+        readmeFile
+      )}\n`
+    );
+  }
 
   const command = Command.make(
     "pnpm",
@@ -300,7 +324,7 @@ const runLesson: (opts: {
       root,
       envFilePath,
       cwd,
-      subfolderIndex: nextExerciseToRun.subfolderIndex,
+      forceSubfolderIndex: nextExerciseToRun.subfolderIndex,
     });
   } else if (
     processOutcome === "previous" &&
@@ -311,7 +335,7 @@ const runLesson: (opts: {
       root,
       envFilePath,
       cwd,
-      subfolderIndex: previousExerciseToRun.subfolderIndex,
+      forceSubfolderIndex: previousExerciseToRun.subfolderIndex,
     });
   } else if (processOutcome === "choose-exercise") {
     return yield* chooseLessonAndRunIt({
@@ -380,7 +404,7 @@ const runLesson: (opts: {
       root,
       envFilePath,
       cwd,
-      subfolderIndex: undefined,
+      forceSubfolderIndex: undefined,
     });
   } else if (choice === "choose-exercise") {
     return yield* chooseLessonAndRunIt({
@@ -394,7 +418,7 @@ const runLesson: (opts: {
       root,
       envFilePath,
       cwd,
-      subfolderIndex: nextExerciseToRun.subfolderIndex,
+      forceSubfolderIndex: nextExerciseToRun.subfolderIndex,
     });
   } else if (
     choice === "previous-exercise" &&
@@ -405,7 +429,7 @@ const runLesson: (opts: {
       root,
       envFilePath,
       cwd,
-      subfolderIndex: previousExerciseToRun.subfolderIndex,
+      forceSubfolderIndex: previousExerciseToRun.subfolderIndex,
     });
   }
 });
@@ -420,6 +444,8 @@ const chooseLessonAndRunIt = (opts: {
     const lessons = yield* lessonService.getLessonsFromRepo(
       opts.root
     );
+
+    yield* Console.clear;
 
     const { lesson: lessonNumber } = yield* runPrompt<{
       lesson: number;
@@ -452,9 +478,9 @@ const chooseLessonAndRunIt = (opts: {
       root: opts.root,
       envFilePath: opts.envFilePath,
       cwd: opts.cwd,
-      subfolderIndex: undefined,
+      forceSubfolderIndex: undefined,
     });
-  });
+  }).pipe(Effect.catchAll(Console.log));
 
 export const exercise = CLICommand.make(
   "exercise",
@@ -489,7 +515,7 @@ export const exercise = CLICommand.make(
           root,
           envFilePath,
           cwd,
-          subfolderIndex: undefined,
+          forceSubfolderIndex: undefined,
         });
       }
 

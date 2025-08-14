@@ -1,6 +1,6 @@
 import { FileSystem } from "@effect/platform";
 import { NodeFileSystem } from "@effect/platform-node";
-import { Data, Effect, Schema } from "effect";
+import { Data, Effect } from "effect";
 import * as path from "node:path";
 
 export class InvalidPathError extends Data.TaggedError(
@@ -24,7 +24,6 @@ export class Lesson {
   readonly sectionName: string;
   readonly root: string;
   readonly path: string;
-  private readonly files: Array<string>;
 
   constructor(opts: {
     num: number;
@@ -32,14 +31,12 @@ export class Lesson {
     path: string;
     sectionName: string;
     root: string;
-    files?: Array<string>;
   }) {
     this.num = opts.num;
     this.name = opts.name;
     this.path = opts.path;
     this.sectionName = opts.sectionName;
     this.root = opts.root;
-    this.files = opts.files ?? [];
   }
 
   absolutePath() {
@@ -47,15 +44,29 @@ export class Lesson {
   }
 
   allFiles() {
-    return this.files.map((file) =>
-      path.resolve(this.absolutePath(), file)
-    );
+    const absolutePath = this.absolutePath();
+    return Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+
+      const files = yield* fs.readDirectory(absolutePath, {
+        recursive: true,
+      });
+
+      return files.map((file) => path.join(absolutePath, file));
+    });
   }
 
-  topLevelFiles() {
-    return this.files.filter((file) => {
-      return file.split(path.sep).length === 1;
-    });
+  subfolders() {
+    const absolutePath = this.absolutePath();
+    return this.allFiles().pipe(
+      Effect.map((files) =>
+        files
+          .map((file) => path.relative(absolutePath, file))
+          .filter((file) => {
+            return file.split(path.sep).length === 1;
+          })
+      )
+    );
   }
 }
 
@@ -130,25 +141,11 @@ export class LessonParserService extends Effect.Service<LessonParserService>()(
             opts.lessonPath
           );
 
-          const fullLessonPath = path.join(
-            opts.root,
-            opts.sectionPath,
-            opts.lessonPath
-          );
-
-          const allFiles = yield* fs.readDirectory(
-            fullLessonPath,
-            {
-              recursive: true,
-            }
-          );
-
           return new Lesson({
             name,
             num,
             sectionName: opts.sectionPath,
             root: opts.root,
-            files: allFiles,
             path: opts.lessonPath,
           });
         }

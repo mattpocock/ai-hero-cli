@@ -7,8 +7,8 @@ import { run } from "./Cli.js";
 import { LessonParserService } from "./lesson-parser-service.js";
 
 run(process.argv).pipe(
-  Effect.provide(NodeContext.layer),
   Effect.provide(LessonParserService.Default),
+  Effect.provide(NodeContext.layer),
   Effect.scoped,
   NodeRuntime.runMain({ disableErrorReporting: true })
 );
