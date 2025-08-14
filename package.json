@@ -1,13 +1,14 @@
 {
   "name": "ai-hero-cli",
-  "version": "0.0.0",
+  "version": "0.0.6",
   "type": "module",
   "packageManager": "pnpm@10.14.0",
   "license": "MIT",
-  "description": "A basic Effect CLI application",
+  "description": "The CLI used to run exercises for the AI Hero course",
   "bin": {
-    "ai-help": "dist/bin.js"
+    "ai-hero": "dist/bin.js"
   },
+  "author": "Matt Pocock <team@aihero.dev> (https://aihero.dev)",
   "repository": {
     "type": "git",
     "url": "https://github.com/mattpocock/ai-hero-cli"
@@ -60,6 +61,7 @@
     "eslint-plugin-import": "^2.30.0",
     "eslint-plugin-simple-import-sort": "^12.1.1",
     "eslint-plugin-sort-destructure-keys": "^2.0.0",
+    "prompts": "^2.4.2",
     "tsup": "^8.2.4",
     "tsx": "^4.19.1",
     "typescript": "^5.6.2",
@@ -69,8 +71,5 @@
     "patchedDependencies": {
       "@changesets/get-github-info@0.6.0": "patches/@changesets__get-github-info@0.6.0.patch"
     }
-  },
-  "dependencies": {
-    "prompts": "^2.4.2"
   }
 }
