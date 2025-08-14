@@ -1,6 +1,7 @@
 import { Command as CLICommand, Options } from "@effect/cli";
 import { Command } from "@effect/platform";
 import { Console, Effect } from "effect";
+import { updateCVM } from "./update-cvm.js";
 
 const upgradePackages = CLICommand.make(
   "upgrade",
@@ -43,7 +44,7 @@ const upgradePackages = CLICommand.make(
       if (exitCode === 0) {
         yield* Console.log("Successfully upgraded");
       } else {
-        yield* Console.log(
+        yield* Console.error(
           "Failed to upgrade. Please try again."
         );
       }
@@ -53,6 +54,6 @@ const upgradePackages = CLICommand.make(
 );
 
 export const internal = CLICommand.make("internal").pipe(
-  CLICommand.withSubcommands([upgradePackages]),
+  CLICommand.withSubcommands([upgradePackages, updateCVM]),
   CLICommand.withDescription("Internal commands for AI Hero")
 );
