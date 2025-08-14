@@ -492,7 +492,7 @@ export const exercise = CLICommand.make(
       Options.withDescription(
         "The directory to look for lessons"
       ),
-      Options.withDefault(process.cwd())
+      Options.withDefault(path.join(process.cwd(), "exercises"))
     ),
     envFilePath: Options.text("env-file").pipe(
       Options.withDescription(

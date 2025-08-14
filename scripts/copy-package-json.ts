@@ -30,6 +30,12 @@ const program = Effect.gen(function* () {
     path.join("dist", "package.json"),
     JSON.stringify(pkg, null, 2)
   );
+
+  yield* Effect.log("[Build] Copying README.md ...");
+  yield* fs.copyFile(
+    "README.md",
+    path.join("dist", "README.md")
+  );
   yield* Effect.log("[Build] Build completed.");
 }).pipe(Effect.provide(NodeContext.layer));
 
