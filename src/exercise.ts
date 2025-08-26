@@ -438,12 +438,15 @@ const chooseLessonAndRunIt = (opts: {
           message:
             "Which exercise do you want to run? (type to search)",
           choices: lessons.map((lesson) => ({
-            title: `${lesson.num}-${lesson.name}`,
+            title: lesson.path.split("-")[0]!,
             value: lesson.num,
+            description: lesson.name,
           })),
           suggest: async (input, choices) => {
             return choices.filter((choice) =>
-              choice.title.includes(input)
+              `${choice.title}-${choice.description}`.includes(
+                input
+              )
             );
           },
         },
