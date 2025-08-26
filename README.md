@@ -29,9 +29,6 @@ pnpm add -D ai-hero-cli
 # Run a specific exercise by lesson number
 ai-hero exercise 1
 
-# Run a specific exercise with subfolder
-ai-hero exercise 1 --subfolder 2
-
 # Browse and select an exercise interactively
 ai-hero exercise
 ```
@@ -41,6 +38,7 @@ ai-hero exercise
 - `--root`: Directory to look for lessons (default: current directory)
 - `--env-file`: Path to environment file (default: `.env` in current directory)
 - `--cwd`: Working directory to run the command in (default: current directory)
+- `--simple`: Run the exercise in simple mode. This will disable the more advanced features of the CLI, such as shortcuts, to ensure maximum compatibility with some systems (default: false)
 
 ### Interactive Features
 
