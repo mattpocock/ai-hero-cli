@@ -1,6 +1,6 @@
 import { FileSystem } from "@effect/platform";
 import { NodeFileSystem } from "@effect/platform-node";
-import { Data, Effect } from "effect";
+import { Array, Data, Effect, flow } from "effect";
 import * as path from "node:path";
 
 export class InvalidPathError extends Data.TaggedError(
@@ -57,16 +57,43 @@ export class Lesson {
   }
 
   subfolders() {
+    const allFilesEffect = this.allFiles();
     const absolutePath = this.absolutePath();
-    return this.allFiles().pipe(
-      Effect.map((files) =>
-        files
-          .map((file) => path.relative(absolutePath, file))
-          .filter((file) => {
-            return file.split(path.sep).length === 1;
-          })
-      )
-    );
+
+    return Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+
+      const allFiles = yield* allFilesEffect;
+
+      const candidates = allFiles
+        .map((folder) => path.relative(absolutePath, folder))
+        .filter((folder) => {
+          return folder.split(path.sep).length === 1;
+        });
+
+      const folders = yield* Effect.all(
+        candidates.map((candidateFolder) => {
+          return Effect.gen(function* () {
+            const stat = yield* fs.stat(
+              path.join(absolutePath, candidateFolder)
+            );
+            return {
+              folder: candidateFolder,
+              isDirectory: stat.type === "Directory",
+            };
+          });
+        })
+      ).pipe(
+        Effect.map(
+          flow(
+            Array.filter(({ isDirectory }) => isDirectory),
+            Array.map(({ folder }) => folder)
+          )
+        )
+      );
+
+      return folders;
+    });
   }
 }
 
