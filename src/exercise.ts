@@ -19,8 +19,10 @@ import { styleText } from "util";
 import type {
   InvalidPathError,
   PathNumberIsNaNError,
+  Lesson,
 } from "./lesson-parser-service.js";
 import { LessonParserService } from "./lesson-parser-service.js";
+import { execSync } from "node:child_process";
 
 class PromptCancelledError extends Data.TaggedError(
   "PromptCancelledError"
@@ -83,6 +85,7 @@ const runLesson: (opts: {
    * The index of the subfolder to run the exercise in
    */
   forceSubfolderIndex: number | undefined;
+  simple: boolean;
 }) => Effect.Effect<
   void,
   | LessonNotFoundError
@@ -97,6 +100,10 @@ const runLesson: (opts: {
   | CommandExecutor.CommandExecutor
   | Scope.Scope
 > = Effect.fn("runLesson")(function* (opts) {
+  if (opts.simple) {
+    return yield* runLessonSimple(opts);
+  }
+
   const { cwd, envFilePath, lesson, root } = opts;
   const service = yield* LessonParserService;
   const lessons = yield* service.getLessonsFromRepo(root);
@@ -116,11 +123,7 @@ const runLesson: (opts: {
   const previousLesson = lessons[foundLessonIndex - 1];
   const nextLesson = lessons[foundLessonIndex + 1];
 
-  const subfolders = yield* foundLesson
-    .subfolders()
-    .pipe(
-      Effect.map((files) => files.map((p) => path.basename(p)))
-    );
+  const subfolders = yield* foundLesson.subfolders();
 
   if (subfolders.length === 0) {
     return yield* new LessonEntrypointNotFoundError({
@@ -139,23 +142,11 @@ const runLesson: (opts: {
     if (subfolders.length === 1) {
       subfolderIndex = 0;
     } else {
-      const result = yield* runPrompt<{
-        subfolder: number;
-      }>(() =>
-        prompt([
-          {
-            type: "select",
-            name: "subfolder",
-            message: "Select a subfolder",
-            choices: subfolders.map((file, index) => ({
-              title: file,
-              value: index,
-            })),
-          },
-        ])
-      );
+      const result = yield* selectSubfolderIndex({
+        lesson: foundLesson,
+      });
 
-      subfolderIndex = Number(result.subfolder);
+      subfolderIndex = result.subfolderIndex;
     }
   }
 
@@ -209,32 +200,10 @@ const runLesson: (opts: {
     previousExerciseToRun = undefined;
   }
 
-  const mainFile = yield* foundLesson
-    .allFiles()
-    .pipe(
-      Effect.map((files) =>
-        files.find((file) =>
-          file.includes(path.join(subfolder, "main.ts"))
-        )
-      )
-    );
-
-  if (!mainFile) {
-    return yield* new LessonEntrypointNotFoundError({
-      lesson,
-      message: `main.ts file for exercise ${subfolder} not found`,
-    });
-  }
-
-  const readmeFile = yield* foundLesson
-    .allFiles()
-    .pipe(
-      Effect.map((files) =>
-        files.find((file) =>
-          file.includes(path.join(subfolder, "readme.md"))
-        )
-      )
-    );
+  const { mainFile, readmeFile } = yield* getMainAndReadmeFiles({
+    lesson: foundLesson,
+    subfolder,
+  });
 
   yield* Console.clear;
 
@@ -323,6 +292,7 @@ const runLesson: (opts: {
 
   if (processOutcome === "next" && nextExerciseToRun) {
     return yield* runLesson({
+      simple: opts.simple,
       lesson: nextExerciseToRun.lessonNumber,
       root,
       envFilePath,
@@ -334,6 +304,7 @@ const runLesson: (opts: {
     previousExerciseToRun
   ) {
     return yield* runLesson({
+      simple: opts.simple,
       lesson: previousExerciseToRun.lessonNumber,
       root,
       envFilePath,
@@ -342,6 +313,7 @@ const runLesson: (opts: {
     });
   } else if (processOutcome === "choose-exercise") {
     return yield* chooseLessonAndRunIt({
+      simple: opts.simple,
       root,
       envFilePath,
       cwd,
@@ -409,12 +381,14 @@ const runLesson: (opts: {
       cwd,
       // Run the same exercise again, with the same subfolder index
       forceSubfolderIndex: subfolderIndex,
+      simple: opts.simple,
     });
   } else if (choice === "choose-exercise") {
     return yield* chooseLessonAndRunIt({
       root,
       envFilePath,
       cwd,
+      simple: opts.simple,
     });
   } else if (choice === "next-exercise" && nextExerciseToRun) {
     return yield* runLesson({
@@ -423,6 +397,7 @@ const runLesson: (opts: {
       envFilePath,
       cwd,
       forceSubfolderIndex: nextExerciseToRun.subfolderIndex,
+      simple: opts.simple,
     });
   } else if (
     choice === "previous-exercise" &&
@@ -434,6 +409,7 @@ const runLesson: (opts: {
       envFilePath,
       cwd,
       forceSubfolderIndex: previousExerciseToRun.subfolderIndex,
+      simple: opts.simple,
     });
   }
 });
@@ -442,6 +418,7 @@ const chooseLessonAndRunIt = (opts: {
   root: string;
   envFilePath: string;
   cwd: string;
+  simple: boolean;
 }) =>
   Effect.gen(function* () {
     const lessonService = yield* LessonParserService;
@@ -483,6 +460,7 @@ const chooseLessonAndRunIt = (opts: {
       envFilePath: opts.envFilePath,
       cwd: opts.cwd,
       forceSubfolderIndex: undefined,
+      simple: opts.simple,
     });
   }).pipe(Effect.catchAll(Console.log));
 
@@ -510,8 +488,14 @@ export const exercise = CLICommand.make(
       ),
       Options.withDefault(process.cwd())
     ),
+    simple: Options.boolean("simple").pipe(
+      Options.withDescription(
+        "Run the exercise in simple mode. This will disable the more advanced features of the CLI, such as shortcuts, to ensure maximum compatibility with some systems."
+      ),
+      Options.withDefault(false)
+    ),
   },
-  ({ cwd, envFilePath, lesson, root }) => {
+  ({ cwd, envFilePath, lesson, root, simple }) => {
     return Effect.gen(function* () {
       if (Option.isSome(lesson)) {
         return yield* runLesson({
@@ -520,6 +504,7 @@ export const exercise = CLICommand.make(
           envFilePath,
           cwd,
           forceSubfolderIndex: undefined,
+          simple,
         });
       }
 
@@ -527,7 +512,139 @@ export const exercise = CLICommand.make(
         root,
         envFilePath,
         cwd,
+        simple,
       });
     });
   }
 );
+
+const findLesson = Effect.fn("findLesson")(function* (opts: {
+  lesson: number;
+  root: string;
+}) {
+  const service = yield* LessonParserService;
+  const lessons = yield* service.getLessonsFromRepo(opts.root);
+
+  const foundLessonIndex = lessons.findIndex(
+    (l) => l.num === opts.lesson
+  );
+
+  if (foundLessonIndex === -1) {
+    return yield* new LessonNotFoundError({
+      lesson: opts.lesson,
+      message: `Lesson ${opts.lesson} not found`,
+    });
+  }
+
+  return lessons[foundLessonIndex]!;
+});
+
+const selectSubfolderIndex = Effect.fn("selectSubfolder")(
+  function* (opts: { lesson: Lesson }) {
+    const subfolders = yield* opts.lesson.subfolders();
+
+    if (subfolders.length === 0) {
+      return yield* new LessonEntrypointNotFoundError({
+        lesson: opts.lesson.num,
+        message: `No subfolders found for lesson ${opts.lesson.num}`,
+      });
+    }
+
+    const result = yield* runPrompt<{
+      subfolderIndex: number;
+    }>(() =>
+      prompt([
+        {
+          type: "select",
+          name: "subfolderIndex",
+          message: "Select a subfolder",
+          choices: subfolders.map((file, index) => ({
+            title: file,
+            value: index,
+          })),
+        },
+      ])
+    );
+
+    return {
+      subfolderIndex: result.subfolderIndex,
+      subfolder: subfolders[result.subfolderIndex]!,
+    };
+  }
+);
+
+const getMainAndReadmeFiles = Effect.fn("getMainAndReadmeFiles")(
+  function* (opts: { lesson: Lesson; subfolder: string }) {
+    const mainFile = yield* opts.lesson
+      .allFiles()
+      .pipe(
+        Effect.map((files) =>
+          files.find((file) =>
+            file.includes(path.join(opts.subfolder, "main.ts"))
+          )
+        )
+      );
+
+    if (!mainFile) {
+      return yield* new LessonEntrypointNotFoundError({
+        lesson: opts.lesson.num,
+        message: `main.ts file for exercise ${opts.subfolder} not found`,
+      });
+    }
+
+    const readmeFile = yield* opts.lesson
+      .allFiles()
+      .pipe(
+        Effect.map((files) =>
+          files.find((file) =>
+            file.includes(path.join(opts.subfolder, "readme.md"))
+          )
+        )
+      );
+
+    return { mainFile, readmeFile };
+  }
+);
+
+const runLessonSimple = (opts: {
+  lesson: number;
+  root: string;
+  envFilePath: string;
+  cwd: string;
+}) =>
+  Effect.gen(function* () {
+    const { cwd, envFilePath, lesson, root } = opts;
+
+    const foundLesson = yield* findLesson({
+      lesson,
+      root,
+    });
+
+    const { subfolder } = yield* selectSubfolderIndex({
+      lesson: foundLesson,
+    });
+
+    const { mainFile, readmeFile } =
+      yield* getMainAndReadmeFiles({
+        lesson: foundLesson,
+        subfolder,
+      });
+
+    if (readmeFile) {
+      yield* Console.log(
+        `${styleText([], "Instructions:")}\n  ${styleText(
+          "dim",
+          readmeFile
+        )}\n`
+      );
+    }
+
+    yield* Console.log(
+      styleText("bold", `Running ${lesson} ${subfolder}...`)
+    );
+
+    execSync(`pnpm tsx --env-file ${envFilePath} ${mainFile}`, {
+      stdio: "inherit",
+      cwd,
+    });
+  });
