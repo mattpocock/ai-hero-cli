@@ -129,6 +129,9 @@ const runLesson: (opts: {
     });
   }
 
+  /**
+   * The subfolder index to run the exercise in.
+   */
   let subfolderIndex: number | undefined =
     opts.forceSubfolderIndex;
 
@@ -404,7 +407,8 @@ const runLesson: (opts: {
       root,
       envFilePath,
       cwd,
-      forceSubfolderIndex: undefined,
+      // Run the same exercise again, with the same subfolder index
+      forceSubfolderIndex: subfolderIndex,
     });
   } else if (choice === "choose-exercise") {
     return yield* chooseLessonAndRunIt({
