@@ -1,5 +1,12 @@
 # ai-hero-cli
 
+## 0.0.9
+
+### Patch Changes
+
+- 165ff7f: Fixed upgrade script
+- 00f6953: Added update-cvm internal script
+
 ## 0.0.8
 
 ### Patch Changes
