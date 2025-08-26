@@ -2,7 +2,7 @@
   "name": "ai-hero-cli",
   "version": "0.0.11",
   "type": "module",
-  "packageManager": "pnpm@10.14.0",
+  "packageManager": "pnpm@10.15.0",
   "license": "MIT",
   "description": "The CLI used to run exercises for the AI Hero course",
   "bin": {
