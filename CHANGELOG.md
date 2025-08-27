@@ -1,5 +1,13 @@
 # ai-hero-cli
 
+## 0.0.13
+
+### Patch Changes
+
+- 9492726: Added rename script to AI Hero CLI
+- 3c60eb1: Added relative link checking
+- e75c29e: Added a rule that checks for PMPM run exercise.
+
 ## 0.0.12
 
 ### Patch Changes
