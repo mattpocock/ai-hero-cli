@@ -136,10 +136,10 @@ export const lint = CLICommand.make(
             continue;
           }
 
-          const links =
+          const absoluteLinks =
             readmeContent.match(/\[[^\]]+\]\(\/[^)]+\)/gm) ?? [];
 
-          for (const link of links) {
+          for (const link of absoluteLinks) {
             const splitResult = link.split("](");
             const url = splitResult[1]?.slice(1, -1);
 
@@ -152,7 +152,33 @@ export const lint = CLICommand.make(
             if (!linkExists) {
               errorTracker.addError(
                 lesson,
-                `Broken link in readme.md: ${url}`
+                `Broken absolute link in readme.md: ${url}`
+              );
+            }
+          }
+
+          const relativeLinks =
+            readmeContent.match(/\[[^\]]+\]\(\.\/[^)]+\)/gm) ??
+            [];
+
+          for (const link of relativeLinks) {
+            const splitResult = link.split("](");
+            const url = splitResult[1]?.slice(0, -1);
+
+            if (!url) continue;
+
+            const linkExists = yield* existsCache.get(
+              path.resolve(
+                lesson.absolutePath(),
+                folderForReadme,
+                url
+              )
+            );
+
+            if (!linkExists) {
+              errorTracker.addError(
+                lesson,
+                `Broken relative link in readme.md: ${url}`
               );
             }
           }
