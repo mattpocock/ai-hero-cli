@@ -1,11 +1,9 @@
 import { Command as CLICommand } from "@effect/cli";
-import { Console, Effect, Cache, Duration } from "effect";
-import type { Lesson } from "../lesson-parser-service.js";
-import { LessonParserService } from "../lesson-parser-service.js";
-import { cwdOption, rootOption } from "../options.js";
-import { styleText } from "util";
-import * as path from "path";
 import { FileSystem } from "@effect/platform";
+import { Console, Effect } from "effect";
+import * as path from "path";
+import { LessonParserService } from "../lesson-parser-service.js";
+import { rootOption } from "../options.js";
 
 export const rename = CLICommand.make(
   "rename",

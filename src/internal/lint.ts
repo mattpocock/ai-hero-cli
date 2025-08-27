@@ -128,6 +128,14 @@ export const lint = CLICommand.make(
             continue;
           }
 
+          if (readmeContent.includes("`pnpm run exercise ")) {
+            errorTracker.addError(
+              lesson,
+              "readme.md file contains a pnpm run exercise command. Please remove it."
+            );
+            continue;
+          }
+
           const links =
             readmeContent.match(/\[[^\]]+\]\(\/[^)]+\)/gm) ?? [];
 
