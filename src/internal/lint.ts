@@ -197,4 +197,8 @@ export const lint = CLICommand.make(
       return Effect.logError(error);
     })
   )
+).pipe(
+  CLICommand.withDescription(
+    "Lint the repository to ensure it is formatted correctly"
+  )
 );
