@@ -2,6 +2,7 @@ import { Command as CLICommand, Options } from "@effect/cli";
 import { Command } from "@effect/platform";
 import { Console, Effect } from "effect";
 import { updateCVM } from "./update-cvm.js";
+import { lint } from "./lint.js";
 
 const upgradePackages = CLICommand.make(
   "upgrade",
@@ -54,6 +55,6 @@ const upgradePackages = CLICommand.make(
 );
 
 export const internal = CLICommand.make("internal").pipe(
-  CLICommand.withSubcommands([upgradePackages, updateCVM]),
+  CLICommand.withSubcommands([upgradePackages, updateCVM, lint]),
   CLICommand.withDescription("Internal commands for AI Hero")
 );

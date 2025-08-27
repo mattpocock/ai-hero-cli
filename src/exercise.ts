@@ -23,6 +23,11 @@ import type {
 } from "./lesson-parser-service.js";
 import { LessonParserService } from "./lesson-parser-service.js";
 import { execSync } from "node:child_process";
+import {
+  cwdOption,
+  envFilePathOption,
+  rootOption,
+} from "./options.js";
 
 class PromptCancelledError extends Data.TaggedError(
   "PromptCancelledError"
@@ -473,24 +478,9 @@ export const exercise = CLICommand.make(
     lesson: Args.float({
       name: "lesson-number",
     }).pipe(Args.optional),
-    root: Options.text("root").pipe(
-      Options.withDescription(
-        "The directory to look for lessons"
-      ),
-      Options.withDefault(path.join(process.cwd(), "exercises"))
-    ),
-    envFilePath: Options.text("env-file").pipe(
-      Options.withDescription(
-        "The path to the environment file to use"
-      ),
-      Options.withDefault(path.join(process.cwd(), ".env"))
-    ),
-    cwd: Options.text("cwd").pipe(
-      Options.withDescription(
-        "The working directory to run the command in"
-      ),
-      Options.withDefault(process.cwd())
-    ),
+    root: rootOption,
+    envFilePath: envFilePathOption,
+    cwd: cwdOption,
     simple: Options.boolean("simple").pipe(
       Options.withDescription(
         "Run the exercise in simple mode. This will disable the more advanced features of the CLI, such as shortcuts, to ensure maximum compatibility with some systems."
