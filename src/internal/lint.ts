@@ -16,13 +16,13 @@ const createErrorTracker = () => {
 
   return {
     addError: (lesson: Lesson, error: string) => {
-      if (!groupedErrors[lesson.sectionName]) {
-        groupedErrors[lesson.sectionName] = {};
+      if (!groupedErrors[lesson.sectionPath]) {
+        groupedErrors[lesson.sectionPath] = {};
       }
-      if (!groupedErrors[lesson.sectionName][lesson.path]) {
-        groupedErrors[lesson.sectionName][lesson.path] = [];
+      if (!groupedErrors[lesson.sectionPath][lesson.path]) {
+        groupedErrors[lesson.sectionPath][lesson.path] = [];
       }
-      groupedErrors[lesson.sectionName][lesson.path].push(error);
+      groupedErrors[lesson.sectionPath][lesson.path].push(error);
     },
     log: Effect.gen(function* () {
       for (const [section, exercises] of Object.entries(

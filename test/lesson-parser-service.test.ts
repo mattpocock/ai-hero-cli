@@ -57,18 +57,22 @@ describe("LessonParserService", () => {
 
         expect(lessons).toEqual([
           new Lesson({
-            num: 1,
-            name: "introduction",
-            sectionName: "1-introduction",
+            lessonNum: 1,
+            lessonName: "introduction",
+            lessonPath: "1-introduction",
+            sectionNum: 1,
+            sectionName: "introduction",
+            sectionPath: "1-introduction",
             root: tmpDir,
-            path: "1-introduction",
           }),
           new Lesson({
-            num: 2,
-            name: "agentic-stuff",
-            sectionName: "2-basics",
+            lessonNum: 2,
+            lessonName: "agentic-stuff",
+            lessonPath: "2-basics",
+            sectionNum: 2,
+            sectionName: "basics",
+            sectionPath: "2-basics",
             root: tmpDir,
-            path: "2-basics",
           }),
         ]);
       }).pipe(

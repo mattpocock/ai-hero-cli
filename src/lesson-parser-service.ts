@@ -21,26 +21,31 @@ export class PathNumberIsNaNError extends Data.TaggedError(
 export class Lesson {
   readonly num: number;
   readonly name: string;
-  readonly sectionName: string;
-  readonly root: string;
   readonly path: string;
-
+  readonly root: string;
+  readonly sectionNum: number;
+  readonly sectionName: string;
+  readonly sectionPath: string;
   constructor(opts: {
-    num: number;
-    name: string;
-    path: string;
+    lessonNum: number;
+    lessonName: string;
+    lessonPath: string;
+    sectionNum: number;
     sectionName: string;
+    sectionPath: string;
     root: string;
   }) {
-    this.num = opts.num;
-    this.name = opts.name;
-    this.path = opts.path;
+    this.num = opts.lessonNum;
+    this.name = opts.lessonName;
+    this.path = opts.lessonPath;
+    this.sectionNum = opts.sectionNum;
     this.sectionName = opts.sectionName;
+    this.sectionPath = opts.sectionPath;
     this.root = opts.root;
   }
 
   absolutePath() {
-    return path.resolve(this.root, this.sectionName, this.path);
+    return path.resolve(this.root, this.sectionPath, this.path);
   }
 
   allFiles() {
@@ -168,12 +173,17 @@ export class LessonParserService extends Effect.Service<LessonParserService>()(
             opts.lessonPath
           );
 
+          const { name: sectionName, num: sectionNum } =
+            yield* getNameAndNumberFromPath(opts.sectionPath);
+
           return new Lesson({
-            name,
-            num,
-            sectionName: opts.sectionPath,
-            root: opts.root,
-            path: opts.lessonPath,
+            lessonName: name,
+            lessonNum: num,
+            lessonPath: opts.lessonPath,
+            sectionNum,
+            sectionName,
+            root: path.resolve(opts.root),
+            sectionPath: opts.sectionPath,
           });
         }
       );
