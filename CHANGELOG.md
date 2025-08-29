@@ -1,5 +1,11 @@
 # ai-hero-cli
 
+## 0.0.15
+
+### Patch Changes
+
+- 23cd2f3: Made the update cvm script error properly
+
 ## 0.0.14
 
 ### Patch Changes
