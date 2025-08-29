@@ -44,6 +44,16 @@ export class Lesson {
     this.root = opts.root;
   }
 
+  isExplainer() {
+    return this.subfolders().pipe(
+      Effect.map(
+        Array.some((subfolder) => {
+          return subfolder.includes("explainer");
+        })
+      )
+    );
+  }
+
   absolutePath() {
     return path.resolve(this.root, this.sectionPath, this.path);
   }

@@ -71,6 +71,7 @@ type ExerciseInstruction = {
    * The lesson number to run
    */
   lessonNumber: number;
+  lessonName: string;
   /**
    * The index of the subfolder to run the exercise in
    */
@@ -164,12 +165,14 @@ const runLesson: (opts: {
   if (nextSubfolder) {
     nextExerciseToRun = {
       lessonNumber: foundLesson.num,
+      lessonName: foundLesson.name,
       subfolderIndex: subfolderIndex + 1,
       subfolder: nextSubfolder,
     };
   } else if (nextLesson) {
     nextExerciseToRun = {
       lessonNumber: nextLesson.num,
+      lessonName: nextLesson.name,
       subfolderIndex: 0,
       subfolder: (yield* nextLesson.subfolders())[0],
     };
@@ -183,6 +186,7 @@ const runLesson: (opts: {
   if (subfolderIndex > 0) {
     previousExerciseToRun = {
       lessonNumber: foundLesson.num,
+      lessonName: foundLesson.name,
       subfolderIndex: subfolderIndex - 1,
       subfolder: subfolders[subfolderIndex - 1]!,
     };
@@ -195,6 +199,7 @@ const runLesson: (opts: {
 
     previousExerciseToRun = {
       lessonNumber: previousLesson.num,
+      lessonName: previousLesson.name,
       subfolderIndex: previousLessonLastSubfolderIndex,
       subfolder:
         previousLessonSubfolders[
@@ -229,12 +234,7 @@ const runLesson: (opts: {
   );
 
   if (readmeFile) {
-    yield* Console.log(
-      `${styleText([], "Instructions:")}\n  ${styleText(
-        "dim",
-        readmeFile
-      )}\n`
-    );
+    yield* logReadmeFile({ readmeFile });
   }
 
   const command = Command.make(
@@ -325,6 +325,22 @@ const runLesson: (opts: {
     });
   }
 
+  if (foundLesson.isExplainer() && readmeFile) {
+    yield* logReadmeFile({ readmeFile });
+  }
+
+  const lessonNoun = foundLesson.isExplainer()
+    ? {
+        successMessage: `Explainer executed! Once you've read the readme and understand the code, you can go to the next exercise.`,
+        failureMessage: `Looks like the explainer errored! Want to try again?`,
+        lowercase: "explainer",
+      }
+    : {
+        successMessage: "Exercise complete! What's next?",
+        failureMessage: `Looks like the exercise errored! Want to try again?`,
+        lowercase: "exercise",
+      };
+
   const { choice } = yield* runPrompt<{
     choice:
       | "run-again"
@@ -339,20 +355,20 @@ const runLesson: (opts: {
         name: "choice",
         message:
           processOutcome === "exit"
-            ? "Exercise complete! What's next?"
-            : "Looks like the exercise errored! What's next?",
+            ? lessonNoun.successMessage
+            : lessonNoun.failureMessage,
         choices: [
           {
             title:
               processOutcome === "failed"
-                ? "🔄 Run the exercise again"
-                : "🔄 Try the exercise again",
+                ? `🔄 Run the ${lessonNoun.lowercase} again`
+                : `🔄 Try the ${lessonNoun.lowercase} again`,
             value: "run-again",
           },
           ...(nextExerciseToRun
             ? [
                 {
-                  title: `➡️  Run the next exercise: ${nextExerciseToRun?.lessonNumber} ${nextExerciseToRun?.subfolder}`,
+                  title: `➡️  Run the next exercise: ${nextExerciseToRun?.lessonNumber}-${nextExerciseToRun?.lessonName} ${nextExerciseToRun?.subfolder}`,
                   value: "next-exercise",
                 },
               ]
@@ -360,7 +376,7 @@ const runLesson: (opts: {
           ...(previousExerciseToRun
             ? [
                 {
-                  title: `⬅️  Run the previous exercise: ${previousExerciseToRun?.lessonNumber} ${previousExerciseToRun?.subfolder}`,
+                  title: `⬅️  Run the previous exercise: ${previousExerciseToRun?.lessonNumber}-${previousExerciseToRun?.lessonName} ${previousExerciseToRun?.subfolder}`,
                   value: "previous-exercise",
                 },
               ]
@@ -418,6 +434,17 @@ const runLesson: (opts: {
     });
   }
 });
+
+const logReadmeFile = Effect.fn("logReadmeFile")(
+  function* (opts: { readmeFile: string }) {
+    yield* Console.log(
+      `${styleText([], "Instructions:")}\n  ${styleText(
+        "dim",
+        opts.readmeFile
+      )}\n`
+    );
+  }
+);
 
 const chooseLessonAndRunIt = (opts: {
   root: string;
@@ -624,12 +651,7 @@ const runLessonSimple = (opts: {
       });
 
     if (readmeFile) {
-      yield* Console.log(
-        `${styleText([], "Instructions:")}\n  ${styleText(
-          "dim",
-          readmeFile
-        )}\n`
-      );
+      yield* logReadmeFile({ readmeFile });
     }
 
     yield* Console.log(
@@ -640,4 +662,8 @@ const runLessonSimple = (opts: {
       stdio: "inherit",
       cwd,
     });
+
+    if (foundLesson.isExplainer() && readmeFile) {
+      yield* logReadmeFile({ readmeFile });
+    }
   });
