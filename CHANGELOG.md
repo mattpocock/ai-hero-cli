@@ -1,5 +1,12 @@
 # ai-hero-cli
 
+## 0.0.14
+
+### Patch Changes
+
+- 2426351: Choosing the next exercise now shows the name of the exercise.
+- 2426351: Made it so that the success and failure text for explainers is clearer.
+
 ## 0.0.13
 
 ### Patch Changes
