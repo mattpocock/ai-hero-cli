@@ -31,7 +31,7 @@ import {
 
 class PromptCancelledError extends Data.TaggedError(
   "PromptCancelledError"
-)<{}> {}
+) {}
 
 const runPrompt = <T>(prompt: () => Promise<T>) => {
   return Effect.gen(function* () {
