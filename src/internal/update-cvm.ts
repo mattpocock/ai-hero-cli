@@ -227,5 +227,10 @@ export const updateCVM = CLICommand.make(
       yield* Effect.log(
         "[update-cvm] Successfully updated the CVM"
       );
-    })
+    }).pipe(
+      Effect.catchAll((e) => {
+        process.exitCode = 1;
+        return Effect.logError(e);
+      })
+    )
 );
