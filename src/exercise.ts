@@ -325,11 +325,13 @@ const runLesson: (opts: {
     });
   }
 
-  if (foundLesson.isExplainer() && readmeFile) {
+  const isExplainer = yield* foundLesson.isExplainer();
+
+  if (isExplainer && readmeFile) {
     yield* logReadmeFile({ readmeFile });
   }
 
-  const lessonNoun = foundLesson.isExplainer()
+  const lessonNoun = isExplainer
     ? {
         successMessage: `Explainer executed! Once you've read the readme and understand the code, you can go to the next exercise.`,
         failureMessage: `Looks like the explainer errored! Want to try again?`,
@@ -663,7 +665,7 @@ const runLessonSimple = (opts: {
       cwd,
     });
 
-    if (foundLesson.isExplainer() && readmeFile) {
+    if ((yield* foundLesson.isExplainer()) && readmeFile) {
       yield* logReadmeFile({ readmeFile });
     }
   });
