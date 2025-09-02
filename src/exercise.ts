@@ -241,8 +241,8 @@ const runLesson: (opts: {
     "pnpm",
     "tsx",
     "--env-file",
-    envFilePath,
-    mainFile
+    `"${envFilePath}"`,
+    `"${mainFile}"`
   ).pipe(
     Command.stdout("inherit"),
     Command.stderr("inherit"),
@@ -660,10 +660,13 @@ const runLessonSimple = (opts: {
       styleText("bold", `Running ${lesson} ${subfolder}...`)
     );
 
-    execSync(`pnpm tsx --env-file ${envFilePath} ${mainFile}`, {
-      stdio: "inherit",
-      cwd,
-    });
+    execSync(
+      `pnpm tsx --env-file "${envFilePath}" "${mainFile}"`,
+      {
+        stdio: "inherit",
+        cwd,
+      }
+    );
 
     if ((yield* foundLesson.isExplainer()) && readmeFile) {
       yield* logReadmeFile({ readmeFile });
