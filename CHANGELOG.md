@@ -1,5 +1,11 @@
 # ai-hero-cli
 
+## 0.0.16
+
+### Patch Changes
+
+- fd8d32d: Wrapped tsx in quotes to work on windows
+
 ## 0.0.15
 
 ### Patch Changes
