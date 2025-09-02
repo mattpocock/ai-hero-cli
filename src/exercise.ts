@@ -241,8 +241,8 @@ const runLesson: (opts: {
     "pnpm",
     "tsx",
     "--env-file",
-    `"${envFilePath}"`,
-    `"${mainFile}"`
+    envFilePath,
+    mainFile
   ).pipe(
     Command.stdout("inherit"),
     Command.stderr("inherit"),
