@@ -10,5 +10,5 @@ run(process.argv).pipe(
   Effect.provide(LessonParserService.Default),
   Effect.provide(NodeContext.layer),
   Effect.scoped,
-  NodeRuntime.runMain({ disableErrorReporting: true })
+  NodeRuntime.runMain({})
 );

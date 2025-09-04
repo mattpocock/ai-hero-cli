@@ -260,7 +260,7 @@ const runLesson: (opts: {
     Effect.gen(function* () {
       const proc = yield* Command.start(command);
 
-      yield* Effect.addFinalizer(() =>
+      const killWithLogging = () =>
         proc
           .kill()
           .pipe(
@@ -270,8 +270,45 @@ const runLesson: (opts: {
                 e
               )
             )
+          );
+
+      yield* Effect.addFinalizer(() =>
+        killWithLogging().pipe(
+          Effect.catchAll((e) =>
+            Effect.logDebug(
+              `Error occurred when killing child process.`,
+              e
+            )
           )
+        )
       );
+
+      const kill = () =>
+        killWithLogging().pipe(Effect.runPromise);
+
+      yield* Effect.fork(
+        Effect.sync(() => {
+          process.on("SIGINT", kill);
+        })
+      );
+
+      yield* Effect.fork(
+        Effect.sync(() => {
+          process.on("SIGTERM", kill);
+        })
+      );
+
+      yield* Effect.addFinalizer(() => {
+        return Effect.sync(() =>
+          process.removeListener("SIGINT", kill)
+        );
+      });
+
+      yield* Effect.addFinalizer(() => {
+        return Effect.sync(() =>
+          process.removeListener("SIGTERM", kill)
+        );
+      });
 
       const result = yield* proc.exitCode;
 
@@ -287,9 +324,13 @@ const runLesson: (opts: {
       });
 
       while (true) {
-        const line = yield* Effect.promise(() =>
-          rl.question("")
-        );
+        const line = yield* Effect.promise(async (signal) => {
+          const result = await rl.question("", { signal });
+
+          rl.close();
+
+          return result;
+        });
 
         if (line === "h") {
           yield* Console.log(styleText("bold", "Shortcuts:"));
