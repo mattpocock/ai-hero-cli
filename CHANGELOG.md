@@ -1,5 +1,11 @@
 # ai-hero-cli
 
+## 0.0.18
+
+### Patch Changes
+
+- 5844963: Fixed an issue where the exercise subprocess was not being killed
+
 ## 0.0.17
 
 ### Patch Changes
