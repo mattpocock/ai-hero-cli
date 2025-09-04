@@ -1,5 +1,11 @@
 # ai-hero-cli
 
+## 0.0.19
+
+### Patch Changes
+
+- 7b20d9b: Fixed an issue where erroring commands would erroneously log
+
 ## 0.0.18
 
 ### Patch Changes
