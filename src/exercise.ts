@@ -10,25 +10,31 @@ import type {
 import { Command } from "@effect/platform";
 import type { PlatformError } from "@effect/platform/Error";
 import type { Scope } from "effect";
-import { Console, Data, Effect, Option } from "effect";
+import {
+  Console,
+  Data,
+  Effect,
+  Logger,
+  LogLevel,
+  Option,
+} from "effect";
 import type { NoSuchElementException } from "effect/Cause";
+import { execSync } from "node:child_process";
+import * as readline from "node:readline/promises";
 import * as path from "path";
 import prompt from "prompts";
-import * as readline from "node:readline/promises";
 import { styleText } from "util";
 import type {
   InvalidPathError,
-  PathNumberIsNaNError,
   Lesson,
+  PathNumberIsNaNError,
 } from "./lesson-parser-service.js";
 import { LessonParserService } from "./lesson-parser-service.js";
-import { execSync } from "node:child_process";
 import {
   cwdOption,
   envFilePathOption,
   rootOption,
 } from "./options.js";
-import { on } from "node:events";
 
 class PromptCancelledError extends Data.TaggedError(
   "PromptCancelledError"
@@ -575,8 +581,14 @@ export const exercise = CLICommand.make(
       ),
       Options.withDefault(false)
     ),
+    debug: Options.boolean("debug").pipe(
+      Options.withDescription(
+        "Whether or not to run the exercise in debug mode"
+      ),
+      Options.withDefault(false)
+    ),
   },
-  ({ cwd, envFilePath, lesson, root, simple }) => {
+  ({ cwd, debug, envFilePath, lesson, root, simple }) => {
     return Effect.gen(function* () {
       if (Option.isSome(lesson)) {
         return yield* runLesson({
@@ -586,7 +598,11 @@ export const exercise = CLICommand.make(
           cwd,
           forceSubfolderIndex: undefined,
           simple,
-        });
+        }).pipe(
+          Logger.withMinimumLogLevel(
+            debug ? LogLevel.Debug : LogLevel.Info
+          )
+        );
       }
 
       return yield* chooseLessonAndRunIt({
@@ -594,7 +610,11 @@ export const exercise = CLICommand.make(
         envFilePath,
         cwd,
         simple,
-      });
+      }).pipe(
+        Logger.withMinimumLogLevel(
+          debug ? LogLevel.Debug : LogLevel.Info
+        )
+      );
     });
   }
 );
