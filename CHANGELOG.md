@@ -1,5 +1,12 @@
 # ai-hero-cli
 
+## 0.0.20
+
+### Patch Changes
+
+- d83df9a: Added a debug option
+- dddbc44: Another attempted fix for subprocess hanging by explicitly handling SIGINT and SIGTERM.
+
 ## 0.0.19
 
 ### Patch Changes
