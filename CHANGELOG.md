@@ -1,5 +1,11 @@
 # ai-hero-cli
 
+## 0.0.21
+
+### Patch Changes
+
+- 8ce3ec3: Made the kill logic only run if the process is still running
+
 ## 0.0.20
 
 ### Patch Changes
