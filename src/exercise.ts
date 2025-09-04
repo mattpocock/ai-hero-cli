@@ -267,52 +267,45 @@ const runLesson: (opts: {
       const proc = yield* Command.start(command);
 
       const killWithLogging = () =>
-        proc
-          .kill()
-          .pipe(
-            Effect.catchAll((e) =>
-              Effect.logDebug(
-                `Error occurred when killing child process.`,
-                e
-              )
-            )
-          );
-
-      yield* Effect.addFinalizer(() =>
-        killWithLogging().pipe(
+        Effect.gen(function* () {
+          if (yield* proc.isRunning) {
+            return yield* proc.kill();
+          }
+        }).pipe(
           Effect.catchAll((e) =>
             Effect.logDebug(
               `Error occurred when killing child process.`,
               e
             )
           )
-        )
-      );
+        );
 
-      const kill = () =>
+      yield* Effect.addFinalizer(() => killWithLogging());
+
+      const killAsCallback = () =>
         killWithLogging().pipe(Effect.runPromise);
 
       yield* Effect.fork(
         Effect.sync(() => {
-          process.on("SIGINT", kill);
+          process.on("SIGINT", killAsCallback);
         })
       );
 
       yield* Effect.fork(
         Effect.sync(() => {
-          process.on("SIGTERM", kill);
+          process.on("SIGTERM", killAsCallback);
         })
       );
 
       yield* Effect.addFinalizer(() => {
         return Effect.sync(() =>
-          process.removeListener("SIGINT", kill)
+          process.removeListener("SIGINT", killAsCallback)
         );
       });
 
       yield* Effect.addFinalizer(() => {
         return Effect.sync(() =>
-          process.removeListener("SIGTERM", kill)
+          process.removeListener("SIGTERM", killAsCallback)
         );
       });
 
