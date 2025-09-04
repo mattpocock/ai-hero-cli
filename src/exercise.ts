@@ -28,6 +28,7 @@ import {
   envFilePathOption,
   rootOption,
 } from "./options.js";
+import { on } from "node:events";
 
 class PromptCancelledError extends Data.TaggedError(
   "PromptCancelledError"
@@ -256,9 +257,26 @@ const runLesson: (opts: {
     | "choose-exercise"
     | "failed"
     | "exit" = yield* Effect.raceAll([
-    Command.exitCode(command).pipe(
-      Effect.map((code) => (code === 0 ? "exit" : "failed"))
-    ),
+    Effect.gen(function* () {
+      const proc = yield* Command.start(command);
+
+      yield* Effect.addFinalizer(() =>
+        proc
+          .kill()
+          .pipe(
+            Effect.catchAll((e) =>
+              Effect.logError(
+                `Error occurred when killing child process.`,
+                e
+              )
+            )
+          )
+      );
+
+      const result = yield* proc.exitCode;
+
+      return result === 0 ? "exit" : "failed";
+    }),
     Effect.gen(function* () {
       const rl = readline.createInterface({
         input: process.stdin,
