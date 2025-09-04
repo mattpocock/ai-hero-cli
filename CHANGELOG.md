@@ -1,5 +1,11 @@
 # ai-hero-cli
 
+## 0.0.17
+
+### Patch Changes
+
+- 800a9a3: Fixed advanced branch
+
 ## 0.0.16
 
 ### Patch Changes
