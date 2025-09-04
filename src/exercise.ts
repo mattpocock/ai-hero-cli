@@ -265,7 +265,7 @@ const runLesson: (opts: {
           .kill()
           .pipe(
             Effect.catchAll((e) =>
-              Effect.logError(
+              Effect.logDebug(
                 `Error occurred when killing child process.`,
                 e
               )
