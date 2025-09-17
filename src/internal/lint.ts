@@ -68,6 +68,8 @@ export const lint = CLICommand.make(
           }),
       });
 
+      const allReadmeContents: Array<string> = [];
+
       const errorTracker = createErrorTracker();
       const lessonParser = yield* LessonParserService;
       const fs = yield* FileSystem.FileSystem;
@@ -119,6 +121,8 @@ export const lint = CLICommand.make(
           const readmeContent = yield* fs.readFileString(
             readmePath
           );
+
+          allReadmeContents.push(readmeContent);
 
           if (readmeContent.trim().length === 0) {
             errorTracker.addError(
@@ -209,6 +213,22 @@ export const lint = CLICommand.make(
           errorTracker.addError(
             lesson,
             ".gitkeep file found in the exercise."
+          );
+        }
+      }
+
+      // Check for unused reference lessons
+      const readmeContents = allReadmeContents.join("\n");
+
+      const referenceLessons = lessons.filter(
+        (lesson) => lesson.sectionName === "reference"
+      );
+
+      for (const referenceLesson of referenceLessons) {
+        if (!readmeContents.includes(referenceLesson.path)) {
+          errorTracker.addError(
+            referenceLesson,
+            `${referenceLesson.path} is not referenced in any other exercise.`
           );
         }
       }
