@@ -1,5 +1,11 @@
 # ai-hero-cli
 
+## 0.0.22
+
+### Patch Changes
+
+- b9a3afd: Added a lint rule that checks for unreferenced reference material.
+
 ## 0.0.21
 
 ### Patch Changes
