@@ -205,6 +205,17 @@ export const lint = CLICommand.make(
               `main.ts file not found in the ${subfolder} folder.`
             );
           }
+
+          const mainFileContent = yield* fs.readFileString(
+            mainFilePath
+          );
+
+          if (mainFileContent.trim().length === 0) {
+            errorTracker.addError(
+              lesson,
+              `main.ts file is empty in the ${subfolder} folder.`
+            );
+          }
         }
 
         const files = yield* lesson.allFiles();
