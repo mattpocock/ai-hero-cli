@@ -1,5 +1,11 @@
 # ai-hero-cli
 
+## 0.0.24
+
+### Patch Changes
+
+- b60fe11: Added upload to cloudinary script
+
 ## 0.0.23
 
 ### Patch Changes
