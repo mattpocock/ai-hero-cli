@@ -1,5 +1,11 @@
 # ai-hero-cli
 
+## 0.0.23
+
+### Patch Changes
+
+- f5f5756: Fixed a bug where reading the main file would cause an error because it did not exist.
+
 ## 0.0.22
 
 ### Patch Changes
