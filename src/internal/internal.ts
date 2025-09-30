@@ -4,6 +4,7 @@ import { Console, Effect } from "effect";
 import { updateCVM } from "./update-cvm.js";
 import { lint } from "./lint.js";
 import { rename } from "./rename.js";
+import { uploadToCloudinary } from "./upload-to-cloudinary.js";
 
 const upgradePackages = CLICommand.make(
   "upgrade",
@@ -61,6 +62,7 @@ export const internal = CLICommand.make("internal").pipe(
     updateCVM,
     lint,
     rename,
+    uploadToCloudinary,
   ]),
   CLICommand.withDescription("Internal commands for AI Hero")
 );
