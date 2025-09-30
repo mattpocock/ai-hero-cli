@@ -2,9 +2,16 @@ import { Command as CLICommand, Options } from "@effect/cli";
 import { FileSystem } from "@effect/platform";
 import { v2 as cloudinary } from "cloudinary";
 import * as dotenv from "dotenv";
-import { Console, Data, Effect } from "effect";
+import {
+  Array as EffectArray,
+  Console,
+  Data,
+  Effect,
+  flow,
+} from "effect";
 import * as path from "path";
-import { envFilePathOption } from "../options.js";
+import { envFilePathOption, rootOption } from "../options.js";
+import { LessonParserService } from "../lesson-parser-service.js";
 
 class CloudinaryUrlNotSetError extends Data.TaggedError(
   "CloudinaryUrlNotSetError"
@@ -53,11 +60,7 @@ class ImageUploadError extends Data.TaggedError(
 export const uploadToCloudinary = CLICommand.make(
   "upload-to-cloudinary",
   {
-    filePath: Options.text("file-path").pipe(
-      Options.withDescription(
-        "The markdown file to extract images from"
-      )
-    ),
+    root: rootOption,
     cwd: Options.text("cwd").pipe(
       Options.withDescription("The working directory"),
       Options.withDefault(process.cwd())
@@ -67,7 +70,7 @@ export const uploadToCloudinary = CLICommand.make(
   Effect.fn("upload-to-cloudinary")(function* ({
     cwd,
     envFilePath,
-    filePath,
+    root,
   }) {
     const fs = yield* FileSystem.FileSystem;
     const envConfig = dotenv.config({
@@ -106,88 +109,115 @@ export const uploadToCloudinary = CLICommand.make(
       cloud_name: cloudName,
     });
 
-    // Read the markdown file
-    const fileContent = yield* fs.readFileString(filePath);
+    const lessonParserService = yield* LessonParserService;
 
-    // Extract image references from markdown
-    const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
-    const imageMatches = Array.from(
-      fileContent.matchAll(imageRegex)
-    );
+    const lessons =
+      yield* lessonParserService.getLessonsFromRepo(root);
 
-    if (imageMatches.length === 0) {
-      return yield* new NoImagesFoundError({
-        message: "No images found in the markdown file",
-      });
+    const readmeFiles: Array<string> = [];
+
+    for (const lesson of lessons) {
+      const allFiles = yield* lesson.allFiles();
+
+      const foundReadmes = allFiles.filter((file) =>
+        file.includes("readme.md")
+      );
+
+      for (const readmeFile of foundReadmes) {
+        readmeFiles.push(readmeFile);
+      }
     }
 
-    let updatedContent = fileContent;
-    const markdownDir = path.dirname(filePath);
+    for (const readmeFile of readmeFiles) {
+      // Read the markdown file
+      const fileContent = yield* fs.readFileString(readmeFile);
 
-    // Process each image
-    for (const [fullMatch, altText, imagePath] of imageMatches) {
-      let resolvedImagePath: string;
+      // Extract image references from markdown
+      const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+      const imageMatches = Array.from(
+        fileContent.matchAll(imageRegex)
+      );
 
-      // Resolve image path based on whether it's relative or absolute
-      if (imagePath.startsWith("/")) {
-        // Absolute path - resolve from working directory
-        resolvedImagePath = path.resolve(
-          cwd,
-          // Remove the leading slash
-          imagePath.slice(1)
-        );
-      } else if (imagePath.startsWith("http")) {
-        // URL - skip
-        continue;
-      } else {
-        // Relative path - resolve from markdown file directory
-        resolvedImagePath = path.resolve(markdownDir, imagePath);
+      if (imageMatches.length === 0) {
+        return yield* new NoImagesFoundError({
+          message: "No images found in the markdown file",
+        });
       }
 
-      // Check if image file exists
-      const imageExists = yield* fs.exists(resolvedImagePath);
-      if (!imageExists) {
-        yield* Console.log(
-          `Warning: Image file not found: ${resolvedImagePath}`
-        );
-        continue;
-      }
+      let updatedContent = fileContent;
+      const markdownDir = path.dirname(readmeFile);
 
-      yield* Console.log(`Uploading: ${resolvedImagePath}`);
-
-      // Upload to Cloudinary
-      const uploadResult = yield* Effect.tryPromise({
-        try: () => {
-          return cloudinary.uploader.upload(resolvedImagePath, {
-            resource_type: "auto",
-            folder: "ai-hero-images", // Optional: organize uploads in a folder
-          });
-        },
-        catch: (error) => {
-          return new ImageUploadError({
-            message: `Error uploading ${imagePath}`,
-            cause: error,
-          });
-        },
-      });
-
-      // Replace the image reference with the Cloudinary URL
-      updatedContent = updatedContent.replace(
+      // Process each image
+      for (const [
         fullMatch,
-        `![${altText}](${uploadResult.secure_url})`
-      );
+        altText,
+        imagePath,
+      ] of imageMatches) {
+        let resolvedImagePath: string;
 
-      yield* Console.log(
-        `✓ Uploaded: ${uploadResult.secure_url}`
-      );
+        // Resolve image path based on whether it's relative or absolute
+        if (imagePath.startsWith("/")) {
+          // Absolute path - resolve from working directory
+          resolvedImagePath = path.resolve(
+            cwd,
+            // Remove the leading slash
+            imagePath.slice(1)
+          );
+        } else if (imagePath.startsWith("http")) {
+          // URL - skip
+          continue;
+        } else {
+          // Relative path - resolve from markdown file directory
+          resolvedImagePath = path.resolve(
+            markdownDir,
+            imagePath
+          );
+        }
+
+        // Check if image file exists
+        const imageExists = yield* fs.exists(resolvedImagePath);
+        if (!imageExists) {
+          yield* Console.log(
+            `Warning: Image file not found: ${resolvedImagePath}`
+          );
+          continue;
+        }
+
+        yield* Console.log(`Uploading: ${resolvedImagePath}`);
+
+        // Upload to Cloudinary
+        const uploadResult = yield* Effect.tryPromise({
+          try: () => {
+            return cloudinary.uploader.upload(
+              resolvedImagePath,
+              {
+                resource_type: "auto",
+                folder: "ai-hero-images", // Optional: organize uploads in a folder
+              }
+            );
+          },
+          catch: (error) => {
+            return new ImageUploadError({
+              message: `Error uploading ${imagePath}`,
+              cause: error,
+            });
+          },
+        });
+
+        // Replace the image reference with the Cloudinary URL
+        updatedContent = updatedContent.replace(
+          fullMatch,
+          `![${altText}](${uploadResult.secure_url})`
+        );
+
+        yield* Console.log(
+          `✓ Uploaded: ${uploadResult.secure_url}`
+        );
+      }
+
+      // Write the updated content back to the file
+      yield* fs.writeFileString(readmeFile, updatedContent);
     }
-
-    // Write the updated content back to the file
-    yield* fs.writeFileString(filePath, updatedContent);
-
-    yield* Console.log(
-      "✓ Markdown file updated with Cloudinary URLs"
-    );
   })
 ).pipe(
   CLICommand.withDescription(
