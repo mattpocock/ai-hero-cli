@@ -1,5 +1,12 @@
 # ai-hero-cli
 
+## 0.0.25
+
+### Patch Changes
+
+- 7a321fe: Made the upload to cloudinary script work on the entire repo
+- 621a483: Added evalite to the packages
+
 ## 0.0.24
 
 ### Patch Changes
