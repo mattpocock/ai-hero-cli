@@ -226,6 +226,13 @@ export const lint = CLICommand.make(
             ".gitkeep file found in the exercise."
           );
         }
+
+        if (files.some((file) => file.includes("speaker-notes.md"))) {
+          errorTracker.addError(
+            lesson,
+            "speaker-notes.md file found in the exercise. This should not be exposed to users."
+          );
+        }
       }
 
       // Check for unused reference lessons
