@@ -506,6 +506,10 @@ const logReadmeFile = Effect.fn("logReadmeFile")(
   }
 );
 
+const normalizeExerciseNumber = (str: string): string => {
+  return str.replace(/\b0+(\d)/g, "$1");
+};
+
 const chooseLessonAndRunIt = (opts: {
   root: string;
   envFilePath: string;
@@ -535,11 +539,12 @@ const chooseLessonAndRunIt = (opts: {
             description: lesson.name,
           })),
           suggest: async (input, choices) => {
-            return choices.filter((choice) =>
-              `${choice.title}-${choice.description}`.includes(
-                input
-              )
-            );
+            const normalizedInput = normalizeExerciseNumber(input);
+            return choices.filter((choice) => {
+              const searchText = `${choice.title}-${choice.description}`;
+              const normalizedSearchText = normalizeExerciseNumber(searchText);
+              return searchText.includes(input) || normalizedSearchText.includes(normalizedInput);
+            });
           },
         },
       ])
