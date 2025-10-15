@@ -32,7 +32,8 @@ const upgradePackages = CLICommand.make(
         "ai@latest",
         "@ai-sdk/*@latest",
         "ai-hero-cli@latest",
-        "evalite@latest"
+        "evalite@latest",
+        "vitest@latest"
       ).pipe(
         verbose
           ? Command.stdout("inherit")
