@@ -1,5 +1,14 @@
 # ai-hero-cli
 
+## 0.0.26
+
+### Patch Changes
+
+- 1f4d455: Upgrade script now updates vitest to latest version.
+- 544e585: Improved exercise search to accept more intuitive formats - users can now search for "03.02" using "3.2"
+- 8b70c08: Fix .env file not found error by using correct tsx --env-file flag syntax with equals sign and quotes
+- b80b85b: Added lint rule for speaker notes
+
 ## 0.0.25
 
 ### Patch Changes
