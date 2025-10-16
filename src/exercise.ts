@@ -247,7 +247,7 @@ const runLesson: (opts: {
   const command = Command.make(
     "pnpm",
     "tsx",
-    "--env-file",
+    `--env-file`,
     envFilePath,
     mainFile
   ).pipe(
@@ -539,11 +539,16 @@ const chooseLessonAndRunIt = (opts: {
             description: lesson.name,
           })),
           suggest: async (input, choices) => {
-            const normalizedInput = normalizeExerciseNumber(input);
+            const normalizedInput =
+              normalizeExerciseNumber(input);
             return choices.filter((choice) => {
               const searchText = `${choice.title}-${choice.description}`;
-              const normalizedSearchText = normalizeExerciseNumber(searchText);
-              return searchText.includes(input) || normalizedSearchText.includes(normalizedInput);
+              const normalizedSearchText =
+                normalizeExerciseNumber(searchText);
+              return (
+                searchText.includes(input) ||
+                normalizedSearchText.includes(normalizedInput)
+              );
             });
           },
         },
@@ -588,11 +593,16 @@ export const exercise = CLICommand.make(
   },
   ({ cwd, debug, envFilePath, lesson, root, simple }) => {
     return Effect.gen(function* () {
+      const resolvedEnvFilePath = path.relative(
+        cwd,
+        envFilePath
+      );
+
       if (Option.isSome(lesson)) {
         return yield* runLesson({
           lesson: lesson.value,
           root,
-          envFilePath,
+          envFilePath: resolvedEnvFilePath,
           cwd,
           forceSubfolderIndex: undefined,
           simple,
@@ -605,7 +615,7 @@ export const exercise = CLICommand.make(
 
       return yield* chooseLessonAndRunIt({
         root,
-        envFilePath,
+        envFilePath: resolvedEnvFilePath,
         cwd,
         simple,
       }).pipe(
@@ -738,7 +748,7 @@ const runLessonSimple = (opts: {
     );
 
     execSync(
-      `pnpm tsx --env-file "${envFilePath}" "${mainFile}"`,
+      `pnpm tsx --env-file="${envFilePath}" "${mainFile}"`,
       {
         stdio: "inherit",
         cwd,
