@@ -247,8 +247,7 @@ const runLesson: (opts: {
   const command = Command.make(
     "pnpm",
     "tsx",
-    "--env-file",
-    envFilePath,
+    `--env-file="${envFilePath}"`,
     mainFile
   ).pipe(
     Command.stdout("inherit"),
@@ -738,7 +737,7 @@ const runLessonSimple = (opts: {
     );
 
     execSync(
-      `pnpm tsx --env-file "${envFilePath}" "${mainFile}"`,
+      `pnpm tsx --env-file="${envFilePath}" "${mainFile}"`,
       {
         stdio: "inherit",
         cwd,
