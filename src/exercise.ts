@@ -592,12 +592,16 @@ export const exercise = CLICommand.make(
   },
   ({ cwd, debug, envFilePath, lesson, root, simple }) => {
     return Effect.gen(function* () {
-      yield* Console.log(`envFilePath: ${envFilePath}`);
+      const resolvedEnvFilePath = path.relative(
+        cwd,
+        envFilePath
+      );
+
       if (Option.isSome(lesson)) {
         return yield* runLesson({
           lesson: lesson.value,
           root,
-          envFilePath,
+          envFilePath: resolvedEnvFilePath,
           cwd,
           forceSubfolderIndex: undefined,
           simple,
@@ -610,7 +614,7 @@ export const exercise = CLICommand.make(
 
       return yield* chooseLessonAndRunIt({
         root,
-        envFilePath,
+        envFilePath: resolvedEnvFilePath,
         cwd,
         simple,
       }).pipe(
