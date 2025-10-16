@@ -1,5 +1,11 @@
 # ai-hero-cli
 
+## 0.1.0
+
+### Minor Changes
+
+- 6fbdbed: Simple mode is now default and only mode. --simple flag throws error message.
+
 ## 0.0.26
 
 ### Patch Changes

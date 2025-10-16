@@ -1,6 +1,6 @@
 {
   "name": "ai-hero-cli",
-  "version": "0.0.26",
+  "version": "0.1.0",
   "type": "module",
   "packageManager": "pnpm@10.15.0",
   "license": "MIT",
