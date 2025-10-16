@@ -538,11 +538,16 @@ const chooseLessonAndRunIt = (opts: {
             description: lesson.name,
           })),
           suggest: async (input, choices) => {
-            const normalizedInput = normalizeExerciseNumber(input);
+            const normalizedInput =
+              normalizeExerciseNumber(input);
             return choices.filter((choice) => {
               const searchText = `${choice.title}-${choice.description}`;
-              const normalizedSearchText = normalizeExerciseNumber(searchText);
-              return searchText.includes(input) || normalizedSearchText.includes(normalizedInput);
+              const normalizedSearchText =
+                normalizeExerciseNumber(searchText);
+              return (
+                searchText.includes(input) ||
+                normalizedSearchText.includes(normalizedInput)
+              );
             });
           },
         },
@@ -587,6 +592,7 @@ export const exercise = CLICommand.make(
   },
   ({ cwd, debug, envFilePath, lesson, root, simple }) => {
     return Effect.gen(function* () {
+      yield* Console.log(`envFilePath: ${envFilePath}`);
       if (Option.isSome(lesson)) {
         return yield* runLesson({
           lesson: lesson.value,
