@@ -3,13 +3,8 @@ import {
   Command as CLICommand,
   Options,
 } from "@effect/cli";
-import type {
-  CommandExecutor,
-  FileSystem,
-} from "@effect/platform";
-import { Command } from "@effect/platform";
+import type { FileSystem } from "@effect/platform";
 import type { PlatformError } from "@effect/platform/Error";
-import type { Scope } from "effect";
 import {
   Console,
   Data,
@@ -20,7 +15,6 @@ import {
 } from "effect";
 import type { NoSuchElementException } from "effect/Cause";
 import { execSync } from "node:child_process";
-import * as readline from "node:readline/promises";
 import * as path from "path";
 import prompt from "prompts";
 import { styleText } from "util";
@@ -98,7 +92,6 @@ const runLesson: (opts: {
    * The index of the subfolder to run the exercise in
    */
   forceSubfolderIndex: number | undefined;
-  simple: boolean;
 }) => Effect.Effect<
   void,
   | LessonNotFoundError
@@ -108,15 +101,8 @@ const runLesson: (opts: {
   | InvalidPathError
   | NoSuchElementException
   | PathNumberIsNaNError,
-  | LessonParserService
-  | FileSystem.FileSystem
-  | CommandExecutor.CommandExecutor
-  | Scope.Scope
+  LessonParserService | FileSystem.FileSystem
 > = Effect.fn("runLesson")(function* (opts) {
-  if (opts.simple) {
-    return yield* runLessonSimple(opts);
-  }
-
   const { cwd, envFilePath, lesson, root } = opts;
   const service = yield* LessonParserService;
   const lessons = yield* service.getLessonsFromRepo(root);
@@ -244,144 +230,20 @@ const runLesson: (opts: {
     yield* logReadmeFile({ readmeFile });
   }
 
-  const command = Command.make(
-    "pnpm",
-    "tsx",
-    `--env-file`,
-    envFilePath,
-    mainFile
-  ).pipe(
-    Command.stdout("inherit"),
-    Command.stderr("inherit"),
-    Command.workingDirectory(cwd)
-  );
-
-  const processOutcome:
-    | "next"
-    | "previous"
-    | "quit"
-    | "choose-exercise"
-    | "failed"
-    | "exit" = yield* Effect.raceAll([
-    Effect.gen(function* () {
-      const proc = yield* Command.start(command);
-
-      const killWithLogging = () =>
-        Effect.gen(function* () {
-          if (yield* proc.isRunning) {
-            return yield* proc.kill();
-          }
-        }).pipe(
-          Effect.catchAll((e) =>
-            Effect.logDebug(
-              `Error occurred when killing child process.`,
-              e
-            )
-          )
-        );
-
-      yield* Effect.addFinalizer(() => killWithLogging());
-
-      const killAsCallback = () =>
-        killWithLogging().pipe(Effect.runPromise);
-
-      yield* Effect.fork(
-        Effect.sync(() => {
-          process.on("SIGINT", killAsCallback);
-        })
-      );
-
-      yield* Effect.fork(
-        Effect.sync(() => {
-          process.on("SIGTERM", killAsCallback);
-        })
-      );
-
-      yield* Effect.addFinalizer(() => {
-        return Effect.sync(() =>
-          process.removeListener("SIGINT", killAsCallback)
-        );
-      });
-
-      yield* Effect.addFinalizer(() => {
-        return Effect.sync(() =>
-          process.removeListener("SIGTERM", killAsCallback)
-        );
-      });
-
-      const result = yield* proc.exitCode;
-
-      return result === 0 ? "exit" : "failed";
-    }),
-    Effect.gen(function* () {
-      const rl = readline.createInterface({
-        input: process.stdin,
-      });
-
-      yield* Effect.addFinalizer(() => {
-        return Effect.succeed(rl.close());
-      });
-
-      while (true) {
-        const line = yield* Effect.promise(async (signal) => {
-          const result = await rl.question("", { signal });
-
-          rl.close();
-
-          return result;
-        });
-
-        if (line === "h") {
-          yield* Console.log(styleText("bold", "Shortcuts:"));
-          for (const [key, value] of Object.entries(shortcuts)) {
-            yield* Console.log(
-              `  ${key} ${styleText("dim", `- ${value}`)}`
-            );
-          }
-        } else if (line === "q") {
-          return "quit";
-        } else if (line === "n") {
-          return "next";
-        } else if (line === "p") {
-          return "previous";
-        } else if (line.trim() === "") {
-          return "choose-exercise";
+  const result = yield* Effect.try({
+    try: () =>
+      execSync(
+        `pnpm tsx --env-file="${envFilePath}" "${mainFile}"`,
+        {
+          stdio: "inherit",
+          cwd,
         }
-      }
-    }),
-  ]).pipe(Effect.scoped);
-
-  yield* Console.log("");
-
-  if (processOutcome === "next" && nextExerciseToRun) {
-    return yield* runLesson({
-      simple: opts.simple,
-      lesson: nextExerciseToRun.lessonNumber,
-      root,
-      envFilePath,
-      cwd,
-      forceSubfolderIndex: nextExerciseToRun.subfolderIndex,
-    });
-  } else if (
-    processOutcome === "previous" &&
-    previousExerciseToRun
-  ) {
-    return yield* runLesson({
-      simple: opts.simple,
-      lesson: previousExerciseToRun.lessonNumber,
-      root,
-      envFilePath,
-      cwd,
-      forceSubfolderIndex: previousExerciseToRun.subfolderIndex,
-    });
-  } else if (processOutcome === "choose-exercise") {
-    return yield* chooseLessonAndRunIt({
-      simple: opts.simple,
-      root,
-      envFilePath,
-      cwd,
-    });
-  }
+      ),
+    catch: (error) => new RunLessonSimpleError({ cause: error }),
+  }).pipe(
+    Effect.map(() => "success" as const),
+    Effect.catchAll(() => Effect.succeed("failed" as const))
+  );
 
   const isExplainer = yield* foundLesson.isExplainer();
 
@@ -414,13 +276,13 @@ const runLesson: (opts: {
         type: "select",
         name: "choice",
         message:
-          processOutcome === "exit"
+          result === "success"
             ? lessonNoun.successMessage
             : lessonNoun.failureMessage,
         choices: [
           {
             title:
-              processOutcome === "failed"
+              result === "failed"
                 ? `🔄 Run the ${lessonNoun.lowercase} again`
                 : `🔄 Try the ${lessonNoun.lowercase} again`,
             value: "run-again",
@@ -462,14 +324,12 @@ const runLesson: (opts: {
       cwd,
       // Run the same exercise again, with the same subfolder index
       forceSubfolderIndex: subfolderIndex,
-      simple: opts.simple,
     });
   } else if (choice === "choose-exercise") {
     return yield* chooseLessonAndRunIt({
       root,
       envFilePath,
       cwd,
-      simple: opts.simple,
     });
   } else if (choice === "next-exercise" && nextExerciseToRun) {
     return yield* runLesson({
@@ -478,7 +338,6 @@ const runLesson: (opts: {
       envFilePath,
       cwd,
       forceSubfolderIndex: nextExerciseToRun.subfolderIndex,
-      simple: opts.simple,
     });
   } else if (
     choice === "previous-exercise" &&
@@ -490,7 +349,6 @@ const runLesson: (opts: {
       envFilePath,
       cwd,
       forceSubfolderIndex: previousExerciseToRun.subfolderIndex,
-      simple: opts.simple,
     });
   }
 });
@@ -514,7 +372,6 @@ const chooseLessonAndRunIt = (opts: {
   root: string;
   envFilePath: string;
   cwd: string;
-  simple: boolean;
 }) =>
   Effect.gen(function* () {
     const lessonService = yield* LessonParserService;
@@ -565,7 +422,6 @@ const chooseLessonAndRunIt = (opts: {
       envFilePath: opts.envFilePath,
       cwd: opts.cwd,
       forceSubfolderIndex: undefined,
-      simple: opts.simple,
     });
   }).pipe(Effect.catchAll(Console.log));
 
@@ -593,6 +449,12 @@ export const exercise = CLICommand.make(
   },
   ({ cwd, debug, envFilePath, lesson, root, simple }) => {
     return Effect.gen(function* () {
+      if (simple) {
+        return yield* Console.log(
+          "Simple mode is now the default mode! No need to use the --simple flag."
+        );
+      }
+
       const resolvedEnvFilePath = path.relative(
         cwd,
         envFilePath
@@ -605,7 +467,6 @@ export const exercise = CLICommand.make(
           envFilePath: resolvedEnvFilePath,
           cwd,
           forceSubfolderIndex: undefined,
-          simple,
         }).pipe(
           Logger.withMinimumLogLevel(
             debug ? LogLevel.Debug : LogLevel.Info
@@ -617,7 +478,6 @@ export const exercise = CLICommand.make(
         root,
         envFilePath: resolvedEnvFilePath,
         cwd,
-        simple,
       }).pipe(
         Logger.withMinimumLogLevel(
           debug ? LogLevel.Debug : LogLevel.Info
@@ -626,27 +486,6 @@ export const exercise = CLICommand.make(
     });
   }
 );
-
-const findLesson = Effect.fn("findLesson")(function* (opts: {
-  lesson: number;
-  root: string;
-}) {
-  const service = yield* LessonParserService;
-  const lessons = yield* service.getLessonsFromRepo(opts.root);
-
-  const foundLessonIndex = lessons.findIndex(
-    (l) => l.num === opts.lesson
-  );
-
-  if (foundLessonIndex === -1) {
-    return yield* new LessonNotFoundError({
-      lesson: opts.lesson,
-      message: `Lesson ${opts.lesson} not found`,
-    });
-  }
-
-  return lessons[foundLessonIndex]!;
-});
 
 const selectSubfolderIndex = Effect.fn("selectSubfolder")(
   function* (opts: { lesson: Lesson }) {
@@ -715,47 +554,8 @@ const getMainAndReadmeFiles = Effect.fn("getMainAndReadmeFiles")(
   }
 );
 
-const runLessonSimple = (opts: {
-  lesson: number;
-  root: string;
-  envFilePath: string;
-  cwd: string;
-}) =>
-  Effect.gen(function* () {
-    const { cwd, envFilePath, lesson, root } = opts;
-
-    const foundLesson = yield* findLesson({
-      lesson,
-      root,
-    });
-
-    const { subfolder } = yield* selectSubfolderIndex({
-      lesson: foundLesson,
-    });
-
-    const { mainFile, readmeFile } =
-      yield* getMainAndReadmeFiles({
-        lesson: foundLesson,
-        subfolder,
-      });
-
-    if (readmeFile) {
-      yield* logReadmeFile({ readmeFile });
-    }
-
-    yield* Console.log(
-      styleText("bold", `Running ${lesson} ${subfolder}...`)
-    );
-
-    execSync(
-      `pnpm tsx --env-file="${envFilePath}" "${mainFile}"`,
-      {
-        stdio: "inherit",
-        cwd,
-      }
-    );
-
-    if ((yield* foundLesson.isExplainer()) && readmeFile) {
-      yield* logReadmeFile({ readmeFile });
-    }
-  });
+class RunLessonSimpleError extends Data.TaggedError(
+  "RunLessonSimpleError"
+)<{
+  cause: unknown;
+}> {}
