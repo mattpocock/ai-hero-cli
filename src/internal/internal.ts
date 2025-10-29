@@ -59,7 +59,7 @@ const upgradePackages = CLICommand.make(
   CLICommand.withDescription("Upgrade the AI SDK packages")
 );
 
-export const internal = CLICommand.make("internal").pipe(
+export const internal: any = CLICommand.make("internal").pipe(
   CLICommand.withSubcommands([
     upgradePackages,
     updateCVM,
