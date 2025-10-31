@@ -1,5 +1,11 @@
 # ai-hero-cli
 
+## 0.2.3
+
+### Patch Changes
+
+- 743a54d: Fixed bugs with reset and cherrypick
+
 ## 0.2.2
 
 ### Patch Changes
