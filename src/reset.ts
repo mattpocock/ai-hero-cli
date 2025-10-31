@@ -127,7 +127,8 @@ export const reset = CLICommand.make(
       }
 
       // If multiple commits found, choose the latest one (last in the list)
-      const targetCommit = matchingCommits[matchingCommits.length - 1]!;
+      const targetCommit =
+        matchingCommits[matchingCommits.length - 1]!;
 
       yield* Console.log(
         `Found commit: ${targetCommit.sha} ${targetCommit.message}`
@@ -179,7 +180,11 @@ export const reset = CLICommand.make(
           "-b",
           branchName,
           targetCommit.sha
-        ).pipe(Command.workingDirectory(cwd));
+        ).pipe(
+          Command.workingDirectory(cwd),
+          Command.stdout("inherit"),
+          Command.stderr("inherit")
+        );
 
         const exitCode = yield* Command.exitCode(
           createBranchCommand
@@ -242,7 +247,11 @@ export const reset = CLICommand.make(
         "reset",
         "--hard",
         targetCommit.sha
-      ).pipe(Command.workingDirectory(cwd));
+      ).pipe(
+        Command.workingDirectory(cwd),
+        Command.stdout("inherit"),
+        Command.stderr("inherit")
+      );
 
       const exitCode = yield* Command.exitCode(
         resetCommand
