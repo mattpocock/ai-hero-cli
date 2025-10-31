@@ -54,9 +54,7 @@ export const getDiffs = CLICommand.make(
       )
     ),
     branch: Options.text("branch").pipe(
-      Options.withDescription(
-        "Branch to checkout before getting diffs"
-      )
+      Options.withDescription("Branch to get diffs from")
     ),
     root: Options.text("root").pipe(
       Options.withDescription(
@@ -90,47 +88,28 @@ export const getDiffs = CLICommand.make(
         );
       }
 
-      // Check for dirty working tree
-      const gitStatusCommand = Command.make(
+      // Fetch latest from origin
+      yield* Console.log("Fetching latest from origin...");
+      const gitFetchCommand = Command.make(
         "git",
-        "status",
-        "--porcelain"
+        "fetch",
+        "origin"
       ).pipe(Command.workingDirectory(projectRepo));
 
-      const statusOutput = yield* Command.string(
-        gitStatusCommand
-      );
-
-      if (statusOutput.trim() !== "") {
-        return yield* Effect.fail(
-          new DirtyWorkingTreeError({
-            path: projectRepo,
-            message: `Working tree has uncommitted changes. Commit or stash changes before running get-diffs`,
-          })
-        );
-      }
-
-      // Checkout branch
-      const gitCheckoutCommand = Command.make(
-        "git",
-        "checkout",
-        branch
-      ).pipe(Command.workingDirectory(projectRepo));
-
-      const checkoutExitCode = yield* Command.exitCode(
-        gitCheckoutCommand
+      const fetchExitCode = yield* Command.exitCode(
+        gitFetchCommand
       ).pipe(Effect.catchAll(() => Effect.succeed(1)));
 
-      if (checkoutExitCode !== 0) {
+      if (fetchExitCode !== 0) {
         return yield* Effect.fail(
           new InvalidProjectRepoError({
             path: projectRepo,
-            message: `Failed to checkout branch: ${branch}`,
+            message: `Failed to fetch from origin`,
           })
         );
       }
 
-      yield* Console.log(`✓ Checked out branch: ${branch}`);
+      yield* Console.log(`✓ Fetched latest from origin`);
       yield* Console.log(
         `✓ Validated project repo: ${projectRepo}`
       );
@@ -144,7 +123,7 @@ export const getDiffs = CLICommand.make(
         "log",
         "--oneline",
         "--reverse", // Chronological order (oldest first)
-        "--all"
+        branch
       ).pipe(Command.workingDirectory(projectRepo));
 
       const commitHistory = yield* Command.string(gitLogCommand);
@@ -427,12 +406,6 @@ export const getDiffs = CLICommand.make(
     }).pipe(
       Effect.catchTags({
         InvalidProjectRepoError: (error) => {
-          return Effect.gen(function* () {
-            yield* Console.error(`Error: ${error.message}`);
-            process.exitCode = 1;
-          });
-        },
-        DirtyWorkingTreeError: (error) => {
           return Effect.gen(function* () {
             yield* Console.error(`Error: ${error.message}`);
             process.exitCode = 1;
