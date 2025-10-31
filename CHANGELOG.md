@@ -1,5 +1,11 @@
 # ai-hero-cli
 
+## 0.2.2
+
+### Patch Changes
+
+- 47dd3b0: Made all git commands report their output
+
 ## 0.2.1
 
 ### Patch Changes
