@@ -1,5 +1,11 @@
 # ai-hero-cli
 
+## 0.2.0
+
+### Minor Changes
+
+- 26e77f3: Added get-diffs internal script
+
 ## 0.1.1
 
 ### Patch Changes
