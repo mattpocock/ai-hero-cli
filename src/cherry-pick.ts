@@ -51,13 +51,32 @@ export const cherryPick = CLICommand.make(
         `Searching for lesson ${lessonId} on branch ${branch}...`
       );
 
+      const gitFetchCommand = Command.make(
+        "git",
+        "fetch",
+        "origin"
+      ).pipe(
+        Command.workingDirectory(cwd),
+        Command.stdout("inherit"),
+        Command.stderr("inherit")
+      );
+
+      const fetchExitCode = yield* Command.exitCode(
+        gitFetchCommand
+      );
+
+      if (fetchExitCode !== 0) {
+        yield* Console.error("Failed to fetch branch");
+        process.exitCode = 1;
+        return;
+      }
+
       // Search commit history for lesson ID
       const gitLogCommand = Command.make(
         "git",
         "log",
         branch,
-        "--oneline",
-        "--all"
+        "--oneline"
       ).pipe(Command.workingDirectory(cwd));
 
       const commitHistory = yield* Command.string(gitLogCommand);
@@ -110,7 +129,8 @@ export const cherryPick = CLICommand.make(
       }
 
       // If multiple commits found, choose the latest one (last in the list)
-      const targetCommit = matchingCommits[matchingCommits.length - 1]!;
+      const targetCommit =
+        matchingCommits[matchingCommits.length - 1]!;
 
       yield* Console.log(
         `Found commit: ${targetCommit.sha} ${targetCommit.message}`

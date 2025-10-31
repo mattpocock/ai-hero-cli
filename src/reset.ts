@@ -64,6 +64,26 @@ export const reset = CLICommand.make(
         );
       }
 
+      const gitFetchCommand = Command.make(
+        "git",
+        "fetch",
+        "origin"
+      ).pipe(
+        Command.workingDirectory(cwd),
+        Command.stdout("inherit"),
+        Command.stderr("inherit")
+      );
+
+      const fetchExitCode = yield* Command.exitCode(
+        gitFetchCommand
+      );
+
+      if (fetchExitCode !== 0) {
+        yield* Console.error("Failed to fetch branch");
+        process.exitCode = 1;
+        return;
+      }
+
       yield* Console.log(
         `Searching for lesson ${lessonId} on branch ${branch}...`
       );
@@ -73,8 +93,7 @@ export const reset = CLICommand.make(
         "git",
         "log",
         branch,
-        "--oneline",
-        "--all"
+        "--oneline"
       ).pipe(Command.workingDirectory(cwd));
 
       const commitHistory = yield* Command.string(gitLogCommand);
