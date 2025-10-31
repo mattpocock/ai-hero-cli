@@ -1,5 +1,11 @@
 # ai-hero-cli
 
+## 0.2.4
+
+### Patch Changes
+
+- 8c7a4f6: Fixed a bug with get-diffs
+
 ## 0.2.3
 
 ### Patch Changes
