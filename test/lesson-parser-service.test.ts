@@ -68,7 +68,7 @@ describe("LessonParserService", () => {
           new Lesson({
             lessonNum: 2,
             lessonName: "agentic-stuff",
-            lessonPath: "2-basics",
+            lessonPath: "2-agentic-stuff",
             sectionNum: 2,
             sectionName: "basics",
             sectionPath: "2-basics",
