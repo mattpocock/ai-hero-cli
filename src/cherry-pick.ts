@@ -77,6 +77,7 @@ export const cherryPick = CLICommand.make(
           lessonId,
           promptMessage:
             "Which lesson do you want to cherry-pick? (type to search)",
+          excludeCurrentBranch: true,
         });
 
       // Get current branch name and validate

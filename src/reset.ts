@@ -78,6 +78,7 @@ export const reset = CLICommand.make(
           lessonId,
           promptMessage:
             "Which lesson do you want to reset to? (type to search)",
+          excludeCurrentBranch: false,
         });
 
       // Prompt for action

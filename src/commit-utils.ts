@@ -60,6 +60,7 @@ const parseCommits = (
 export const selectLessonCommit = ({
   branch,
   cwd,
+  excludeCurrentBranch,
   lessonId,
   promptMessage,
 }: {
@@ -67,14 +68,17 @@ export const selectLessonCommit = ({
   branch: string;
   lessonId: Option.Option<string>;
   promptMessage: string;
+  excludeCurrentBranch: boolean;
 }) =>
   Effect.gen(function* () {
     // Search commit history for lesson ID
+    const gitLogArgs = excludeCurrentBranch
+      ? ["log", branch, "--not", "HEAD", "--oneline"]
+      : ["log", branch, "--oneline"];
+
     const gitLogCommand = Command.make(
       "git",
-      "log",
-      branch,
-      "--oneline"
+      ...gitLogArgs
     ).pipe(Command.workingDirectory(cwd));
 
     const commitHistory = yield* Command.string(gitLogCommand);
