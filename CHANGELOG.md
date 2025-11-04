@@ -1,5 +1,15 @@
 # ai-hero-cli
 
+## 0.2.4
+
+### Patch Changes
+
+- 4cb4202: Added branch protection to reset and cherry-pick commands. Prevents resetting current branch or cherry-picking when on target branch or main branch.
+- ceb92ce: Add the ability to choose the commit to cherrypick or reset to
+- d6e1b24: Fixed a bug where cancelled prompts were not being properly cancelled
+- 8c7a4f6: Fixed a bug with get-diffs
+- eb09a76: Cherry-picking a commit now hides commits that have already been added to this branch.
+
 ## 0.2.3
 
 ### Patch Changes
