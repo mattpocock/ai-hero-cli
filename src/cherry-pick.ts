@@ -7,19 +7,14 @@ import { Command } from "@effect/platform";
 import { Console, Data, Effect } from "effect";
 import { existsSync } from "node:fs";
 import * as path from "node:path";
+import { PromptCancelledError } from "./prompt-utils.js";
+import { CommitNotFoundError, selectLessonCommit } from "./commit-utils.js";
 
 export class NotAGitRepoError extends Data.TaggedError(
   "NotAGitRepoError"
 )<{
   path: string;
   message: string;
-}> {}
-
-export class CommitNotFoundError extends Data.TaggedError(
-  "CommitNotFoundError"
-)<{
-  lessonId: string;
-  branch: string;
 }> {}
 
 export class InvalidBranchOperationError extends Data.TaggedError(
@@ -31,7 +26,9 @@ export class InvalidBranchOperationError extends Data.TaggedError(
 export const cherryPick = CLICommand.make(
   "cherry-pick",
   {
-    lessonId: Args.text({ name: "lesson-id" }),
+    lessonId: Args.text({ name: "lesson-id" }).pipe(
+      Args.optional
+    ),
     branch: Options.text("branch").pipe(
       Options.withDescription(
         "Branch to search for the lesson commit"
@@ -53,10 +50,6 @@ export const cherryPick = CLICommand.make(
         );
       }
 
-      yield* Console.log(
-        `Searching for lesson ${lessonId} on branch ${branch}...`
-      );
-
       const gitFetchCommand = Command.make(
         "git",
         "fetch",
@@ -77,70 +70,14 @@ export const cherryPick = CLICommand.make(
         return;
       }
 
-      // Search commit history for lesson ID
-      const gitLogCommand = Command.make(
-        "git",
-        "log",
-        branch,
-        "--oneline"
-      ).pipe(Command.workingDirectory(cwd));
-
-      const commitHistory = yield* Command.string(gitLogCommand);
-
-      // Parse commits to find matching lesson ID
-      type ParsedCommit = {
-        sha: string;
-        message: string;
-        lessonId: string | null;
-      };
-
-      const commits: Array<ParsedCommit> = commitHistory
-        .trim()
-        .split("\n")
-        .filter(Boolean)
-        .map((line) => {
-          const [sha, ...messageParts] = line.split(" ");
-          const message = messageParts.join(" ");
-
-          // Extract lesson ID - match pattern like 01.01.01, 1.1.1, etc.
-          const lessonMatch = message.match(
-            /^(\d+)[.-](\d+)[.-](\d+)/
-          );
-          const extractedLessonId = lessonMatch
-            ? `${lessonMatch[1]!.padStart(
-                2,
-                "0"
-              )}.${lessonMatch[2]!.padStart(
-                2,
-                "0"
-              )}.${lessonMatch[3]!.padStart(2, "0")}`
-            : null;
-
-          return {
-            sha: sha!,
-            message,
-            lessonId: extractedLessonId,
-          };
-        });
-
-      const matchingCommits = commits.filter(
-        (commit) => commit.lessonId === lessonId
-      );
-
-      if (matchingCommits.length === 0) {
-        return yield* new CommitNotFoundError({
-          lessonId,
+      const { commit: targetCommit, lessonId: selectedLessonId } =
+        yield* selectLessonCommit({
+          cwd,
           branch,
+          lessonId,
+          promptMessage:
+            "Which lesson do you want to cherry-pick? (type to search)",
         });
-      }
-
-      // If multiple commits found, choose the latest one (last in the list)
-      const targetCommit =
-        matchingCommits[matchingCommits.length - 1]!;
-
-      yield* Console.log(
-        `Found commit: ${targetCommit.sha} ${targetCommit.message}`
-      );
 
       // Get current branch name and validate
       const currentBranchCommand = Command.make(
@@ -149,9 +86,9 @@ export const cherryPick = CLICommand.make(
         "--show-current"
       ).pipe(Command.workingDirectory(cwd));
 
-      const currentBranch = (
-        yield* Command.string(currentBranchCommand)
-      ).trim();
+      const currentBranch = (yield* Command.string(
+        currentBranchCommand
+      )).trim();
 
       // Check if current branch is the target branch
       if (currentBranch === branch) {
@@ -193,7 +130,7 @@ export const cherryPick = CLICommand.make(
       }
 
       yield* Console.log(
-        `\n✓ Successfully cherry-picked lesson ${lessonId}`
+        `\n✓ Successfully cherry-picked lesson ${selectedLessonId}`
       );
     }).pipe(
       Effect.catchTags({
@@ -215,6 +152,12 @@ export const cherryPick = CLICommand.make(
           return Effect.gen(function* () {
             yield* Console.error(`Error: ${error.message}`);
             process.exitCode = 1;
+          });
+        },
+        PromptCancelledError: () => {
+          return Effect.gen(function* () {
+            yield* Console.log("Operation cancelled");
+            process.exitCode = 0;
           });
         },
       }),

@@ -8,6 +8,8 @@ import { Console, Data, Effect } from "effect";
 import { existsSync } from "node:fs";
 import * as path from "node:path";
 import prompt from "prompts";
+import { PromptCancelledError, runPrompt } from "./prompt-utils.js";
+import { CommitNotFoundError, selectLessonCommit } from "./commit-utils.js";
 
 export class NotAGitRepoError extends Data.TaggedError(
   "NotAGitRepoError"
@@ -16,39 +18,18 @@ export class NotAGitRepoError extends Data.TaggedError(
   message: string;
 }> {}
 
-export class CommitNotFoundError extends Data.TaggedError(
-  "CommitNotFoundError"
-)<{
-  lessonId: string;
-  branch: string;
-}> {}
-
-export class PromptCancelledError extends Data.TaggedError(
-  "PromptCancelledError"
-) {}
-
 export class InvalidBranchOperationError extends Data.TaggedError(
   "InvalidBranchOperationError"
 )<{
   message: string;
 }> {}
 
-const runPrompt = <T>(promptFn: () => Promise<T>) => {
-  return Effect.gen(function* () {
-    const result = yield* Effect.promise(() => promptFn());
-
-    if (!result) {
-      return yield* new PromptCancelledError();
-    }
-
-    return result;
-  });
-};
-
 export const reset = CLICommand.make(
   "reset",
   {
-    lessonId: Args.text({ name: "lesson-id" }),
+    lessonId: Args.text({ name: "lesson-id" }).pipe(
+      Args.optional
+    ),
     branch: Options.text("branch").pipe(
       Options.withDescription(
         "Branch to search for the lesson commit"
@@ -90,74 +71,14 @@ export const reset = CLICommand.make(
         return;
       }
 
-      yield* Console.log(
-        `Searching for lesson ${lessonId} on branch ${branch}...`
-      );
-
-      // Search commit history for lesson ID
-      const gitLogCommand = Command.make(
-        "git",
-        "log",
-        branch,
-        "--oneline"
-      ).pipe(Command.workingDirectory(cwd));
-
-      const commitHistory = yield* Command.string(gitLogCommand);
-
-      // Parse commits to find matching lesson ID
-      type ParsedCommit = {
-        sha: string;
-        message: string;
-        lessonId: string | null;
-      };
-
-      const commits: Array<ParsedCommit> = commitHistory
-        .trim()
-        .split("\n")
-        .filter(Boolean)
-        .map((line) => {
-          const [sha, ...messageParts] = line.split(" ");
-          const message = messageParts.join(" ");
-
-          // Extract lesson ID - match pattern like 01.01.01, 1.1.1, etc.
-          const lessonMatch = message.match(
-            /^(\d+)[.-](\d+)[.-](\d+) /
-          );
-          const extractedLessonId = lessonMatch
-            ? `${lessonMatch[1]!.padStart(
-                2,
-                "0"
-              )}.${lessonMatch[2]!.padStart(
-                2,
-                "0"
-              )}.${lessonMatch[3]!.padStart(2, "0")}`
-            : null;
-
-          return {
-            sha: sha!,
-            message,
-            lessonId: extractedLessonId,
-          };
-        });
-
-      const matchingCommits = commits.filter(
-        (commit) => commit.lessonId === lessonId
-      );
-
-      if (matchingCommits.length === 0) {
-        return yield* new CommitNotFoundError({
-          lessonId,
+      const { commit: targetCommit, lessonId: selectedLessonId } =
+        yield* selectLessonCommit({
+          cwd,
           branch,
+          lessonId,
+          promptMessage:
+            "Which lesson do you want to reset to? (type to search)",
         });
-      }
-
-      // If multiple commits found, choose the latest one (last in the list)
-      const targetCommit =
-        matchingCommits[matchingCommits.length - 1]!;
-
-      yield* Console.log(
-        `Found commit: ${targetCommit.sha} ${targetCommit.message}`
-      );
 
       // Prompt for action
       const { action } = yield* runPrompt<{
@@ -190,9 +111,9 @@ export const reset = CLICommand.make(
           "--show-current"
         ).pipe(Command.workingDirectory(cwd));
 
-        const currentBranch = (
-          yield* Command.string(currentBranchCommand)
-        ).trim();
+        const currentBranch = (yield* Command.string(
+          currentBranchCommand
+        )).trim();
 
         // Check if current branch is the target branch
         if (currentBranch === branch) {
@@ -315,7 +236,9 @@ export const reset = CLICommand.make(
         return;
       }
 
-      yield* Console.log(`✓ Reset to lesson ${lessonId}`);
+      yield* Console.log(
+        `✓ Reset to lesson ${selectedLessonId}`
+      );
     }).pipe(
       Effect.catchTags({
         NotAGitRepoError: (error) => {
