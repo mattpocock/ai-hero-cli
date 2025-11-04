@@ -50,8 +50,11 @@ export const reset = CLICommand.make(
         "Reset to solution state (final code)"
       )
     ),
+    demo: Options.boolean("demo").pipe(
+      Options.withAlias("d")
+    ),
   },
-  ({ branch, lessonId, problem, solution }) =>
+  ({ branch, demo, lessonId, problem, solution }) =>
     Effect.gen(function* () {
       const cwd = process.cwd();
 
@@ -112,8 +115,17 @@ export const reset = CLICommand.make(
         );
       }
 
-      // If neither flag is provided, prompt user
-      if (!problem && !solution) {
+      if (demo && (problem || solution)) {
+        return yield* Effect.fail(
+          new InvalidBranchOperationError({
+            message:
+              "Cannot use --demo with --problem or --solution flags",
+          })
+        );
+      }
+
+      // If neither flag is provided, prompt user (unless demo mode)
+      if (!problem && !solution && !demo) {
         const { state } = yield* runPrompt<{
           state: "problem" | "solution";
         }>(() =>
@@ -167,28 +179,34 @@ export const reset = CLICommand.make(
         currentBranchCommand
       )).trim();
 
-      // Prompt for action
-      const { action } = yield* runPrompt<{
-        action: "reset-current" | "create-branch";
-      }>(() =>
-        prompt([
-          {
-            type: "select",
-            name: "action",
-            message: "How would you like to proceed?",
-            choices: [
-              {
-                title: `Reset current branch (${currentBranch})`,
-                value: "reset-current",
-              },
-              {
-                title: "Create new branch from commit",
-                value: "create-branch",
-              },
-            ],
-          },
-        ])
-      );
+      // Prompt for action (skip in demo mode)
+      let action: "reset-current" | "create-branch";
+      if (demo) {
+        action = "reset-current";
+      } else {
+        const result = yield* runPrompt<{
+          action: "reset-current" | "create-branch";
+        }>(() =>
+          prompt([
+            {
+              type: "select",
+              name: "action",
+              message: "How would you like to proceed?",
+              choices: [
+                {
+                  title: `Reset current branch (${currentBranch})`,
+                  value: "reset-current",
+                },
+                {
+                  title: "Create new branch from commit",
+                  value: "create-branch",
+                },
+              ],
+            },
+          ])
+        );
+        action = result.action;
+      }
 
       if (action === "reset-current") {
         // Check if current branch is the target branch
@@ -251,40 +269,42 @@ export const reset = CLICommand.make(
         return;
       }
 
-      // Reset current branch - check for unstaged changes
-      const gitStatusCommand = Command.make(
-        "git",
-        "status",
-        "--porcelain"
-      ).pipe(Command.workingDirectory(cwd));
+      // Reset current branch - check for unstaged changes (skip in demo mode)
+      if (!demo) {
+        const gitStatusCommand = Command.make(
+          "git",
+          "status",
+          "--porcelain"
+        ).pipe(Command.workingDirectory(cwd));
 
-      const statusOutput = yield* Command.string(
-        gitStatusCommand
-      );
-
-      if (statusOutput.trim() !== "") {
-        yield* Console.log(
-          "\nWarning: You have uncommitted changes:"
-        );
-        yield* Console.log(statusOutput);
-
-        const { confirm } = yield* runPrompt<{
-          confirm: boolean;
-        }>(() =>
-          prompt([
-            {
-              type: "confirm",
-              name: "confirm",
-              message:
-                "This will lose all uncommitted work. Continue?",
-              initial: false,
-            },
-          ])
+        const statusOutput = yield* Command.string(
+          gitStatusCommand
         );
 
-        if (!confirm) {
-          yield* Console.log("Reset cancelled");
-          return;
+        if (statusOutput.trim() !== "") {
+          yield* Console.log(
+            "\nWarning: You have uncommitted changes:"
+          );
+          yield* Console.log(statusOutput);
+
+          const { confirm } = yield* runPrompt<{
+            confirm: boolean;
+          }>(() =>
+            prompt([
+              {
+                type: "confirm",
+                name: "confirm",
+                message:
+                  "This will lose all uncommitted work. Continue?",
+                initial: false,
+              },
+            ])
+          );
+
+          if (!confirm) {
+            yield* Console.log("Reset cancelled");
+            return;
+          }
         }
       }
 
@@ -314,9 +334,59 @@ export const reset = CLICommand.make(
         return;
       }
 
-      yield* Console.log(
-        `✓ Reset to lesson ${selectedLessonId} (${stateDescription})`
-      );
+      // Demo mode: undo commit and unstage changes
+      if (demo) {
+        yield* Console.log("Undoing commit and unstaging changes...");
+
+        const undoCommand = Command.make(
+          "git",
+          "reset",
+          "HEAD^"
+        ).pipe(
+          Command.workingDirectory(cwd),
+          Command.stdout("inherit"),
+          Command.stderr("inherit")
+        );
+
+        const undoExitCode = yield* Command.exitCode(
+          undoCommand
+        ).pipe(Effect.catchAll(() => Effect.succeed(1)));
+
+        if (undoExitCode !== 0) {
+          yield* Console.error("Failed to undo commit");
+          process.exitCode = 1;
+          return;
+        }
+
+        const unstageCommand = Command.make(
+          "git",
+          "restore",
+          "--staged",
+          "."
+        ).pipe(
+          Command.workingDirectory(cwd),
+          Command.stdout("inherit"),
+          Command.stderr("inherit")
+        );
+
+        const unstageExitCode = yield* Command.exitCode(
+          unstageCommand
+        ).pipe(Effect.catchAll(() => Effect.succeed(1)));
+
+        if (unstageExitCode !== 0) {
+          yield* Console.error("Failed to unstage changes");
+          process.exitCode = 1;
+          return;
+        }
+
+        yield* Console.log(
+          `✓ Demo mode: Reset to lesson ${selectedLessonId} with unstaged changes`
+        );
+      } else {
+        yield* Console.log(
+          `✓ Reset to lesson ${selectedLessonId} (${stateDescription})`
+        );
+      }
     }).pipe(
       Effect.catchTags({
         NoParentCommitError: (error) => {
