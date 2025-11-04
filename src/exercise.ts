@@ -13,7 +13,6 @@ import {
   LogLevel,
   Option,
 } from "effect";
-import type { NoSuchElementException } from "effect/Cause";
 import { execSync } from "node:child_process";
 import * as path from "path";
 import prompt from "prompts";
@@ -29,22 +28,10 @@ import {
   envFilePathOption,
   rootOption,
 } from "./options.js";
-
-class PromptCancelledError extends Data.TaggedError(
-  "PromptCancelledError"
-) {}
-
-const runPrompt = <T>(prompt: () => Promise<T>) => {
-  return Effect.gen(function* () {
-    const result = yield* Effect.promise(() => prompt());
-
-    if (!result) {
-      return yield* new PromptCancelledError();
-    }
-
-    return result;
-  });
-};
+import {
+  runPrompt,
+  type PromptCancelledError,
+} from "./prompt-utils.js";
 
 class LessonNotFoundError extends Data.TaggedError(
   "LessonNotFoundError"
@@ -59,13 +46,6 @@ class LessonEntrypointNotFoundError extends Data.TaggedError(
   lesson: number;
   message: string;
 }> {}
-
-const shortcuts = {
-  enter: "Choose a new exercise to run",
-  n: "Go to the next exercise",
-  p: "Go to the previous exercise",
-  q: "Quit the exercise",
-};
 
 type ExerciseInstruction = {
   /**
@@ -99,7 +79,6 @@ const runLesson: (opts: {
   | PromptCancelledError
   | PlatformError
   | InvalidPathError
-  | NoSuchElementException
   | PathNumberIsNaNError,
   LessonParserService | FileSystem.FileSystem
 > = Effect.fn("runLesson")(function* (opts) {

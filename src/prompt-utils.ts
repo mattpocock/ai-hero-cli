@@ -4,11 +4,13 @@ export class PromptCancelledError extends Data.TaggedError(
   "PromptCancelledError"
 ) {}
 
-export const runPrompt = <T>(promptFn: () => Promise<T>) => {
+export const runPrompt = <T extends object>(
+  promptFn: () => Promise<T>
+) => {
   return Effect.gen(function* () {
     const result = yield* Effect.promise(() => promptFn());
 
-    if (!result) {
+    if (Object.keys(result).length === 0) {
       return yield* new PromptCancelledError();
     }
 
