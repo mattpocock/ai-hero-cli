@@ -2,16 +2,10 @@ import { Command as CLICommand, Options } from "@effect/cli";
 import { FileSystem } from "@effect/platform";
 import { v2 as cloudinary } from "cloudinary";
 import * as dotenv from "dotenv";
-import {
-  Array as EffectArray,
-  Console,
-  Data,
-  Effect,
-  flow,
-} from "effect";
+import { Console, Data, Effect } from "effect";
 import * as path from "path";
-import { envFilePathOption, rootOption } from "../options.js";
 import { LessonParserService } from "../lesson-parser-service.js";
+import { envFilePathOption, rootOption } from "../options.js";
 
 class CloudinaryUrlNotSetError extends Data.TaggedError(
   "CloudinaryUrlNotSetError"

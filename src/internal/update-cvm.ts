@@ -1,6 +1,6 @@
 import { Command as CLICommand, Options } from "@effect/cli";
 import { Command } from "@effect/platform";
-import { Console, Effect } from "effect";
+import { Effect } from "effect";
 import { existsSync } from "node:fs";
 import * as path from "node:path";
 
