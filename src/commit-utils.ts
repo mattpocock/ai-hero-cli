@@ -10,6 +10,12 @@ export class CommitNotFoundError extends Data.TaggedError(
   branch: string;
 }> {}
 
+export class NoParentCommitError extends Data.TaggedError(
+  "NoParentCommitError"
+)<{
+  commitSha: string;
+}> {}
+
 type ParsedCommit = {
   /** Short commit SHA */
   sha: string;
@@ -165,4 +171,31 @@ export const selectLessonCommit = ({
       commit: targetCommit,
       lessonId: selectedLessonId,
     };
+  });
+
+/**
+ * Get the parent commit of a given commit SHA.
+ * Throws NoParentCommitError if the commit has no parent.
+ */
+export const getParentCommit = ({
+  commitSha,
+  cwd,
+}: {
+  commitSha: string;
+  cwd: string;
+}) =>
+  Effect.gen(function* () {
+    const gitRevParseCommand = Command.make(
+      "git",
+      "rev-parse",
+      `${commitSha}^`
+    ).pipe(Command.workingDirectory(cwd));
+
+    const parentSha = yield* Command.string(
+      gitRevParseCommand
+    ).pipe(
+      Effect.mapError(() => new NoParentCommitError({ commitSha }))
+    );
+
+    return parentSha.trim();
   });

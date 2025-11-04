@@ -8,8 +8,11 @@ import { Console, Data, Effect } from "effect";
 import { existsSync } from "node:fs";
 import * as path from "node:path";
 import prompt from "prompts";
-import { PromptCancelledError, runPrompt } from "./prompt-utils.js";
-import { CommitNotFoundError, selectLessonCommit } from "./commit-utils.js";
+import {
+  getParentCommit,
+  selectLessonCommit,
+} from "./commit-utils.js";
+import { runPrompt } from "./prompt-utils.js";
 
 export class NotAGitRepoError extends Data.TaggedError(
   "NotAGitRepoError"
@@ -35,8 +38,20 @@ export const reset = CLICommand.make(
         "Branch to search for the lesson commit"
       )
     ),
+    problem: Options.boolean("problem").pipe(
+      Options.withAlias("p"),
+      Options.withDescription(
+        "Reset to problem state (start the exercise)"
+      )
+    ),
+    solution: Options.boolean("solution").pipe(
+      Options.withAlias("s"),
+      Options.withDescription(
+        "Reset to solution state (final code)"
+      )
+    ),
   },
-  ({ branch, lessonId }) =>
+  ({ branch, lessonId, problem, solution }) =>
     Effect.gen(function* () {
       const cwd = process.cwd();
 
@@ -71,15 +86,86 @@ export const reset = CLICommand.make(
         return;
       }
 
-      const { commit: targetCommit, lessonId: selectedLessonId } =
-        yield* selectLessonCommit({
+      const {
+        commit: targetCommit,
+        lessonId: selectedLessonId,
+      } = yield* selectLessonCommit({
+        cwd,
+        branch,
+        lessonId,
+        promptMessage:
+          "Which lesson do you want to reset to? (type to search)",
+        excludeCurrentBranch: false,
+      });
+
+      // Determine which commit to use based on problem/solution state
+      let commitToUse = targetCommit.sha;
+      let stateDescription = "final code";
+
+      // Check for conflicting flags
+      if (problem && solution) {
+        return yield* Effect.fail(
+          new InvalidBranchOperationError({
+            message:
+              "Cannot use both --problem and --solution flags",
+          })
+        );
+      }
+
+      // If neither flag is provided, prompt user
+      if (!problem && !solution) {
+        const { state } = yield* runPrompt<{
+          state: "problem" | "solution";
+        }>(() =>
+          prompt([
+            {
+              type: "select",
+              name: "state",
+              message: "Start the exercise or view final code?",
+              choices: [
+                {
+                  title: "Start the exercise",
+                  value: "problem",
+                  description:
+                    "Reset to problem state (commit before solution)",
+                },
+                {
+                  title: "Final code",
+                  value: "solution",
+                  description:
+                    "Reset to solution state (completed exercise)",
+                },
+              ],
+            },
+          ])
+        );
+
+        if (state === "problem") {
+          commitToUse = yield* getParentCommit({
+            commitSha: targetCommit.sha,
+            cwd,
+          });
+          stateDescription = "problem state";
+        }
+      } else if (problem) {
+        commitToUse = yield* getParentCommit({
+          commitSha: targetCommit.sha,
           cwd,
-          branch,
-          lessonId,
-          promptMessage:
-            "Which lesson do you want to reset to? (type to search)",
-          excludeCurrentBranch: false,
         });
+        stateDescription = "problem state";
+      }
+      // If solution flag is set, commitToUse stays as targetCommit.sha
+
+      // Get current branch name for the prompt
+      const currentBranchCommand = Command.make(
+        "git",
+        "branch",
+        "--show-current"
+      ).pipe(Command.workingDirectory(cwd));
+
+      const currentBranch = (yield* Command.string(
+        currentBranchCommand
+      )).trim();
 
       // Prompt for action
       const { action } = yield* runPrompt<{
@@ -92,7 +178,7 @@ export const reset = CLICommand.make(
             message: "How would you like to proceed?",
             choices: [
               {
-                title: "Reset current branch",
+                title: `Reset current branch (${currentBranch})`,
                 value: "reset-current",
               },
               {
@@ -105,17 +191,6 @@ export const reset = CLICommand.make(
       );
 
       if (action === "reset-current") {
-        // Get current branch name
-        const currentBranchCommand = Command.make(
-          "git",
-          "branch",
-          "--show-current"
-        ).pipe(Command.workingDirectory(cwd));
-
-        const currentBranch = (yield* Command.string(
-          currentBranchCommand
-        )).trim();
-
         // Check if current branch is the target branch
         if (currentBranch === branch) {
           return yield* new InvalidBranchOperationError({
@@ -145,7 +220,7 @@ export const reset = CLICommand.make(
         );
 
         yield* Console.log(
-          `Creating branch ${branchName} from ${targetCommit.sha}...`
+          `Creating branch ${branchName} from ${commitToUse} (${stateDescription})...`
         );
 
         const createBranchCommand = Command.make(
@@ -153,7 +228,7 @@ export const reset = CLICommand.make(
           "checkout",
           "-b",
           branchName,
-          targetCommit.sha
+          commitToUse
         ).pipe(
           Command.workingDirectory(cwd),
           Command.stdout("inherit"),
@@ -214,13 +289,15 @@ export const reset = CLICommand.make(
       }
 
       // Reset to target commit
-      yield* Console.log(`Resetting to ${targetCommit.sha}...`);
+      yield* Console.log(
+        `Resetting to ${commitToUse} (${stateDescription})...`
+      );
 
       const resetCommand = Command.make(
         "git",
         "reset",
         "--hard",
-        targetCommit.sha
+        commitToUse
       ).pipe(
         Command.workingDirectory(cwd),
         Command.stdout("inherit"),
@@ -238,10 +315,18 @@ export const reset = CLICommand.make(
       }
 
       yield* Console.log(
-        `✓ Reset to lesson ${selectedLessonId}`
+        `✓ Reset to lesson ${selectedLessonId} (${stateDescription})`
       );
     }).pipe(
       Effect.catchTags({
+        NoParentCommitError: (error) => {
+          return Effect.gen(function* () {
+            yield* Console.error(
+              `Error: Commit ${error.commitSha} has no parent commit. Repository may be in an invalid state.`
+            );
+            process.exitCode = 1;
+          });
+        },
         NotAGitRepoError: (error) => {
           return Effect.gen(function* () {
             yield* Console.error(`Error: ${error.message}`);

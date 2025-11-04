@@ -7,8 +7,7 @@ import { Command } from "@effect/platform";
 import { Console, Data, Effect } from "effect";
 import { existsSync } from "node:fs";
 import * as path from "node:path";
-import { PromptCancelledError } from "./prompt-utils.js";
-import { CommitNotFoundError, selectLessonCommit } from "./commit-utils.js";
+import { selectLessonCommit } from "./commit-utils.js";
 
 export class NotAGitRepoError extends Data.TaggedError(
   "NotAGitRepoError"
@@ -70,15 +69,17 @@ export const cherryPick = CLICommand.make(
         return;
       }
 
-      const { commit: targetCommit, lessonId: selectedLessonId } =
-        yield* selectLessonCommit({
-          cwd,
-          branch,
-          lessonId,
-          promptMessage:
-            "Which lesson do you want to cherry-pick? (type to search)",
-          excludeCurrentBranch: true,
-        });
+      const {
+        commit: targetCommit,
+        lessonId: selectedLessonId,
+      } = yield* selectLessonCommit({
+        cwd,
+        branch,
+        lessonId,
+        promptMessage:
+          "Which lesson do you want to cherry-pick? (type to search)",
+        excludeCurrentBranch: true,
+      });
 
       // Get current branch name and validate
       const currentBranchCommand = Command.make(
