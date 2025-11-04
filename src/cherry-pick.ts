@@ -22,6 +22,12 @@ export class CommitNotFoundError extends Data.TaggedError(
   branch: string;
 }> {}
 
+export class InvalidBranchOperationError extends Data.TaggedError(
+  "InvalidBranchOperationError"
+)<{
+  message: string;
+}> {}
+
 export const cherryPick = CLICommand.make(
   "cherry-pick",
   {
@@ -135,6 +141,32 @@ export const cherryPick = CLICommand.make(
       yield* Console.log(
         `Found commit: ${targetCommit.sha} ${targetCommit.message}`
       );
+
+      // Get current branch name and validate
+      const currentBranchCommand = Command.make(
+        "git",
+        "branch",
+        "--show-current"
+      ).pipe(Command.workingDirectory(cwd));
+
+      const currentBranch = (
+        yield* Command.string(currentBranchCommand)
+      ).trim();
+
+      // Check if current branch is the target branch
+      if (currentBranch === branch) {
+        return yield* new InvalidBranchOperationError({
+          message: `Cannot cherry-pick when on target branch "${branch}"`,
+        });
+      }
+
+      // Check if current branch is main
+      if (currentBranch === "main") {
+        return yield* new InvalidBranchOperationError({
+          message: `Cannot cherry-pick when on "main" branch`,
+        });
+      }
+
       yield* Console.log(
         `Cherry-picking ${targetCommit.sha} onto current branch...\n`
       );
@@ -176,6 +208,12 @@ export const cherryPick = CLICommand.make(
             yield* Console.error(
               `Error: No commit found for lesson ${error.lessonId} on branch ${error.branch}`
             );
+            process.exitCode = 1;
+          });
+        },
+        InvalidBranchOperationError: (error) => {
+          return Effect.gen(function* () {
+            yield* Console.error(`Error: ${error.message}`);
             process.exitCode = 1;
           });
         },

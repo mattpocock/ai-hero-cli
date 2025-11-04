@@ -27,6 +27,12 @@ export class PromptCancelledError extends Data.TaggedError(
   "PromptCancelledError"
 ) {}
 
+export class InvalidBranchOperationError extends Data.TaggedError(
+  "InvalidBranchOperationError"
+)<{
+  message: string;
+}> {}
+
 const runPrompt = <T>(promptFn: () => Promise<T>) => {
   return Effect.gen(function* () {
     const result = yield* Effect.promise(() => promptFn());
@@ -176,6 +182,33 @@ export const reset = CLICommand.make(
         ])
       );
 
+      if (action === "reset-current") {
+        // Get current branch name
+        const currentBranchCommand = Command.make(
+          "git",
+          "branch",
+          "--show-current"
+        ).pipe(Command.workingDirectory(cwd));
+
+        const currentBranch = (
+          yield* Command.string(currentBranchCommand)
+        ).trim();
+
+        // Check if current branch is the target branch
+        if (currentBranch === branch) {
+          return yield* new InvalidBranchOperationError({
+            message: `Cannot reset current branch when on target branch "${branch}"`,
+          });
+        }
+
+        // Check if current branch is main
+        if (currentBranch === "main") {
+          return yield* new InvalidBranchOperationError({
+            message: `Cannot reset current branch when on "main" branch`,
+          });
+        }
+      }
+
       if (action === "create-branch") {
         const { branchName } = yield* runPrompt<{
           branchName: string;
@@ -303,6 +336,12 @@ export const reset = CLICommand.make(
           return Effect.gen(function* () {
             yield* Console.log("Operation cancelled");
             process.exitCode = 0;
+          });
+        },
+        InvalidBranchOperationError: (error) => {
+          return Effect.gen(function* () {
+            yield* Console.error(`Error: ${error.message}`);
+            process.exitCode = 1;
           });
         },
       }),
