@@ -78,18 +78,58 @@ export const selectLessonCommit = ({
 }) =>
   Effect.gen(function* () {
     // Search commit history for lesson ID
-    const gitLogArgs = excludeCurrentBranch
-      ? ["log", branch, "--not", "HEAD", "--oneline"]
-      : ["log", branch, "--oneline"];
+    let commits: Array<ParsedCommit>;
 
-    const gitLogCommand = Command.make(
-      "git",
-      ...gitLogArgs
-    ).pipe(Command.workingDirectory(cwd));
+    if (excludeCurrentBranch) {
+      // Get commits from current branch to extract lesson IDs
+      const currentBranchCommand = Command.make(
+        "git",
+        "log",
+        "HEAD",
+        "--oneline"
+      ).pipe(Command.workingDirectory(cwd));
 
-    const commitHistory = yield* Command.string(gitLogCommand);
+      const currentBranchHistory = yield* Command.string(
+        currentBranchCommand
+      );
+      const currentBranchCommits = parseCommits(currentBranchHistory);
 
-    const commits = parseCommits(commitHistory);
+      // Extract lesson IDs from current branch (only commits with lesson IDs)
+      const currentLessonIds = new Set(
+        currentBranchCommits
+          .filter((c) => c.lessonId !== null)
+          .map((c) => c.lessonId!)
+      );
+
+      // Get commits from target branch
+      const targetBranchCommand = Command.make(
+        "git",
+        "log",
+        branch,
+        "--oneline"
+      ).pipe(Command.workingDirectory(cwd));
+
+      const targetBranchHistory = yield* Command.string(
+        targetBranchCommand
+      );
+      const allTargetCommits = parseCommits(targetBranchHistory);
+
+      // Filter out commits with lesson IDs that exist on current branch
+      commits = allTargetCommits.filter(
+        (c) => !c.lessonId || !currentLessonIds.has(c.lessonId)
+      );
+    } else {
+      const gitLogCommand = Command.make(
+        "git",
+        "log",
+        branch,
+        "--oneline"
+      ).pipe(Command.workingDirectory(cwd));
+
+      const commitHistory = yield* Command.string(gitLogCommand);
+
+      commits = parseCommits(commitHistory);
+    }
 
     // Get selected lesson ID
     let selectedLessonId: string;
