@@ -1,5 +1,12 @@
 # ai-hero-cli
 
+## 0.2.5
+
+### Patch Changes
+
+- 8b294a1: Added internal edit commit for working with project history
+- ba10d66: Added a default to --branch
+
 ## 0.2.4
 
 ### Patch Changes
