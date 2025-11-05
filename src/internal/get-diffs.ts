@@ -7,6 +7,7 @@ import {
   LessonParserService,
   type Lesson,
 } from "../lesson-parser-service.js";
+import { DEFAULT_PROJECT_TARGET_BRANCH } from "../constants.js";
 
 export class InvalidProjectRepoError extends Data.TaggedError(
   "InvalidProjectRepoError"
@@ -54,7 +55,8 @@ export const getDiffs = CLICommand.make(
       )
     ),
     branch: Options.text("branch").pipe(
-      Options.withDescription("Branch to get diffs from")
+      Options.withDescription("Branch to get diffs from"),
+      Options.withDefault(DEFAULT_PROJECT_TARGET_BRANCH)
     ),
     root: Options.text("root").pipe(
       Options.withDescription(

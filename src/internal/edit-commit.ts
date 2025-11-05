@@ -16,6 +16,7 @@ import type {
   SystemError,
 } from "@effect/platform/Error";
 import type { CommandExecutor } from "@effect/platform/CommandExecutor";
+import { DEFAULT_PROJECT_TARGET_BRANCH } from "../constants.js";
 
 export class NotAGitRepoError extends Data.TaggedError(
   "NotAGitRepoError"
@@ -52,7 +53,7 @@ export const editCommit = CLICommand.make(
       Options.withDescription(
         "Branch to search for the lesson commit"
       ),
-      Options.withDefault("live-run-through")
+      Options.withDefault(DEFAULT_PROJECT_TARGET_BRANCH)
     ),
   },
   ({ branch, lessonId }) =>
@@ -426,7 +427,9 @@ export const editCommit = CLICommand.make(
         return;
       }
 
-      yield* Console.log(`✓ ${branch} updated with your changes`);
+      yield* Console.log(
+        `✓ ${branch} updated with your changes`
+      );
 
       // Prompt to force push
       const { forcePush } = yield* runPrompt<{
@@ -443,7 +446,9 @@ export const editCommit = CLICommand.make(
       );
 
       if (!forcePush) {
-        yield* Console.log("Local changes saved. Session complete.");
+        yield* Console.log(
+          "Local changes saved. Session complete."
+        );
         return;
       }
 
@@ -549,7 +554,8 @@ function resolveConflictLoop(
         {
           type: "select",
           name: "action",
-          message: "Cherry-pick conflict. What do you want to do?",
+          message:
+            "Cherry-pick conflict. What do you want to do?",
           choices: [
             {
               title: "Continue (run git cherry-pick --continue)",
@@ -558,7 +564,8 @@ function resolveConflictLoop(
                 "Continue cherry-pick after resolving conflicts",
             },
             {
-              title: "Skip (already resolved in another session)",
+              title:
+                "Skip (already resolved in another session)",
               value: "skip",
               description:
                 "Skip running git command, conflicts already resolved",

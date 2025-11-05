@@ -13,6 +13,7 @@ import {
   selectLessonCommit,
 } from "./commit-utils.js";
 import { runPrompt } from "./prompt-utils.js";
+import { DEFAULT_PROJECT_TARGET_BRANCH } from "./constants.js";
 
 export class NotAGitRepoError extends Data.TaggedError(
   "NotAGitRepoError"
@@ -36,7 +37,8 @@ export const reset = CLICommand.make(
     branch: Options.text("branch").pipe(
       Options.withDescription(
         "Branch to search for the lesson commit"
-      )
+      ),
+      Options.withDefault(DEFAULT_PROJECT_TARGET_BRANCH)
     ),
     problem: Options.boolean("problem").pipe(
       Options.withAlias("p"),
@@ -50,9 +52,7 @@ export const reset = CLICommand.make(
         "Reset to solution state (final code)"
       )
     ),
-    demo: Options.boolean("demo").pipe(
-      Options.withAlias("d")
-    ),
+    demo: Options.boolean("demo").pipe(Options.withAlias("d")),
   },
   ({ branch, demo, lessonId, problem, solution }) =>
     Effect.gen(function* () {
@@ -336,7 +336,9 @@ export const reset = CLICommand.make(
 
       // Demo mode: undo commit and unstage changes
       if (demo) {
-        yield* Console.log("Undoing commit and unstaging changes...");
+        yield* Console.log(
+          "Undoing commit and unstaging changes..."
+        );
 
         const undoCommand = Command.make(
           "git",

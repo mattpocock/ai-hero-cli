@@ -8,6 +8,7 @@ import { Console, Data, Effect } from "effect";
 import { existsSync } from "node:fs";
 import * as path from "node:path";
 import { selectLessonCommit } from "./commit-utils.js";
+import { DEFAULT_PROJECT_TARGET_BRANCH } from "./constants.js";
 
 export class NotAGitRepoError extends Data.TaggedError(
   "NotAGitRepoError"
@@ -31,7 +32,8 @@ export const cherryPick = CLICommand.make(
     branch: Options.text("branch").pipe(
       Options.withDescription(
         "Branch to search for the lesson commit"
-      )
+      ),
+      Options.withDefault(DEFAULT_PROJECT_TARGET_BRANCH)
     ),
   },
   ({ branch, lessonId }) =>
