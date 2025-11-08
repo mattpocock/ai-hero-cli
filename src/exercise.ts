@@ -402,7 +402,17 @@ const chooseLessonAndRunIt = (opts: {
       cwd: opts.cwd,
       forceSubfolderIndex: undefined,
     });
-  }).pipe(Effect.catchAll(Console.log));
+  }).pipe(
+    Effect.catchTags({
+      PromptCancelledError: () => {
+        return Effect.gen(function* () {
+          yield* Console.log("Operation cancelled");
+          process.exitCode = 0;
+        });
+      },
+    }),
+    Effect.catchAll(Console.log)
+  );
 
 export const exercise = CLICommand.make(
   "exercise",
