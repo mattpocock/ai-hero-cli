@@ -241,7 +241,7 @@ export const editCommit = CLICommand.make(
         "✓ Reset complete with unstaged changes"
       );
       yield* Console.log(
-        "\nSession active. Make your changes to the code."
+        "\nSession active. Make your changes to the code. ALL unstaged changes will be added to the commit."
       );
 
       // Wait for user to be ready
@@ -270,7 +270,7 @@ export const editCommit = CLICommand.make(
       );
 
       // Add all files
-      const addCommand = Command.make("git", "add", "-A").pipe(
+      const addCommand = Command.make("git", "add", ".").pipe(
         Command.workingDirectory(cwd),
         Command.stdout("inherit"),
         Command.stderr("inherit")
@@ -480,6 +480,19 @@ export const editCommit = CLICommand.make(
       yield* Console.log(
         `✓ Successfully pushed ${branch} to origin`
       );
+
+      // Go back to the original branch
+      yield* Console.log(
+        `Switching back to ${currentBranch}...`
+      );
+      const switchBackCommand = Command.make(
+        "git",
+        "checkout",
+        currentBranch
+      ).pipe(Command.workingDirectory(cwd));
+      yield* Command.exitCode(switchBackCommand);
+
+      yield* Console.log(`✓ Switched back to ${currentBranch}`);
     }).pipe(
       Effect.catchTags({
         NotAGitRepoError: (error) => {
