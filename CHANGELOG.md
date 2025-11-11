@@ -1,5 +1,13 @@
 # ai-hero-cli
 
+## 0.2.6
+
+### Patch Changes
+
+- 05cc815: Fixed unhandled PromptCancelled error when exiting exercises with Ctrl+C
+- 349cecf: Made it so edit-commit takes you back to the original branch
+- a613420: Made the upgrade script update Evalite to beta.
+
 ## 0.2.5
 
 ### Patch Changes
