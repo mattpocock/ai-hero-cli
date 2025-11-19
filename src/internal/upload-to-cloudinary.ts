@@ -133,9 +133,7 @@ export const uploadToCloudinary = CLICommand.make(
       );
 
       if (imageMatches.length === 0) {
-        return yield* new NoImagesFoundError({
-          message: "No images found in the markdown file",
-        });
+        continue;
       }
 
       let updatedContent = fileContent;
