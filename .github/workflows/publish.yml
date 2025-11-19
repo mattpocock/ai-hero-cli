@@ -17,9 +17,6 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
-    id_tokens:
-      NPM_ID_TOKEN:
-        aud: "npm:registry.npmjs.org"
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -31,6 +28,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          registry-url: "https://registry.npmjs.org"
           cache: "pnpm"
 
       - name: Install dependencies
