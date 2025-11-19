@@ -200,19 +200,33 @@ export const lint = CLICommand.make(
           );
 
           if (!mainFileExists) {
-            errorTracker.addError(
-              lesson,
-              `main.ts file not found in the ${subfolder} folder.`
+            // Check if readme.md exists in this subfolder - if so, skip main.ts error
+            const readmeInSubfolderPath = path.join(
+              lesson.absolutePath(),
+              subfolder,
+              "readme.md"
             );
+            const readmeInSubfolderExists =
+              yield* existsCache.get(readmeInSubfolderPath);
+
+            if (!readmeInSubfolderExists) {
+              errorTracker.addError(
+                lesson,
+                `main.ts file not found in the ${subfolder} folder.`
+              );
+            }
           } else {
             const mainFileContent = yield* fs.readFileString(
               mainFilePath
             );
 
-            if (mainFileContent.trim().length === 0) {
+            const lineCount = mainFileContent
+              .trim()
+              .split("\n").length;
+            if (lineCount === 1) {
               errorTracker.addError(
                 lesson,
-                `main.ts file is empty in the ${subfolder} folder.`
+                `main.ts file in the ${subfolder} folder is too short (${lineCount} lines). Please use a readme-only exercise instead if you only need to show instructions.`
               );
             }
           }
@@ -227,7 +241,9 @@ export const lint = CLICommand.make(
           );
         }
 
-        if (files.some((file) => file.includes("speaker-notes.md"))) {
+        if (
+          files.some((file) => file.includes("speaker-notes.md"))
+        ) {
           errorTracker.addError(
             lesson,
             "speaker-notes.md file found in the exercise. This should not be exposed to users."

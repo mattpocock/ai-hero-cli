@@ -415,8 +415,8 @@ export const reset = CLICommand.make(
         },
         PromptCancelledError: () => {
           return Effect.gen(function* () {
-            yield* Console.log("Operation cancelled");
             process.exitCode = 0;
+            return Effect.succeed(void 0);
           });
         },
         InvalidBranchOperationError: (error) => {

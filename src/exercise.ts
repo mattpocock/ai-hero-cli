@@ -189,45 +189,48 @@ const runLesson: (opts: {
 
   yield* Console.clear;
 
-  yield* Console.log(
-    styleText(
-      "bold",
-      `Running ${foundLesson.num} ${subfolder}...`
-    )
-  );
-  yield* Console.log(
-    styleText(
-      "dim",
-      "  Press n + enter to go to the next exercise"
-    )
-  );
-  yield* Console.log(
-    styleText("dim", "  Press h + enter for more shortcuts\n")
-  );
-
-  if (readmeFile) {
-    yield* logReadmeFile({ readmeFile });
-  }
-
-  const result = yield* Effect.try({
-    try: () =>
-      execSync(
-        `pnpm tsx --env-file="${envFilePath}" "${mainFile}"`,
-        {
-          stdio: "inherit",
-          cwd,
-        }
-      ),
-    catch: (error) => new RunLessonSimpleError({ cause: error }),
-  }).pipe(
-    Effect.map(() => "success" as const),
-    Effect.catchAll(() => Effect.succeed("failed" as const))
-  );
-
   const isExplainer = yield* foundLesson.isExplainer();
 
-  if (isExplainer && readmeFile) {
-    yield* logReadmeFile({ readmeFile });
+  let result: "success" | "failed" | "readme-only";
+
+  if (!mainFile && readmeFile) {
+    yield* Console.log(styleText(["bold"], `Read the readme:`));
+
+    yield* Console.log(
+      styleText("dim", path.relative(cwd, readmeFile))
+    );
+    yield* Console.log("");
+    result = "readme-only";
+  } else if (mainFile) {
+    yield* Console.log(
+      styleText(
+        "bold",
+        `Running ${foundLesson.num} ${subfolder}...`
+      )
+    );
+    if (readmeFile) {
+      yield* logReadmeFile({ readmeFile });
+    }
+    result = yield* Effect.try({
+      try: () =>
+        execSync(
+          `pnpm tsx --env-file="${envFilePath}" "${mainFile}"`,
+          {
+            stdio: "inherit",
+            cwd,
+          }
+        ),
+      catch: (error) =>
+        new RunLessonSimpleError({ cause: error }),
+    }).pipe(
+      Effect.map(() => "success" as const),
+      Effect.catchAll(() => Effect.succeed("failed" as const))
+    );
+    if (isExplainer && readmeFile) {
+      yield* logReadmeFile({ readmeFile });
+    }
+  } else {
+    result = "failed";
   }
 
   const lessonNoun = isExplainer
@@ -235,11 +238,14 @@ const runLesson: (opts: {
         successMessage: `Explainer executed! Once you've read the readme and understand the code, you can go to the next exercise.`,
         failureMessage: `Looks like the explainer errored! Want to try again?`,
         lowercase: "explainer",
+        readmeMessage: `Once you've read the readme, you can go to the next exercise.`,
       }
     : {
         successMessage: "Exercise complete! What's next?",
         failureMessage: `Looks like the exercise errored! Want to try again?`,
         lowercase: "exercise",
+        readmeMessage:
+          "Once you've read the readme, you can go to the next exercise.",
       };
 
   const { choice } = yield* runPrompt<{
@@ -257,15 +263,21 @@ const runLesson: (opts: {
         message:
           result === "success"
             ? lessonNoun.successMessage
+            : result === "readme-only"
+            ? lessonNoun.readmeMessage
             : lessonNoun.failureMessage,
         choices: [
-          {
-            title:
-              result === "failed"
-                ? `🔄 Run the ${lessonNoun.lowercase} again`
-                : `🔄 Try the ${lessonNoun.lowercase} again`,
-            value: "run-again",
-          },
+          ...(result === "readme-only"
+            ? []
+            : [
+                {
+                  title:
+                    result === "failed"
+                      ? `🔄 Run the ${lessonNoun.lowercase} again`
+                      : `🔄 Try the ${lessonNoun.lowercase} again`,
+                  value: "run-again",
+                },
+              ]),
           ...(nextExerciseToRun
             ? [
                 {
@@ -405,10 +417,8 @@ const chooseLessonAndRunIt = (opts: {
   }).pipe(
     Effect.catchTags({
       PromptCancelledError: () => {
-        return Effect.gen(function* () {
-          yield* Console.log("Operation cancelled");
-          process.exitCode = 0;
-        });
+        process.exitCode = 0;
+        return Effect.succeed(void 0);
       },
     }),
     Effect.catchAll(Console.log)
@@ -522,13 +532,6 @@ const getMainAndReadmeFiles = Effect.fn("getMainAndReadmeFiles")(
         )
       );
 
-    if (!mainFile) {
-      return yield* new LessonEntrypointNotFoundError({
-        lesson: opts.lesson.num,
-        message: `main.ts file for exercise ${opts.subfolder} not found`,
-      });
-    }
-
     const readmeFile = yield* opts.lesson
       .allFiles()
       .pipe(
@@ -539,7 +542,17 @@ const getMainAndReadmeFiles = Effect.fn("getMainAndReadmeFiles")(
         )
       );
 
-    return { mainFile, readmeFile };
+    if (!mainFile && !readmeFile) {
+      return yield* new LessonEntrypointNotFoundError({
+        lesson: opts.lesson.num,
+        message: `main.ts file for exercise ${opts.subfolder} not found`,
+      });
+    }
+
+    return {
+      mainFile: mainFile ?? null,
+      readmeFile: readmeFile ?? null,
+    };
   }
 );
 
