@@ -19,12 +19,6 @@ class CouldNotParseCloudinaryUrlError extends Data.TaggedError(
   message: string;
 }> {}
 
-class NoImagesFoundError extends Data.TaggedError(
-  "NoImagesFoundError"
-)<{
-  message: string;
-}> {}
-
 class EnvFileError extends Data.TaggedError("EnvFileError")<{
   message: string;
   cause: unknown;
