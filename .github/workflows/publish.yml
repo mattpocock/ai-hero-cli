@@ -17,6 +17,9 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
+    id_tokens:
+      NPM_ID_TOKEN:
+        aud: "npm:registry.npmjs.org"
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -39,9 +42,7 @@ jobs:
       - name: Create Release Pull Request or Publish
         id: changesets
         uses: changesets/action@v1
-        id_tokens:
-          NPM_ID_TOKEN:
-            aud: "npm:registry.npmjs.org"
+
         with:
           publish: pnpm run changeset-publish
         env:
