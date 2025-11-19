@@ -1,5 +1,11 @@
 # ai-hero-cli
 
+## 0.2.7
+
+### Patch Changes
+
+- 6e99337: Fixed bug where upload to cloudinary would error if there were no images
+
 ## 0.2.6
 
 ### Patch Changes
