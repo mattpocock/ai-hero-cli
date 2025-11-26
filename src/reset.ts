@@ -414,10 +414,8 @@ export const reset = CLICommand.make(
           });
         },
         PromptCancelledError: () => {
-          return Effect.gen(function* () {
-            process.exitCode = 0;
-            return Effect.succeed(void 0);
-          });
+          process.exitCode = 0;
+          return Effect.succeed(void 0);
         },
         InvalidBranchOperationError: (error) => {
           return Effect.gen(function* () {
