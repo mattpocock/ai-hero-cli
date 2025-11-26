@@ -92,7 +92,9 @@ export const selectLessonCommit = ({
       const currentBranchHistory = yield* Command.string(
         currentBranchCommand
       );
-      const currentBranchCommits = parseCommits(currentBranchHistory);
+      const currentBranchCommits = parseCommits(
+        currentBranchHistory
+      );
 
       // Extract lesson IDs from current branch (only commits with lesson IDs)
       const currentLessonIds = new Set(
@@ -234,7 +236,9 @@ export const getParentCommit = ({
     const parentSha = yield* Command.string(
       gitRevParseCommand
     ).pipe(
-      Effect.mapError(() => new NoParentCommitError({ commitSha }))
+      Effect.mapError(
+        () => new NoParentCommitError({ commitSha })
+      )
     );
 
     return parentSha.trim();

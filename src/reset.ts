@@ -4,16 +4,21 @@ import {
   Options,
 } from "@effect/cli";
 import { Command } from "@effect/platform";
-import { Console, Data, Effect } from "effect";
-import { existsSync } from "node:fs";
-import * as path from "node:path";
+import {
+  Config,
+  ConfigProvider,
+  Console,
+  Data,
+  Effect,
+} from "effect";
 import prompt from "prompts";
 import {
   getParentCommit,
   selectLessonCommit,
 } from "./commit-utils.js";
-import { runPrompt } from "./prompt-utils.js";
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "./constants.js";
+import { GitService } from "./git-service.js";
+import { runPrompt } from "./prompt-utils.js";
 
 export class NotAGitRepoError extends Data.TaggedError(
   "NotAGitRepoError"
@@ -56,38 +61,13 @@ export const reset = CLICommand.make(
   },
   ({ branch, demo, lessonId, problem, solution }) =>
     Effect.gen(function* () {
-      const cwd = process.cwd();
+      const git = yield* GitService;
+      const cwd = yield* Config.string("cwd");
 
       // Validate git repository
-      const gitDirPath = path.join(cwd, ".git");
-      if (!existsSync(gitDirPath)) {
-        return yield* Effect.fail(
-          new NotAGitRepoError({
-            path: cwd,
-            message: `Current directory is not a git repository: ${cwd}`,
-          })
-        );
-      }
+      yield* git.ensureIsGitRepo();
 
-      const gitFetchCommand = Command.make(
-        "git",
-        "fetch",
-        "origin"
-      ).pipe(
-        Command.workingDirectory(cwd),
-        Command.stdout("inherit"),
-        Command.stderr("inherit")
-      );
-
-      const fetchExitCode = yield* Command.exitCode(
-        gitFetchCommand
-      );
-
-      if (fetchExitCode !== 0) {
-        yield* Console.error("Failed to fetch branch");
-        process.exitCode = 1;
-        return;
-      }
+      yield* git.ensureBranchConnected(branch);
 
       const {
         commit: targetCommit,
@@ -219,7 +199,7 @@ export const reset = CLICommand.make(
         // Check if current branch is main
         if (currentBranch === "main") {
           return yield* new InvalidBranchOperationError({
-            message: `Cannot reset current branch when on "main" branch`,
+            message: `Cannot reset current branch when on "main" branch. Please create a new branch and reset to the lesson from there.`,
           });
         }
       }
@@ -390,6 +370,9 @@ export const reset = CLICommand.make(
         );
       }
     }).pipe(
+      Effect.withConfigProvider(
+        ConfigProvider.fromMap(new Map([["cwd", process.cwd()]]))
+      ),
       Effect.catchTags({
         NoParentCommitError: (error) => {
           return Effect.gen(function* () {

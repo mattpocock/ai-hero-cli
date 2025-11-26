@@ -4,11 +4,16 @@ import {
   Options,
 } from "@effect/cli";
 import { Command } from "@effect/platform";
-import { Console, Data, Effect } from "effect";
-import { existsSync } from "node:fs";
-import * as path from "node:path";
+import {
+  Config,
+  ConfigProvider,
+  Console,
+  Data,
+  Effect,
+} from "effect";
 import { selectLessonCommit } from "./commit-utils.js";
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "./constants.js";
+import { GitService } from "./git-service.js";
 
 export class NotAGitRepoError extends Data.TaggedError(
   "NotAGitRepoError"
@@ -38,38 +43,13 @@ export const cherryPick = CLICommand.make(
   },
   ({ branch, lessonId }) =>
     Effect.gen(function* () {
-      const cwd = process.cwd();
+      const git = yield* GitService;
+      const cwd = yield* Config.string("cwd");
 
       // Validate git repository
-      const gitDirPath = path.join(cwd, ".git");
-      if (!existsSync(gitDirPath)) {
-        return yield* Effect.fail(
-          new NotAGitRepoError({
-            path: cwd,
-            message: `Current directory is not a git repository: ${cwd}`,
-          })
-        );
-      }
+      yield* git.ensureIsGitRepo();
 
-      const gitFetchCommand = Command.make(
-        "git",
-        "fetch",
-        "origin"
-      ).pipe(
-        Command.workingDirectory(cwd),
-        Command.stdout("inherit"),
-        Command.stderr("inherit")
-      );
-
-      const fetchExitCode = yield* Command.exitCode(
-        gitFetchCommand
-      );
-
-      if (fetchExitCode !== 0) {
-        yield* Console.error("Failed to fetch branch");
-        process.exitCode = 1;
-        return;
-      }
+      yield* git.ensureBranchConnected(branch);
 
       const {
         commit: targetCommit,
@@ -137,6 +117,11 @@ export const cherryPick = CLICommand.make(
         `\n✓ Successfully cherry-picked lesson ${selectedLessonId}`
       );
     }).pipe(
+      Effect.withConfigProvider(
+        ConfigProvider.fromJson({
+          cwd: process.cwd(),
+        })
+      ),
       Effect.catchTags({
         NotAGitRepoError: (error) => {
           return Effect.gen(function* () {
