@@ -1,5 +1,11 @@
 # ai-hero-cli
 
+## 0.2.9
+
+### Patch Changes
+
+- 60295bf: fixed a bug where if you were on a fork, you could not reset or cherry-pick.
+
 ## 0.2.8
 
 ### Patch Changes
