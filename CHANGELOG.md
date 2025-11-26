@@ -1,5 +1,11 @@
 # ai-hero-cli
 
+## 0.2.10
+
+### Patch Changes
+
+- ca698ff: Added an internal rebase-to-main command
+
 ## 0.2.9
 
 ### Patch Changes
