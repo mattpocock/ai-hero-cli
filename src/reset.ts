@@ -148,20 +148,16 @@ export const reset = CLICommand.make(
       }
       // If solution flag is set, commitToUse stays as targetCommit.sha
 
-      // Get current branch name for the prompt
-      const currentBranchCommand = Command.make(
-        "git",
-        "branch",
-        "--show-current"
-      ).pipe(Command.workingDirectory(cwd));
-
-      const currentBranch = (yield* Command.string(
-        currentBranchCommand
-      )).trim();
+      const currentBranch = yield* git.getCurrentBranch();
 
       // Prompt for action (skip in demo mode)
       let action: "reset-current" | "create-branch";
-      if (demo) {
+      if (currentBranch === "main") {
+        yield* Console.log(
+          "You cannot reset the main branch. Creating a new branch..."
+        );
+        action = "create-branch";
+      } else if (demo) {
         action = "reset-current";
       } else {
         const result = yield* runPrompt<{
@@ -195,13 +191,6 @@ export const reset = CLICommand.make(
             message: `Cannot reset current branch when on target branch "${branch}"`,
           });
         }
-
-        // Check if current branch is main
-        if (currentBranch === "main") {
-          return yield* new InvalidBranchOperationError({
-            message: `Cannot reset current branch when on "main" branch. Please create a new branch and reset to the lesson from there.`,
-          });
-        }
       }
 
       if (action === "create-branch") {
@@ -221,23 +210,16 @@ export const reset = CLICommand.make(
           `Creating branch ${branchName} from ${commitToUse} (${stateDescription})...`
         );
 
-        const createBranchCommand = Command.make(
-          "git",
-          "checkout",
-          "-b",
-          branchName,
-          commitToUse
-        ).pipe(
-          Command.workingDirectory(cwd),
-          Command.stdout("inherit"),
-          Command.stderr("inherit")
-        );
+        const createBranchExitCode =
+          yield* git.runCommandWithExitCode(
+            "git",
+            "checkout",
+            "-b",
+            branchName,
+            commitToUse
+          );
 
-        const exitCode = yield* Command.exitCode(
-          createBranchCommand
-        ).pipe(Effect.catchAll(() => Effect.succeed(1)));
-
-        if (exitCode !== 0) {
+        if (createBranchExitCode !== 0) {
           yield* Console.error("Failed to create branch");
           process.exitCode = 1;
           return;
@@ -251,17 +233,13 @@ export const reset = CLICommand.make(
 
       // Reset current branch - check for unstaged changes (skip in demo mode)
       if (!demo) {
-        const gitStatusCommand = Command.make(
+        const statusOutput = yield* git.runCommandWithString(
           "git",
           "status",
           "--porcelain"
-        ).pipe(Command.workingDirectory(cwd));
-
-        const statusOutput = yield* Command.string(
-          gitStatusCommand
         );
 
-        if (statusOutput.trim() !== "") {
+        if (statusOutput !== "") {
           yield* Console.log(
             "\nWarning: You have uncommitted changes:"
           );
@@ -293,22 +271,14 @@ export const reset = CLICommand.make(
         `Resetting to ${commitToUse} (${stateDescription})...`
       );
 
-      const resetCommand = Command.make(
+      const resetExitCode = yield* git.runCommandWithExitCode(
         "git",
         "reset",
         "--hard",
         commitToUse
-      ).pipe(
-        Command.workingDirectory(cwd),
-        Command.stdout("inherit"),
-        Command.stderr("inherit")
       );
 
-      const exitCode = yield* Command.exitCode(
-        resetCommand
-      ).pipe(Effect.catchAll(() => Effect.succeed(1)));
-
-      if (exitCode !== 0) {
+      if (resetExitCode !== 0) {
         yield* Console.error("Failed to reset");
         process.exitCode = 1;
         return;
@@ -320,19 +290,11 @@ export const reset = CLICommand.make(
           "Undoing commit and unstaging changes..."
         );
 
-        const undoCommand = Command.make(
+        const undoExitCode = yield* git.runCommandWithExitCode(
           "git",
           "reset",
           "HEAD^"
-        ).pipe(
-          Command.workingDirectory(cwd),
-          Command.stdout("inherit"),
-          Command.stderr("inherit")
         );
-
-        const undoExitCode = yield* Command.exitCode(
-          undoCommand
-        ).pipe(Effect.catchAll(() => Effect.succeed(1)));
 
         if (undoExitCode !== 0) {
           yield* Console.error("Failed to undo commit");
@@ -340,20 +302,13 @@ export const reset = CLICommand.make(
           return;
         }
 
-        const unstageCommand = Command.make(
-          "git",
-          "restore",
-          "--staged",
-          "."
-        ).pipe(
-          Command.workingDirectory(cwd),
-          Command.stdout("inherit"),
-          Command.stderr("inherit")
-        );
-
-        const unstageExitCode = yield* Command.exitCode(
-          unstageCommand
-        ).pipe(Effect.catchAll(() => Effect.succeed(1)));
+        const unstageExitCode =
+          yield* git.runCommandWithExitCode(
+            "git",
+            "restore",
+            "--staged",
+            "."
+          );
 
         if (unstageExitCode !== 0) {
           yield* Console.error("Failed to unstage changes");

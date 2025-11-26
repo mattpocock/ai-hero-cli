@@ -17,6 +17,13 @@ export class FailedToFetchUpstreamError extends Data.TaggedError(
   message: string;
 }> {}
 
+export class FailedToCreateBranchError extends Data.TaggedError(
+  "FailedToCreateBranchError"
+)<{
+  branchName: string;
+  message: string;
+}> {}
+
 export class GitService extends Effect.Service<GitService>()(
   "GitService",
   {
@@ -74,6 +81,43 @@ export class GitService extends Effect.Service<GitService>()(
             );
           }
         }),
+        getCurrentBranch: Effect.fn("getCurrentBranch")(
+          function* () {
+            const cwd = yield* Config.string("cwd");
+            const currentBranchCommand = Command.make(
+              "git",
+              "branch",
+              "--show-current"
+            ).pipe(Command.workingDirectory(cwd));
+            return (yield* Command.string(
+              currentBranchCommand
+            )).trim();
+          }
+        ),
+        runCommandWithExitCode: Effect.fn(
+          "runCommandWithExitCode"
+        )(function* (
+          ...commandArgs: [string, ...Array<string>]
+        ) {
+          const cwd = yield* Config.string("cwd");
+          const command = Command.make(...commandArgs).pipe(
+            Command.workingDirectory(cwd),
+            Command.stdout("inherit"),
+            Command.stderr("inherit")
+          );
+          return yield* Command.exitCode(command);
+        }),
+        runCommandWithString: Effect.fn("runCommandWithString")(
+          function* (
+            ...commandArgs: [string, ...Array<string>]
+          ) {
+            const cwd = yield* Config.string("cwd");
+            const command = Command.make(...commandArgs).pipe(
+              Command.workingDirectory(cwd)
+            );
+            return (yield* Command.string(command)).trim();
+          }
+        ),
       };
     }),
     dependencies: [NodeContext.layer],
