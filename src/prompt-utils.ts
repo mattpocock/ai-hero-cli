@@ -1,4 +1,5 @@
 import { Data, Effect } from "effect";
+import { prompt } from "prompts";
 
 export class PromptCancelledError extends Data.TaggedError(
   "PromptCancelledError"
@@ -17,3 +18,27 @@ export const runPrompt = <T extends object>(
     return result;
   });
 };
+
+export const confirmContinue = Effect.fn("confirmContinue")(
+  function* (
+    message: string,
+    defaultToContinue: boolean = true
+  ) {
+    const { confirm } = yield* runPrompt<{
+      confirm: boolean;
+    }>(() =>
+      prompt([
+        {
+          type: "confirm",
+          name: "confirm",
+          message,
+          initial: defaultToContinue,
+        },
+      ])
+    );
+
+    if (!confirm) {
+      return yield* new PromptCancelledError();
+    }
+  }
+);

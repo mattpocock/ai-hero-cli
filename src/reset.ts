@@ -3,7 +3,6 @@ import {
   Command as CLICommand,
   Options,
 } from "@effect/cli";
-import { Command } from "@effect/platform";
 import {
   Config,
   ConfigProvider,
@@ -233,13 +232,10 @@ export const reset = CLICommand.make(
 
       // Reset current branch - check for unstaged changes (skip in demo mode)
       if (!demo) {
-        const statusOutput = yield* git.runCommandWithString(
-          "git",
-          "status",
-          "--porcelain"
-        );
+        const { hasUncommittedChanges, statusOutput } =
+          yield* git.getUncommittedChanges();
 
-        if (statusOutput !== "") {
+        if (hasUncommittedChanges) {
           yield* Console.log(
             "\nWarning: You have uncommitted changes:"
           );

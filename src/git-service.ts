@@ -29,6 +29,16 @@ export class GitService extends Effect.Service<GitService>()(
   {
     effect: Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
+
+      const runCommandWithString = Effect.fn(
+        "runCommandWithString"
+      )(function* (...commandArgs: [string, ...Array<string>]) {
+        const cwd = yield* Config.string("cwd");
+        const command = Command.make(...commandArgs).pipe(
+          Command.workingDirectory(cwd)
+        );
+        return (yield* Command.string(command)).trim();
+      });
       return {
         ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(
           function* () {
@@ -43,6 +53,19 @@ export class GitService extends Effect.Service<GitService>()(
             }
           }
         ),
+        getUncommittedChanges: Effect.fn(
+          "getUncommittedChanges"
+        )(function* () {
+          const statusOutput = yield* runCommandWithString(
+            "git",
+            "status",
+            "--porcelain"
+          );
+          return {
+            hasUncommittedChanges: statusOutput !== "",
+            statusOutput,
+          };
+        }),
         ensureBranchConnected: Effect.fn(
           "ensureBranchConnected"
         )(function* (targetBranch: string) {
@@ -107,17 +130,7 @@ export class GitService extends Effect.Service<GitService>()(
           );
           return yield* Command.exitCode(command);
         }),
-        runCommandWithString: Effect.fn("runCommandWithString")(
-          function* (
-            ...commandArgs: [string, ...Array<string>]
-          ) {
-            const cwd = yield* Config.string("cwd");
-            const command = Command.make(...commandArgs).pipe(
-              Command.workingDirectory(cwd)
-            );
-            return (yield* Command.string(command)).trim();
-          }
-        ),
+        runCommandWithString,
       };
     }),
     dependencies: [NodeContext.layer],

@@ -7,6 +7,7 @@ import { rename } from "./rename.js";
 import { uploadToCloudinary } from "./upload-to-cloudinary.js";
 import { getDiffs } from "./get-diffs.js";
 import { editCommit } from "./edit-commit.js";
+import { rebaseToMain } from "./rebase-to-main.js";
 
 const upgradePackages = CLICommand.make(
   "upgrade",
@@ -69,6 +70,7 @@ export const internal: any = CLICommand.make("internal").pipe(
     uploadToCloudinary,
     getDiffs,
     editCommit,
+    rebaseToMain,
   ]),
   CLICommand.withDescription("Internal commands for AI Hero")
 );
