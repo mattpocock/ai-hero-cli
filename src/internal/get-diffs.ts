@@ -1,6 +1,6 @@
 import { Command as CLICommand, Options } from "@effect/cli";
 import { Command, FileSystem } from "@effect/platform";
-import { Console, Data, Effect } from "effect";
+import { ConfigProvider, Console, Data, Effect } from "effect";
 import { existsSync } from "node:fs";
 import * as path from "node:path";
 import {
@@ -8,6 +8,7 @@ import {
   type Lesson,
 } from "../lesson-parser-service.js";
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "../constants.js";
+import { GitService } from "../git-service.js";
 
 export class InvalidProjectRepoError extends Data.TaggedError(
   "InvalidProjectRepoError"
@@ -67,6 +68,9 @@ export const getDiffs = CLICommand.make(
   },
   ({ branch, projectRepo, root }) =>
     Effect.gen(function* () {
+      const git = yield* GitService;
+      yield* git.ensureIsGitRepo();
+
       yield* Console.log("Starting get-diffs command...");
 
       // Validate project repo exists
@@ -406,6 +410,11 @@ export const getDiffs = CLICommand.make(
 
       yield* Console.log("=".repeat(50));
     }).pipe(
+      Effect.withConfigProvider(
+        ConfigProvider.fromJson({
+          cwd: projectRepo,
+        })
+      ),
       Effect.catchTags({
         InvalidProjectRepoError: (error) => {
           return Effect.gen(function* () {
