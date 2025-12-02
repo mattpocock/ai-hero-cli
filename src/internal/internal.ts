@@ -9,6 +9,7 @@ import { getDiffs } from "./get-diffs.js";
 import { diffsToRepo } from "./diffs-to-repo.js";
 import { editCommit } from "./edit-commit.js";
 import { rebaseToMain } from "./rebase-to-main.js";
+import { walkThrough } from "./walk-through.js";
 
 const upgradePackages = CLICommand.make(
   "upgrade",
@@ -73,6 +74,7 @@ export const internal: any = CLICommand.make("internal").pipe(
     diffsToRepo,
     editCommit,
     rebaseToMain,
+    walkThrough,
   ]),
   CLICommand.withDescription("Internal commands for AI Hero")
 );
