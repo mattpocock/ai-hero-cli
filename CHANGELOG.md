@@ -1,5 +1,13 @@
 # ai-hero-cli
 
+## 0.2.11
+
+### Patch Changes
+
+- 2fa60d5: Fixed a bug where a failed update in the CVM would not fail the commit
+- 1b35c15: Added diffs-to-repo command on internal
+- bbd505d: Fixed a bug where styleText was not exported by node:util
+
 ## 0.2.10
 
 ### Patch Changes
