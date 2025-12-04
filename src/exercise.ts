@@ -16,7 +16,7 @@ import {
 import { execSync } from "node:child_process";
 import * as path from "path";
 import prompt from "prompts";
-import { styleText } from "util";
+import { styleText } from "node:util";
 import type {
   InvalidPathError,
   Lesson,

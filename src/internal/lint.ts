@@ -3,7 +3,7 @@ import { Console, Effect, Cache, Duration } from "effect";
 import type { Lesson } from "../lesson-parser-service.js";
 import { LessonParserService } from "../lesson-parser-service.js";
 import { cwdOption, rootOption } from "../options.js";
-import { styleText } from "util";
+import { styleText } from "node:util";
 import * as path from "path";
 import { FileSystem } from "@effect/platform";
 
