@@ -39,6 +39,17 @@ export class GitService extends Effect.Service<GitService>()(
         );
         return (yield* Command.string(command)).trim();
       });
+
+      const runCommandWithExitCode = Effect.fn(
+        "runCommandWithExitCode"
+      )(function* (...commandArgs: [string, ...Array<string>]) {
+        const cwd = yield* Config.string("cwd");
+        const command = Command.make(...commandArgs).pipe(
+          Command.workingDirectory(cwd)
+        );
+        return yield* Command.exitCode(command);
+      });
+
       return {
         ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(
           function* () {
@@ -103,6 +114,23 @@ export class GitService extends Effect.Service<GitService>()(
               })
             );
           }
+
+          // Delete the target branch locally (to account for )
+          yield* runCommandWithExitCode(
+            "git",
+            "branch",
+            "-D",
+            targetBranch
+          );
+
+          // Track the target branch
+          yield* runCommandWithExitCode(
+            "git",
+            "branch",
+            "--track",
+            targetBranch,
+            `upstream/${targetBranch}`
+          );
         }),
         getCurrentBranch: Effect.fn("getCurrentBranch")(
           function* () {
@@ -117,19 +145,7 @@ export class GitService extends Effect.Service<GitService>()(
             )).trim();
           }
         ),
-        runCommandWithExitCode: Effect.fn(
-          "runCommandWithExitCode"
-        )(function* (
-          ...commandArgs: [string, ...Array<string>]
-        ) {
-          const cwd = yield* Config.string("cwd");
-          const command = Command.make(...commandArgs).pipe(
-            Command.workingDirectory(cwd),
-            Command.stdout("inherit"),
-            Command.stderr("inherit")
-          );
-          return yield* Command.exitCode(command);
-        }),
+        runCommandWithExitCode,
         runCommandWithString,
       };
     }),
