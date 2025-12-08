@@ -1,5 +1,11 @@
 # ai-hero-cli
 
+## 0.2.12
+
+### Patch Changes
+
+- 2d6ba17: Fixed a bug in cherry-picking where the live-run-through branch was not being pulled in locally
+
 ## 0.2.11
 
 ### Patch Changes
