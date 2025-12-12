@@ -355,8 +355,49 @@ const logReadmeFile = Effect.fn("logReadmeFile")(
   }
 );
 
-const normalizeExerciseNumber = (str: string): string => {
-  return str.replace(/\b0+(\d)/g, "$1");
+const normalizeExerciseNumber = (str: string): Array<string> => {
+  const variations = new Set<string>();
+
+  // Add original
+  variations.add(str);
+
+  // Check if it contains a dot (format like "02.03")
+  const dotIndex = str.indexOf(".");
+  if (dotIndex !== -1) {
+    const beforeDot = str.slice(0, dotIndex);
+    const afterDot = str.slice(dotIndex + 1);
+
+    // Original with dot: "02.03"
+    variations.add(str);
+
+    // Without dot: "0203"
+    variations.add(beforeDot + afterDot);
+
+    // Remove leading zeros from both parts
+    const beforeDotNoZeros = beforeDot.replace(/^0+/, "") || "0";
+    const afterDotNoZeros = afterDot.replace(/^0+/, "") || "0";
+
+    // Without leading zeros: "2.3"
+    variations.add(`${beforeDotNoZeros}.${afterDotNoZeros}`);
+
+    // Without dot and leading zeros: "23"
+    variations.add(beforeDotNoZeros + afterDotNoZeros);
+
+    // Partial leading zeros: "2.03", "02.3"
+    variations.add(`${beforeDotNoZeros}.${afterDot}`);
+    variations.add(`${beforeDot}.${afterDotNoZeros}`);
+
+    // Without dot, partial leading zeros: "203", "023"
+    variations.add(beforeDotNoZeros + afterDot);
+    variations.add(beforeDot + afterDotNoZeros);
+  } else {
+    // No dot - just remove leading zeros
+    const noZeros = str.replace(/^0+/, "") || "0";
+    variations.add(noZeros);
+    variations.add(str);
+  }
+
+  return Array.from(variations);
 };
 
 const chooseLessonAndRunIt = (opts: {
@@ -387,15 +428,19 @@ const chooseLessonAndRunIt = (opts: {
             description: lesson.name,
           })),
           suggest: async (input, choices) => {
-            const normalizedInput =
-              normalizeExerciseNumber(input);
             return choices.filter((choice) => {
               const searchText = `${choice.title}-${choice.description}`;
-              const normalizedSearchText =
+              // Check exact match first
+              if (searchText.includes(input)) {
+                return true;
+              }
+              // Check fuzzy matches using variations
+              const searchTextVariations =
                 normalizeExerciseNumber(searchText);
-              return (
-                searchText.includes(input) ||
-                normalizedSearchText.includes(normalizedInput)
+              return searchTextVariations.some(
+                (variation) =>
+                  variation.includes(input) ||
+                  input.includes(variation)
               );
             });
           },
