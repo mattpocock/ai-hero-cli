@@ -1,5 +1,11 @@
 # ai-hero-cli
 
+## 0.2.13
+
+### Patch Changes
+
+- 091fd79: Improved fuzzy matching for exercise CLI
+
 ## 0.2.12
 
 ### Patch Changes
