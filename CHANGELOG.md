@@ -1,5 +1,13 @@
 # ai-hero-cli
 
+## 0.2.14
+
+### Patch Changes
+
+- ccf2c0f: Made it so that the cherry-pick and reset commands automatically detect the upstream branch. This prevents an issue where hard-coding the git repo can cause authentication issues.
+- 6e57ece: Added a pull command for pulling the latest changes into your working project.
+- 59ffe5e: cherry-pick now offers you the chance to create a new branch
+
 ## 0.2.13
 
 ### Patch Changes
