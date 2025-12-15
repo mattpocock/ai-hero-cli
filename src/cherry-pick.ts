@@ -8,6 +8,8 @@ import { selectLessonCommit } from "./commit-utils.js";
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "./constants.js";
 import { GitService, GitServiceConfig } from "./git-service.js";
 import { cwdOption } from "./options.js";
+import { runPrompt } from "./prompt-utils.js";
+import prompt from "prompts";
 
 export class NotAGitRepoError extends Data.TaggedError(
   "NotAGitRepoError"
@@ -72,9 +74,39 @@ export const cherryPick = CLICommand.make(
 
       // Check if current branch is main
       if (currentBranch === "main") {
-        return yield* new InvalidBranchOperationError({
-          message: `Cannot cherry-pick when on "main" branch`,
+        yield* Console.log(
+          "You cannot cherry-pick onto the main branch."
+        );
+
+        const { branchName } = yield* runPrompt<{
+          branchName: string;
+        }>(() => {
+          return prompt([
+            {
+              type: "text",
+              name: "branchName",
+              message: "Enter name of your new working branch:",
+            },
+          ]);
         });
+
+        const createBranchExitCode =
+          yield* git.runCommandWithExitCode(
+            "git",
+            "checkout",
+            "-b",
+            branchName
+          );
+
+        if (createBranchExitCode !== 0) {
+          return yield* new InvalidBranchOperationError({
+            message: `Failed to create branch`,
+          });
+        }
+
+        yield* Console.log(
+          `✓ Created and switched to ${branchName}`
+        );
       }
 
       yield* Console.log(
