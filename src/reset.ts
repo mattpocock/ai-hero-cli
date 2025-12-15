@@ -3,20 +3,15 @@ import {
   Command as CLICommand,
   Options,
 } from "@effect/cli";
-import {
-  Config,
-  ConfigProvider,
-  Console,
-  Data,
-  Effect,
-} from "effect";
+import { Console, Data, Effect } from "effect";
 import prompt from "prompts";
 import {
   getParentCommit,
   selectLessonCommit,
 } from "./commit-utils.js";
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "./constants.js";
-import { GitService } from "./git-service.js";
+import { GitService, GitServiceConfig } from "./git-service.js";
+import { cwdOption } from "./options.js";
 import { runPrompt } from "./prompt-utils.js";
 
 export class NotAGitRepoError extends Data.TaggedError(
@@ -57,22 +52,32 @@ export const reset = CLICommand.make(
       )
     ),
     demo: Options.boolean("demo").pipe(Options.withAlias("d")),
+    cwd: cwdOption,
   },
-  ({ branch, demo, lessonId, problem, solution }) =>
+  ({
+    branch,
+    cwd,
+    demo,
+    lessonId,
+    problem,
+    solution,
+  }) =>
     Effect.gen(function* () {
       const git = yield* GitService;
-      const cwd = yield* Config.string("cwd");
+      const config = yield* GitServiceConfig;
 
       // Validate git repository
       yield* git.ensureIsGitRepo();
 
-      yield* git.ensureBranchConnected(branch);
+      yield* git.ensureUpstreamBranchConnected({
+        targetBranch: branch,
+      });
 
       const {
         commit: targetCommit,
         lessonId: selectedLessonId,
       } = yield* selectLessonCommit({
-        cwd,
+        cwd: config.cwd,
         branch,
         lessonId,
         promptMessage:
@@ -134,14 +139,14 @@ export const reset = CLICommand.make(
         if (state === "problem") {
           commitToUse = yield* getParentCommit({
             commitSha: targetCommit.sha,
-            cwd,
+            cwd: config.cwd,
           });
           stateDescription = "problem state";
         }
       } else if (problem) {
         commitToUse = yield* getParentCommit({
           commitSha: targetCommit.sha,
-          cwd,
+          cwd: config.cwd,
         });
         stateDescription = "problem state";
       }
@@ -321,8 +326,11 @@ export const reset = CLICommand.make(
         );
       }
     }).pipe(
-      Effect.withConfigProvider(
-        ConfigProvider.fromMap(new Map([["cwd", process.cwd()]]))
+      Effect.provideService(
+        GitServiceConfig,
+        GitServiceConfig.of({
+          cwd,
+        })
       ),
       Effect.catchTags({
         NoParentCommitError: (error) => {
@@ -334,6 +342,12 @@ export const reset = CLICommand.make(
           });
         },
         NotAGitRepoError: (error) => {
+          return Effect.gen(function* () {
+            yield* Console.error(`Error: ${error.message}`);
+            process.exitCode = 1;
+          });
+        },
+        NoUpstreamFoundError: (error) => {
           return Effect.gen(function* () {
             yield* Console.error(`Error: ${error.message}`);
             process.exitCode = 1;

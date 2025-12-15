@@ -8,7 +8,7 @@ import {
   type Lesson,
 } from "../lesson-parser-service.js";
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "../constants.js";
-import { GitService } from "../git-service.js";
+import { GitService, GitServiceConfig } from "../git-service.js";
 
 export class InvalidProjectRepoError extends Data.TaggedError(
   "InvalidProjectRepoError"
@@ -410,8 +410,9 @@ export const getDiffs = CLICommand.make(
 
       yield* Console.log("=".repeat(50));
     }).pipe(
-      Effect.withConfigProvider(
-        ConfigProvider.fromJson({
+      Effect.provideService(
+        GitServiceConfig,
+        GitServiceConfig.of({
           cwd: projectRepo,
         })
       ),

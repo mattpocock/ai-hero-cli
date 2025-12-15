@@ -1,8 +1,8 @@
 import { Command as CLICommand, Options } from "@effect/cli";
-import { ConfigProvider, Console, Effect } from "effect";
+import { Console, Effect } from "effect";
 import { InvalidBranchOperationError } from "../cherry-pick.js";
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "../constants.js";
-import { GitService } from "../git-service.js";
+import { GitService, GitServiceConfig } from "../git-service.js";
 import { confirmContinue } from "../prompt-utils.js";
 
 export const rebaseToMain = CLICommand.make(
@@ -34,8 +34,6 @@ export const rebaseToMain = CLICommand.make(
           })
         );
       }
-
-      yield* git.ensureBranchConnected(opts.target);
 
       const { hasUncommittedChanges } =
         yield* git.getUncommittedChanges();
@@ -124,8 +122,9 @@ export const rebaseToMain = CLICommand.make(
         `✓ Successfully rebased ${opts.target} to main and force pushed`
       );
     }).pipe(
-      Effect.withConfigProvider(
-        ConfigProvider.fromJson({
+      Effect.provideService(
+        GitServiceConfig,
+        GitServiceConfig.of({
           cwd: opts.cwd,
         })
       )

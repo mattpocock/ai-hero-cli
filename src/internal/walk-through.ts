@@ -9,7 +9,7 @@ import {
 } from "effect";
 import prompt from "prompts";
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "../constants.js";
-import { GitService } from "../git-service.js";
+import { GitService, GitServiceConfig } from "../git-service.js";
 import { runPrompt } from "../prompt-utils.js";
 
 export class NotAGitRepoError extends Data.TaggedError(
@@ -140,13 +140,10 @@ export const walkThrough = CLICommand.make(
   ({ liveBranch, mainBranch }) =>
     Effect.gen(function* () {
       const git = yield* GitService;
-      const cwd = yield* Config.string("cwd");
+      const config = yield* GitServiceConfig;
 
       // Validate git repo
       yield* git.ensureIsGitRepo();
-
-      // Validate live branch exists
-      yield* git.ensureBranchConnected(liveBranch);
 
       const currentBranch = yield* git.getCurrentBranch();
 
@@ -237,7 +234,7 @@ export const walkThrough = CLICommand.make(
         "--oneline",
         "--reverse",
         `${mainBranch}..${liveBranch}`
-      ).pipe(Command.workingDirectory(cwd));
+      ).pipe(Command.workingDirectory(config.cwd));
 
       const commitHistory = yield* Command.string(gitLogCommand);
 
@@ -344,8 +341,9 @@ export const walkThrough = CLICommand.make(
       yield* Console.log(`✓ Returned to ${liveBranch}`);
       yield* Console.log("=".repeat(60));
     }).pipe(
-      Effect.withConfigProvider(
-        ConfigProvider.fromJson({
+      Effect.provideService(
+        GitServiceConfig,
+        GitServiceConfig.of({
           cwd: process.cwd(),
         })
       ),

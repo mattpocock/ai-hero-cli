@@ -1,10 +1,10 @@
 import { Command as CLICommand, Options } from "@effect/cli";
 import { Command, FileSystem } from "@effect/platform";
-import { ConfigProvider, Console, Data, Effect } from "effect";
+import { Console, Data, Effect } from "effect";
 import { existsSync } from "node:fs";
 import * as path from "node:path";
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "../constants.js";
-import { GitService } from "../git-service.js";
+import { GitService, GitServiceConfig } from "../git-service.js";
 
 export class InvalidProjectRepoError extends Data.TaggedError(
   "InvalidProjectRepoError"
@@ -176,7 +176,10 @@ export const diffsToRepo = CLICommand.make(
       };
 
       // Create section directory
-      const sectionDir = path.join(targetDir, "01-first-section");
+      const sectionDir = path.join(
+        targetDir,
+        "01-first-section"
+      );
       yield* fs.makeDirectory(sectionDir, { recursive: true });
 
       for (const commit of commits) {
@@ -198,27 +201,44 @@ export const diffsToRepo = CLICommand.make(
           const diff = yield* Command.string(gitShowCommand);
 
           // Create lesson folder name
-          const lessonNumber = `01.${commit.sequence.toString().padStart(2, "0")}`;
+          const lessonNumber = `01.${commit.sequence
+            .toString()
+            .padStart(2, "0")}`;
           const lessonName = toDashCase(commit.message);
           const lessonFolderName = `${lessonNumber}-${lessonName}`;
 
           // Create directory structure
-          const lessonPath = path.join(sectionDir, lessonFolderName);
-          const explainerPath = path.join(lessonPath, "explainer");
+          const lessonPath = path.join(
+            sectionDir,
+            lessonFolderName
+          );
+          const explainerPath = path.join(
+            lessonPath,
+            "explainer"
+          );
 
-          yield* fs.makeDirectory(explainerPath, { recursive: true });
+          yield* fs.makeDirectory(explainerPath, {
+            recursive: true,
+          });
 
           // Write diff file
-          const diffPath = path.join(explainerPath, "solution.diff");
+          const diffPath = path.join(
+            explainerPath,
+            "solution.diff"
+          );
           yield* fs.writeFileString(diffPath, diff);
 
-          yield* Console.log(`  ✓ Created: 01-first-section/${lessonFolderName}/explainer/solution.diff`);
+          yield* Console.log(
+            `  ✓ Created: 01-first-section/${lessonFolderName}/explainer/solution.diff`
+          );
 
           return { status: "saved" as const };
         }).pipe(
           Effect.catchAll((error) =>
             Effect.gen(function* () {
-              yield* Console.log(`  ✗ Error processing commit ${commit.sha}: ${error}`);
+              yield* Console.log(
+                `  ✗ Error processing commit ${commit.sha}: ${error}`
+              );
               errors.push(`${commit.sha}: ${error}`);
               return { status: "error" as const };
             })
@@ -251,8 +271,9 @@ export const diffsToRepo = CLICommand.make(
 
       yield* Console.log("=".repeat(50));
     }).pipe(
-      Effect.withConfigProvider(
-        ConfigProvider.fromJson({
+      Effect.provideService(
+        GitServiceConfig,
+        GitServiceConfig.of({
           cwd: projectRepo,
         })
       ),

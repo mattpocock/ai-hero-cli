@@ -3,17 +3,11 @@ import {
   Command as CLICommand,
   Options,
 } from "@effect/cli";
-import { Command } from "@effect/platform";
-import {
-  Config,
-  ConfigProvider,
-  Console,
-  Data,
-  Effect,
-} from "effect";
+import { Console, Data, Effect } from "effect";
 import { selectLessonCommit } from "./commit-utils.js";
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "./constants.js";
-import { GitService } from "./git-service.js";
+import { GitService, GitServiceConfig } from "./git-service.js";
+import { cwdOption } from "./options.js";
 
 export class NotAGitRepoError extends Data.TaggedError(
   "NotAGitRepoError"
@@ -40,22 +34,25 @@ export const cherryPick = CLICommand.make(
       ),
       Options.withDefault(DEFAULT_PROJECT_TARGET_BRANCH)
     ),
+    cwd: cwdOption,
   },
-  ({ branch, lessonId }) =>
+  ({ branch, cwd, lessonId }) =>
     Effect.gen(function* () {
       const git = yield* GitService;
-      const cwd = yield* Config.string("cwd");
+      const config = yield* GitServiceConfig;
 
       // Validate git repository
       yield* git.ensureIsGitRepo();
 
-      yield* git.ensureBranchConnected(branch);
+      yield* git.ensureUpstreamBranchConnected({
+        targetBranch: branch,
+      });
 
       const {
         commit: targetCommit,
         lessonId: selectedLessonId,
       } = yield* selectLessonCommit({
-        cwd,
+        cwd: config.cwd,
         branch,
         lessonId,
         promptMessage:
@@ -64,15 +61,7 @@ export const cherryPick = CLICommand.make(
       });
 
       // Get current branch name and validate
-      const currentBranchCommand = Command.make(
-        "git",
-        "branch",
-        "--show-current"
-      ).pipe(Command.workingDirectory(cwd));
-
-      const currentBranch = (yield* Command.string(
-        currentBranchCommand
-      )).trim();
+      const currentBranch = yield* git.getCurrentBranch();
 
       // Check if current branch is the target branch
       if (currentBranch === branch) {
@@ -93,22 +82,14 @@ export const cherryPick = CLICommand.make(
       );
 
       // Execute git cherry-pick with inherited stdio
-      const cherryPickCommand = Command.make(
-        "git",
-        "cherry-pick",
-        targetCommit.sha
-      ).pipe(
-        Command.workingDirectory(cwd),
-        Command.stdout("inherit"),
-        Command.stderr("inherit"),
-        Command.stdin("inherit")
-      );
+      const cherryPickExitCode =
+        yield* git.runCommandWithExitCode(
+          "git",
+          "cherry-pick",
+          targetCommit.sha
+        );
 
-      const exitCode = yield* Command.exitCode(
-        cherryPickCommand
-      ).pipe(Effect.catchAll(() => Effect.succeed(1)));
-
-      if (exitCode !== 0) {
+      if (cherryPickExitCode !== 0) {
         process.exitCode = 1;
         return;
       }
@@ -117,13 +98,20 @@ export const cherryPick = CLICommand.make(
         `\n✓ Successfully cherry-picked lesson ${selectedLessonId}`
       );
     }).pipe(
-      Effect.withConfigProvider(
-        ConfigProvider.fromJson({
-          cwd: process.cwd(),
+      Effect.provideService(
+        GitServiceConfig,
+        GitServiceConfig.of({
+          cwd,
         })
       ),
       Effect.catchTags({
         NotAGitRepoError: (error) => {
+          return Effect.gen(function* () {
+            yield* Console.error(`Error: ${error.message}`);
+            process.exitCode = 1;
+          });
+        },
+        NoUpstreamFoundError: (error) => {
           return Effect.gen(function* () {
             yield* Console.error(`Error: ${error.message}`);
             process.exitCode = 1;
