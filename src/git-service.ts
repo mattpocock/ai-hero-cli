@@ -225,6 +225,7 @@ Add upstream remote:
         ),
         runCommandWithExitCode,
         runCommandWithString,
+        detectUpstreamRemote,
       };
     }),
     dependencies: [
