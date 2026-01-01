@@ -6,12 +6,11 @@ import {
 import { Console, Data, Effect } from "effect";
 import { existsSync } from "node:fs";
 import * as path from "node:path";
-import prompt from "prompts";
 import { selectLessonCommit } from "../commit-utils.js";
 import type { PromptCancelledError } from "../prompt-utils.js";
-import { runPrompt } from "../prompt-utils.js";
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "../constants.js";
 import { GitService } from "../git-service.js";
+import { PromptService } from "../prompt-service.js";
 import type { CommandExecutor } from "@effect/platform";
 import type {
   BadArgument,
@@ -54,6 +53,7 @@ export const editCommit = CLICommand.make(
     Effect.gen(function* () {
       const cwd = process.cwd();
       const gitService = yield* GitService;
+      const promptService = yield* PromptService;
 
       // Validate git repository
       const gitDirPath = path.join(cwd, ".git");
@@ -168,24 +168,7 @@ export const editCommit = CLICommand.make(
       );
 
       // Wait for user to be ready
-      const { ready } = yield* runPrompt<{ ready: boolean }>(
-        () =>
-          prompt([
-            {
-              type: "confirm",
-              name: "ready",
-              message: "Ready to commit?",
-              initial: true,
-            },
-          ])
-      );
-
-      if (!ready) {
-        yield* Console.log(
-          "Session cancelled. Branch left as-is."
-        );
-        return;
-      }
+      yield* promptService.confirmReadyToCommit();
 
       // Commit with original message
       yield* Console.log(
@@ -244,7 +227,7 @@ export const editCommit = CLICommand.make(
           );
 
           // Enter conflict resolution loop
-          yield* resolveConflictLoop(gitService);
+          yield* resolveConflictLoop(gitService, promptService);
         } else {
           yield* Console.log("✓ Cherry-pick complete");
         }
@@ -255,25 +238,7 @@ export const editCommit = CLICommand.make(
       );
 
       // Prompt to save changes to target branch
-      const { saveToTarget } = yield* runPrompt<{
-        saveToTarget: boolean;
-      }>(() =>
-        prompt([
-          {
-            type: "confirm",
-            name: "saveToTarget",
-            message: `Save changes to ${branch} branch?`,
-            initial: true,
-          },
-        ])
-      );
-
-      if (!saveToTarget) {
-        yield* Console.log(
-          `Changes kept on ${currentBranch}. Session complete.`
-        );
-        return;
-      }
+      yield* promptService.confirmSaveToTargetBranch(branch);
 
       // Checkout target branch and reset to current branch
       yield* Console.log(
@@ -319,25 +284,7 @@ export const editCommit = CLICommand.make(
       );
 
       // Prompt to force push
-      const { forcePush } = yield* runPrompt<{
-        forcePush: boolean;
-      }>(() =>
-        prompt([
-          {
-            type: "confirm",
-            name: "forcePush",
-            message: `Force push ${branch} to origin?`,
-            initial: false,
-          },
-        ])
-      );
-
-      if (!forcePush) {
-        yield* Console.log(
-          "Local changes saved. Session complete."
-        );
-        return;
-      }
+      yield* promptService.confirmForcePush(branch);
 
       // Force push to origin
       yield* Console.log(`Force pushing ${branch} to origin...`);
@@ -421,7 +368,8 @@ export const editCommit = CLICommand.make(
 
 // Recursive conflict resolution loop
 function resolveConflictLoop(
-  gitService: GitService
+  gitService: GitService,
+  promptService: PromptService
 ): Effect.Effect<
   void,
   PromptCancelledError | BadArgument | SystemError,
@@ -435,38 +383,8 @@ function resolveConflictLoop(
     }
 
     // Prompt user with options
-    const { action } = yield* runPrompt<{
-      action: "continue" | "abort" | "skip";
-    }>(() =>
-      prompt([
-        {
-          type: "select",
-          name: "action",
-          message:
-            "Cherry-pick conflict. What do you want to do?",
-          choices: [
-            {
-              title: "Continue (run git cherry-pick --continue)",
-              value: "continue",
-              description:
-                "Continue cherry-pick after resolving conflicts",
-            },
-            {
-              title:
-                "Skip (already resolved in another session)",
-              value: "skip",
-              description:
-                "Skip running git command, conflicts already resolved",
-            },
-            {
-              title: "Abort (stop cherry-pick)",
-              value: "abort",
-              description: "Abort the cherry-pick process",
-            },
-          ],
-        },
-      ])
-    );
+    const action =
+      yield* promptService.selectCherryPickConflictAction();
 
     if (action === "abort") {
       yield* Console.log(
@@ -499,7 +417,7 @@ function resolveConflictLoop(
       );
       yield* Console.log("Resolve conflicts, then continue.\n");
       // Recursive call
-      yield* resolveConflictLoop(gitService);
+      yield* resolveConflictLoop(gitService, promptService);
     } else {
       yield* Console.log("✓ Cherry-pick complete");
     }

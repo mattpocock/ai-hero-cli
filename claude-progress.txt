@@ -9,3 +9,16 @@ PromptService: implemented confirmProceedWithUncommittedChanges
 PromptService: implemented selectWalkThroughAction
 PromptService: implemented selectSubfolder
 PromptService: implemented selectExerciseAction
+
+Migrated edit-commit.ts to use PromptService:
+- confirmReadyToCommit
+- confirmSaveToTargetBranch
+- confirmForcePush
+- selectCherryPickConflictAction (in resolveConflictLoop)
+
+Remaining files to migrate:
+- src/reset.ts
+- src/internal/walk-through.ts
+- src/exercise.ts
+- src/cherry-pick.ts
+- src/commit-utils.ts

@@ -240,5 +240,22 @@
       "For confirms that check result: method throws on decline, so remove if(!result) checks",
       "Run tests to verify behavior unchanged"
     ]
+  },
+  {
+    "service": "PromptService",
+    "method": "*",
+    "category": "migration-tracking",
+    "status": "IN_PROGRESS",
+    "description": "Track files migrated from runPrompt to PromptService",
+    "migratedFiles": [
+      "src/internal/edit-commit.ts"
+    ],
+    "remainingFiles": [
+      "src/reset.ts",
+      "src/internal/walk-through.ts",
+      "src/exercise.ts",
+      "src/cherry-pick.ts",
+      "src/commit-utils.ts"
+    ]
   }
 ]
