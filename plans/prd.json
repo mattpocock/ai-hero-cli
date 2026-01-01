@@ -88,7 +88,7 @@
       "Update pull.ts to use GitService instead of Command",
       "Run pnpm typecheck to verify no errors"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "rebase-to-main",
@@ -100,7 +100,7 @@
       "Run pnpm typecheck to verify no errors"
     ],
     "dependencies": ["edit-commit-part3"],
-    "passes": false
+    "passes": true
   },
   {
     "id": "commit-utils",

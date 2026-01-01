@@ -2,7 +2,13 @@ import { Command as CLICommand, Options } from "@effect/cli";
 import { Console, Effect } from "effect";
 import { InvalidBranchOperationError } from "../cherry-pick.js";
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "../constants.js";
-import { GitService, GitServiceConfig } from "../git-service.js";
+import {
+  FailedToCheckoutError,
+  FailedToPushError,
+  GitService,
+  GitServiceConfig,
+  RebaseConflictError,
+} from "../git-service.js";
 import { confirmContinue } from "../prompt-utils.js";
 
 export const rebaseToMain = CLICommand.make(
@@ -50,73 +56,61 @@ export const rebaseToMain = CLICommand.make(
         `Do you want to checkout ${opts.target}?`
       );
 
-      const checkoutExitCode = yield* git.runCommandWithExitCode(
-        "git",
-        "checkout",
-        opts.target
+      yield* git.checkout(opts.target).pipe(
+        Effect.mapError(
+          (e) =>
+            new InvalidBranchOperationError({
+              message:
+                e instanceof FailedToCheckoutError
+                  ? e.message
+                  : `Failed to checkout ${opts.target}`,
+            })
+        )
       );
-
-      if (checkoutExitCode !== 0) {
-        return yield* Effect.fail(
-          new InvalidBranchOperationError({
-            message: `Failed to checkout ${opts.target}`,
-          })
-        );
-      }
 
       yield* confirmContinue(`Do you want to rebase to main?`);
 
-      const rebaseExitCode = yield* git.runCommandWithExitCode(
-        "git",
-        "rebase",
-        "main"
+      yield* git.rebase("main").pipe(
+        Effect.mapError(
+          (e) =>
+            new InvalidBranchOperationError({
+              message:
+                e instanceof RebaseConflictError
+                  ? e.message
+                  : `Failed to rebase to main`,
+            })
+        )
       );
-
-      if (rebaseExitCode !== 0) {
-        return yield* Effect.fail(
-          new InvalidBranchOperationError({
-            message: `Failed to rebase to main`,
-          })
-        );
-      }
 
       yield* confirmContinue(
         `Do you want to force push to ${opts.target}?`
       );
 
-      const forcePushExitCode =
-        yield* git.runCommandWithExitCode(
-          "git",
-          "push",
-          "origin",
-          opts.target,
-          "--force-with-lease"
-        );
-
-      if (forcePushExitCode !== 0) {
-        return yield* Effect.fail(
-          new InvalidBranchOperationError({
-            message: `Failed to force push to ${opts.target}`,
-          })
-        );
-      }
+      yield* git.pushForceWithLease("origin", opts.target).pipe(
+        Effect.mapError(
+          (e) =>
+            new InvalidBranchOperationError({
+              message:
+                e instanceof FailedToPushError
+                  ? e.message
+                  : `Failed to force push to ${opts.target}`,
+            })
+        )
+      );
 
       yield* confirmContinue(`Do you want to checkout main?`);
 
-      const backToMainExitCode =
-        yield* git.runCommandWithExitCode(
-          "git",
-          "checkout",
-          "main"
-        );
-
-      if (backToMainExitCode !== 0) {
-        return yield* Effect.fail(
-          new InvalidBranchOperationError({
-            message: `Failed to checkout main`,
-          })
-        );
-      }
+      yield* git.checkout("main").pipe(
+        Effect.mapError(
+          (e) =>
+            new InvalidBranchOperationError({
+              message:
+                e instanceof FailedToCheckoutError
+                  ? e.message
+                  : `Failed to checkout main`,
+            })
+        )
+      );
 
       yield* Console.log(
         `✓ Successfully rebased ${opts.target} to main and force pushed`

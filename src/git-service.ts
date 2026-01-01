@@ -158,6 +158,17 @@ export class MergeConflictError extends Data.TaggedError("MergeConflictError")<{
   message: string;
 }> {}
 
+/**
+ * Error thrown when git rebase encounters conflicts.
+ * Rebasing replays commits on top of a new base, and conflicts occur
+ * when changes in the replayed commits overlap with the new base.
+ * Unlike merge, rebase rewrites history - all rebased commits get new SHAs.
+ */
+export class RebaseConflictError extends Data.TaggedError("RebaseConflictError")<{
+  onto: string;
+  message: string;
+}> {}
+
 export class GitService extends Effect.Service<GitService>()(
   "GitService",
   {
@@ -640,6 +651,30 @@ Add upstream remote:
               new MergeConflictError({
                 ref,
                 message: `Merge conflicts detected when merging ${ref}`,
+              })
+            );
+          }
+        }),
+
+        /**
+         * Rebases the current branch onto another branch.
+         * This replays all commits from the current branch on top of the target branch.
+         * WARNING: Rebase rewrites commit history - all rebased commits get new SHAs.
+         * Never rebase commits that have been pushed to a shared remote unless you
+         * coordinate with all collaborators.
+         *
+         * @param onto - The branch to rebase onto (e.g., "main", "origin/main")
+         * @returns Effect that succeeds when rebase completes
+         * @throws RebaseConflictError if conflicts occur during rebase
+         */
+        rebase: Effect.fn("rebase")(function* (onto: string) {
+          const exitCode = yield* runCommandWithExitCode("git", "rebase", onto);
+
+          if (exitCode !== 0) {
+            return yield* Effect.fail(
+              new RebaseConflictError({
+                onto,
+                message: `Rebase conflicts detected when rebasing onto ${onto}`,
               })
             );
           }
