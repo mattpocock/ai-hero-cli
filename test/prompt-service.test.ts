@@ -31,6 +31,7 @@ describe("PromptService", () => {
         expect(typeof service.selectLessonCommit).toBe("function");
         expect(typeof service.selectExercise).toBe("function");
         expect(typeof service.confirmProceedWithUncommittedChanges).toBe("function");
+        expect(typeof service.selectWalkThroughAction).toBe("function");
       }).pipe(Effect.provide(PromptService.Default))
     );
   });

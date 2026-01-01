@@ -160,6 +160,7 @@
     "service": "PromptService",
     "method": "selectWalkThroughAction",
     "category": "behavior",
+    "status": "DONE",
     "description": "Prompts for next action during walk-through",
     "steps": [
       "Method receives current commit number and total commits",

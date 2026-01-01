@@ -398,6 +398,36 @@ export class PromptService extends Effect.Service<PromptService>()(
         return lesson;
       });
 
+      /**
+       * Prompts for next action during walk-through.
+       *
+       * @param currentCommit - Current commit number (1-based)
+       * @param totalCommits - Total number of commits
+       * @returns 'continue' | 'cancel'
+       * @throws PromptCancelledError if user presses Ctrl+C
+       */
+      const selectWalkThroughAction = Effect.fn("selectWalkThroughAction")(
+        function* (currentCommit: number, totalCommits: number) {
+          const { action } = yield* runPrompt<{
+            action: "continue" | "cancel";
+          }>(() =>
+            prompt([
+              {
+                type: "select",
+                name: "action",
+                message: `Commit ${currentCommit}/${totalCommits} applied. Next?`,
+                choices: [
+                  { title: "Continue to next commit", value: "continue" },
+                  { title: "Cancel walk-through", value: "cancel" },
+                ],
+              },
+            ])
+          );
+
+          return action;
+        }
+      );
+
       return {
         confirmReadyToCommit,
         confirmSaveToTargetBranch,
@@ -410,6 +440,7 @@ export class PromptService extends Effect.Service<PromptService>()(
         selectLessonCommit,
         selectExercise,
         confirmProceedWithUncommittedChanges,
+        selectWalkThroughAction,
       };
     }),
     dependencies: [],
