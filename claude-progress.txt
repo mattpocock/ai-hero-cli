@@ -41,3 +41,15 @@ Changes:
 - Created test/reset.test.ts with test for NotAGitRepoError case
 
 PRD item marked as tested=true.
+
+---
+
+## Session 2026-01-01 (cont. 3)
+
+Added test for PRD: "User runs cherry-pick without valid upstream" (cherry-pick error case).
+
+Changes:
+- Added test in cherry-pick.test.ts that mocks ensureUpstreamBranchConnected to fail with NoUpstreamFoundError
+- Verified runCherryPick propagates NoUpstreamFoundError with helpful message about adding upstream remote
+
+PRD item marked as tested=true.
