@@ -1,5 +1,26 @@
 # Claude Progress Log
 
+## 2026-01-01: test-reset-staging-commit
+
+Added unit tests for reset, staging, and commit git-service methods.
+
+### Changes made:
+
+**test/git-service.test.ts:**
+- Added tests for resetHard() - verifies reset to valid SHA works
+- Added tests for FailedToResetError error structure
+- Added tests for resetHead() - verifies method exists
+- Added tests for restoreStaged() - verifies succeeds with no staged changes
+- Added tests for stageAll() - verifies succeeds in git repo
+- Added tests for commit() - verifies fails when nothing staged
+- Added tests for FailedToCommitError error structure
+
+### Verification:
+- pnpm typecheck: passed
+- pnpm test: passed (20 tests)
+
+---
+
 ## 2026-01-01: test-fetch-status-ref
 
 Added unit tests for fetch, status, and ref git-service methods.

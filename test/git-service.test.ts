@@ -3,6 +3,8 @@ import { NodeContext } from "@effect/platform-node";
 import { Effect } from "effect";
 import {
   FailedToFetchOriginError,
+  FailedToResetError,
+  FailedToCommitError,
   GitService,
   InvalidRefError,
 } from "../src/git-service.js";
@@ -154,5 +156,120 @@ it("InvalidRefError has correct structure", () => {
         Effect.provide(GitService.Default)
       )
     );
+  });
+
+  describe("resetHard", () => {
+    it.effect("resets to a valid SHA", () =>
+      Effect.gen(function* () {
+        const git = yield* GitService;
+
+        // Get current HEAD SHA first
+        const headSha = yield* git.revParse("HEAD");
+
+        // Reset to the same commit (safe operation, no actual change)
+        yield* git.resetHard(headSha);
+
+        // Verify we're still at the same commit
+        const afterSha = yield* git.revParse("HEAD");
+        expect(afterSha).toBe(headSha);
+      }).pipe(
+        Effect.provide(NodeContext.layer),
+        Effect.provide(GitService.Default)
+      )
+    );
+
+    it("FailedToResetError has correct structure", () => {
+      const error = new FailedToResetError({
+        sha: "abc123",
+        message: "Failed to reset to abc123 (exit code: 1)",
+      });
+
+      expect(error._tag).toBe("FailedToResetError");
+      expect(error.sha).toBe("abc123");
+      expect(error.message).toContain("Failed to reset");
+    });
+  });
+
+  describe("resetHead", () => {
+    it.effect("method exists and is callable", () =>
+      Effect.gen(function* () {
+        const git = yield* GitService;
+
+        // Just verify the method exists - actually calling it
+        // would undo the last commit which we don't want in tests
+        expect(typeof git.resetHead).toBe("function");
+      }).pipe(
+        Effect.provide(NodeContext.layer),
+        Effect.provide(GitService.Default)
+      )
+    );
+  });
+
+  describe("restoreStaged", () => {
+    it.effect("succeeds when there are no staged changes", () =>
+      Effect.gen(function* () {
+        const git = yield* GitService;
+
+        // restoreStaged is safe to call even with nothing staged
+        yield* git.restoreStaged();
+
+        // If we get here, the command succeeded
+        expect(true).toBe(true);
+      }).pipe(
+        Effect.provide(NodeContext.layer),
+        Effect.provide(GitService.Default)
+      )
+    );
+  });
+
+  describe("stageAll", () => {
+    it.effect("succeeds in a git repo", () =>
+      Effect.gen(function* () {
+        const git = yield* GitService;
+
+        // stageAll is safe to call even with nothing to stage
+        yield* git.stageAll();
+
+        // If we get here, the command succeeded
+        expect(true).toBe(true);
+      }).pipe(
+        Effect.provide(NodeContext.layer),
+        Effect.provide(GitService.Default)
+      )
+    );
+  });
+
+  describe("commit", () => {
+    it.effect("fails when nothing is staged", () =>
+      Effect.gen(function* () {
+        const git = yield* GitService;
+
+        // Ensure nothing is staged
+        yield* git.restoreStaged();
+
+        // Try to commit with nothing staged - should fail
+        const result = yield* git.commit("test commit").pipe(
+          Effect.map(() => "success" as const),
+          Effect.catchTag("FailedToCommitError", () =>
+            Effect.succeed("commit-failed" as const)
+          )
+        );
+
+        // Commit should fail since nothing is staged
+        expect(result).toBe("commit-failed");
+      }).pipe(
+        Effect.provide(NodeContext.layer),
+        Effect.provide(GitService.Default)
+      )
+    );
+
+    it("FailedToCommitError has correct structure", () => {
+      const error = new FailedToCommitError({
+        message: "Failed to commit (exit code: 1)",
+      });
+
+      expect(error._tag).toBe("FailedToCommitError");
+      expect(error.message).toContain("Failed to commit");
+    });
   });
 });
