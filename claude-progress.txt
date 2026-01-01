@@ -1,5 +1,61 @@
 # Claude Progress Log
 
+## 2026-01-01: get-diffs
+
+Completed refactor to extract git commands from get-diffs.ts to git-service.
+
+### Changes made:
+
+**src/internal/get-diffs.ts:**
+- Removed `Command` import from `@effect/platform` (no longer needed)
+- Removed unused `ConfigProvider` import
+- Replaced `Command.make("git", "fetch", "origin")` with `git.fetchOrigin()`
+- Replaced `Command.make("git", "log", "--oneline", "--reverse", branch)` with `git.getLogOnelineReverse(branch)`
+- Added error handling for `FailedToFetchOriginError` to convert to `InvalidProjectRepoError`
+
+### Verification:
+- pnpm typecheck: passed
+- pnpm test: passed (4 tests)
+
+---
+
+## 2026-01-01: commit-utils
+
+Completed refactor to extract git commands from commit-utils.ts to git-service.
+
+### Changes made:
+
+**src/git-service.ts:**
+- Added `NoParentCommitError` class with JSDoc explaining initial commit has no parent
+- Added `getLogOneline(branch)` method - gets commit log in oneline format for a branch
+- Added `getParentCommit(sha)` method - gets parent commit SHA, throws NoParentCommitError if no parent
+
+**src/commit-utils.ts:**
+- Removed `Command` import from `@effect/platform` (no longer needed)
+- Removed local `NoParentCommitError` class (now in git-service, re-exported)
+- Removed `cwd` parameter from `selectLessonCommit()` function
+- Removed `cwd` parameter from `getParentCommit()` function
+- Replaced `Command.make("git", "log", ...)` calls with `gitService.getLogOneline()`
+- Replaced `Command.make("git", "rev-parse", ...)` call with `gitService.getParentCommit()`
+
+**src/cherry-pick.ts:**
+- Removed unused `config` variable
+- Updated `selectLessonCommit()` call to remove `cwd` parameter
+
+**src/reset.ts:**
+- Removed unused `config` variable
+- Updated `selectLessonCommit()` call to remove `cwd` parameter
+- Updated `getParentCommit()` calls to remove `cwd` parameter
+
+**src/internal/edit-commit.ts:**
+- Updated `selectLessonCommit()` call to remove `cwd` parameter
+
+### Verification:
+- pnpm typecheck: passed
+- pnpm test: passed (4 tests)
+
+---
+
 ## 2026-01-01: rebase-to-main
 
 Completed refactor to extract git commands from rebase-to-main.ts to git-service.

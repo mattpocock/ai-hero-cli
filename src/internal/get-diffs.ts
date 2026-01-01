@@ -1,6 +1,6 @@
 import { Command as CLICommand, Options } from "@effect/cli";
-import { Command, FileSystem } from "@effect/platform";
-import { ConfigProvider, Console, Data, Effect } from "effect";
+import { FileSystem } from "@effect/platform";
+import { Console, Data, Effect } from "effect";
 import { existsSync } from "node:fs";
 import * as path from "node:path";
 import {
@@ -96,24 +96,16 @@ export const getDiffs = CLICommand.make(
 
       // Fetch latest from origin
       yield* Console.log("Fetching latest from origin...");
-      const gitFetchCommand = Command.make(
-        "git",
-        "fetch",
-        "origin"
-      ).pipe(Command.workingDirectory(projectRepo));
-
-      const fetchExitCode = yield* Command.exitCode(
-        gitFetchCommand
-      ).pipe(Effect.catchAll(() => Effect.succeed(1)));
-
-      if (fetchExitCode !== 0) {
-        return yield* Effect.fail(
-          new InvalidProjectRepoError({
-            path: projectRepo,
-            message: `Failed to fetch from origin`,
-          })
-        );
-      }
+      yield* git.fetchOrigin().pipe(
+        Effect.catchTag("FailedToFetchOriginError", () =>
+          Effect.fail(
+            new InvalidProjectRepoError({
+              path: projectRepo,
+              message: `Failed to fetch from origin`,
+            })
+          )
+        )
+      );
 
       yield* Console.log(`✓ Fetched latest from origin`);
       yield* Console.log(
@@ -124,15 +116,7 @@ export const getDiffs = CLICommand.make(
       // Phase 2: Retrieve commit history
       yield* Console.log("\nRetrieving commit history...");
 
-      const gitLogCommand = Command.make(
-        "git",
-        "log",
-        "--oneline",
-        "--reverse", // Chronological order (oldest first)
-        branch
-      ).pipe(Command.workingDirectory(projectRepo));
-
-      const commitHistory = yield* Command.string(gitLogCommand);
+      const commitHistory = yield* git.getLogOnelineReverse(branch);
 
       // Parse commits: format is "SHA message"
       type ParsedCommit = {
