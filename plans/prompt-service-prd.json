@@ -251,10 +251,10 @@
       "src/internal/edit-commit.ts",
       "src/reset.ts",
       "src/internal/walk-through.ts",
-      "src/exercise.ts"
+      "src/exercise.ts",
+      "src/cherry-pick.ts"
     ],
     "remainingFiles": [
-      "src/cherry-pick.ts",
       "src/commit-utils.ts"
     ]
   }

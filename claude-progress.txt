@@ -32,6 +32,8 @@ Migrated exercise.ts to use PromptService:
 - selectExercise (in chooseLessonAndRunIt)
 - selectSubfolder (in selectSubfolderIndex)
 
+Migrated cherry-pick.ts to use PromptService:
+- inputBranchName (for working branch when on main)
+
 Remaining files to migrate:
-- src/cherry-pick.ts
 - src/commit-utils.ts

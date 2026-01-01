@@ -8,8 +8,7 @@ import { selectLessonCommit } from "./commit-utils.js";
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "./constants.js";
 import { GitService, GitServiceConfig } from "./git-service.js";
 import { cwdOption } from "./options.js";
-import { runPrompt } from "./prompt-utils.js";
-import prompt from "prompts";
+import { PromptService } from "./prompt-service.js";
 
 export class InvalidBranchOperationError extends Data.TaggedError(
   "InvalidBranchOperationError"
@@ -34,6 +33,7 @@ export const cherryPick = CLICommand.make(
   ({ branch, cwd, lessonId }) =>
     Effect.gen(function* () {
       const git = yield* GitService;
+      const promptService = yield* PromptService;
 
       // Validate git repository
       yield* git.ensureIsGitRepo();
@@ -69,17 +69,8 @@ export const cherryPick = CLICommand.make(
           "You cannot cherry-pick onto the main branch."
         );
 
-        const { branchName } = yield* runPrompt<{
-          branchName: string;
-        }>(() => {
-          return prompt([
-            {
-              type: "text",
-              name: "branchName",
-              message: "Enter name of your new working branch:",
-            },
-          ]);
-        });
+        const branchName =
+          yield* promptService.inputBranchName("working");
 
         yield* git.checkoutNewBranch(branchName);
 
