@@ -383,7 +383,7 @@
     "command": "reset",
     "category": "error",
     "description": "User provides conflicting state flags",
-    "tested": false,
+    "tested": true,
     "steps": [
       "User runs `ai-hero reset --problem --solution`",
       "System displays: 'Error: Cannot use both --problem and --solution flags'",

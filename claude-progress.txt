@@ -119,3 +119,16 @@ Changes:
 - Added InvalidBranchOperationError import to reset.test.ts
 
 PRD item marked as tested=true.
+
+---
+
+## Session 2026-01-01 (cont. 9)
+
+Added test for PRD: "User provides conflicting state flags" (reset error case).
+
+Changes:
+- Added test in reset.test.ts that verifies runReset fails when both --problem and --solution flags are provided
+- Mocks GitService/PromptService, passes problem=true/solution=true
+- Verified InvalidBranchOperationError with message "Cannot use both --problem and --solution flags"
+
+PRD item marked as tested=true.
