@@ -66,3 +66,16 @@ Changes:
 - Import InvalidBranchOperationError from cherry-pick.ts
 
 PRD item marked as tested=true.
+
+---
+
+## Session 2026-01-01 (cont. 5)
+
+Added test for PRD: "User runs reset without valid upstream" (reset error case).
+
+Changes:
+- Added test in reset.test.ts that mocks ensureUpstreamBranchConnected to fail with NoUpstreamFoundError
+- Verified runReset propagates NoUpstreamFoundError with helpful message about adding upstream remote
+- Added NoUpstreamFoundError import to reset.test.ts
+
+PRD item marked as tested=true.

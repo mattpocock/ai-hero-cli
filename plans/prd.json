@@ -344,7 +344,7 @@
     "command": "reset",
     "category": "error",
     "description": "User runs reset without valid upstream",
-    "tested": false,
+    "tested": true,
     "steps": [
       "User has no upstream remote configured",
       "User runs `ai-hero reset`",
