@@ -248,10 +248,10 @@
     "status": "IN_PROGRESS",
     "description": "Track files migrated from runPrompt to PromptService",
     "migratedFiles": [
-      "src/internal/edit-commit.ts"
+      "src/internal/edit-commit.ts",
+      "src/reset.ts"
     ],
     "remainingFiles": [
-      "src/reset.ts",
       "src/internal/walk-through.ts",
       "src/exercise.ts",
       "src/cherry-pick.ts",

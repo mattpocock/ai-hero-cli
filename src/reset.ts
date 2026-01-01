@@ -4,7 +4,6 @@ import {
   Options,
 } from "@effect/cli";
 import { Console, Data, Effect } from "effect";
-import prompt from "prompts";
 import {
   getParentCommit,
   selectLessonCommit,
@@ -12,7 +11,7 @@ import {
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "./constants.js";
 import { GitService, GitServiceConfig } from "./git-service.js";
 import { cwdOption } from "./options.js";
-import { runPrompt } from "./prompt-utils.js";
+import { PromptService } from "./prompt-service.js";
 
 export class NotAGitRepoError extends Data.TaggedError(
   "NotAGitRepoError"
@@ -64,6 +63,7 @@ export const reset = CLICommand.make(
   }) =>
     Effect.gen(function* () {
       const git = yield* GitService;
+      const promptService = yield* PromptService;
 
       // Validate git repository
       yield* git.ensureIsGitRepo();
@@ -108,31 +108,7 @@ export const reset = CLICommand.make(
 
       // If neither flag is provided, prompt user (unless demo mode)
       if (!problem && !solution && !demo) {
-        const { state } = yield* runPrompt<{
-          state: "problem" | "solution";
-        }>(() =>
-          prompt([
-            {
-              type: "select",
-              name: "state",
-              message: "Start the exercise or view final code?",
-              choices: [
-                {
-                  title: "Start the exercise",
-                  value: "problem",
-                  description:
-                    "Reset to problem state (commit before solution)",
-                },
-                {
-                  title: "Final code",
-                  value: "solution",
-                  description:
-                    "Reset to solution state (completed exercise)",
-                },
-              ],
-            },
-          ])
-        );
+        const state = yield* promptService.selectProblemOrSolution();
 
         if (state === "problem") {
           commitToUse = yield* getParentCommit({
@@ -160,28 +136,7 @@ export const reset = CLICommand.make(
       } else if (demo) {
         action = "reset-current";
       } else {
-        const result = yield* runPrompt<{
-          action: "reset-current" | "create-branch";
-        }>(() =>
-          prompt([
-            {
-              type: "select",
-              name: "action",
-              message: "How would you like to proceed?",
-              choices: [
-                {
-                  title: `Reset current branch (${currentBranch})`,
-                  value: "reset-current",
-                },
-                {
-                  title: "Create new branch from commit",
-                  value: "create-branch",
-                },
-              ],
-            },
-          ])
-        );
-        action = result.action;
+        action = yield* promptService.selectResetAction(currentBranch);
       }
 
       if (action === "reset-current") {
@@ -194,17 +149,7 @@ export const reset = CLICommand.make(
       }
 
       if (action === "create-branch") {
-        const { branchName } = yield* runPrompt<{
-          branchName: string;
-        }>(() =>
-          prompt([
-            {
-              type: "text",
-              name: "branchName",
-              message: "Enter new branch name:",
-            },
-          ])
-        );
+        const branchName = yield* promptService.inputBranchName("new");
 
         yield* Console.log(
           `Creating branch ${branchName} from ${commitToUse} (${stateDescription})...`
@@ -229,24 +174,7 @@ export const reset = CLICommand.make(
           );
           yield* Console.log(statusOutput);
 
-          const { confirm } = yield* runPrompt<{
-            confirm: boolean;
-          }>(() =>
-            prompt([
-              {
-                type: "confirm",
-                name: "confirm",
-                message:
-                  "This will lose all uncommitted work. Continue?",
-                initial: false,
-              },
-            ])
-          );
-
-          if (!confirm) {
-            yield* Console.log("Reset cancelled");
-            return;
-          }
+          yield* promptService.confirmResetWithUncommittedChanges();
         }
       }
 

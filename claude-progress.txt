@@ -16,8 +16,13 @@ Migrated edit-commit.ts to use PromptService:
 - confirmForcePush
 - selectCherryPickConflictAction (in resolveConflictLoop)
 
+Migrated reset.ts to use PromptService:
+- selectProblemOrSolution
+- selectResetAction
+- inputBranchName
+- confirmResetWithUncommittedChanges
+
 Remaining files to migrate:
-- src/reset.ts
 - src/internal/walk-through.ts
 - src/exercise.ts
 - src/cherry-pick.ts
