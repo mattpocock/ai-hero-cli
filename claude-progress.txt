@@ -22,8 +22,12 @@ Migrated reset.ts to use PromptService:
 - inputBranchName
 - confirmResetWithUncommittedChanges
 
+Migrated walk-through.ts to use PromptService:
+- inputBranchName (for working branch)
+- confirmResetWithUncommittedChanges
+- selectWalkThroughAction
+
 Remaining files to migrate:
-- src/internal/walk-through.ts
 - src/exercise.ts
 - src/cherry-pick.ts
 - src/commit-utils.ts

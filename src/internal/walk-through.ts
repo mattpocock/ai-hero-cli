@@ -1,9 +1,8 @@
 import { Command as CLICommand, Options } from "@effect/cli";
 import { Console, Data, Effect } from "effect";
-import prompt from "prompts";
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "../constants.js";
 import { GitService, GitServiceConfig } from "../git-service.js";
-import { runPrompt } from "../prompt-utils.js";
+import { PromptService } from "../prompt-service.js";
 
 export class NotAGitRepoError extends Data.TaggedError(
   "NotAGitRepoError"
@@ -86,6 +85,7 @@ export const walkThrough = CLICommand.make(
   ({ liveBranch, mainBranch }) =>
     Effect.gen(function* () {
       const git = yield* GitService;
+      const promptService = yield* PromptService;
 
       // Validate git repo
       yield* git.ensureIsGitRepo();
@@ -101,17 +101,8 @@ export const walkThrough = CLICommand.make(
           `You are on ${currentBranch}. Walk-through requires a working branch.`
         );
 
-        const { branchName } = yield* runPrompt<{
-          branchName: string;
-        }>(() =>
-          prompt([
-            {
-              type: "text",
-              name: "branchName",
-              message: "Enter name for new working branch:",
-            },
-          ])
-        );
+        const branchName =
+          yield* promptService.inputBranchName("working");
 
         yield* git.checkoutNewBranch(branchName).pipe(
           Effect.catchTag("FailedToCreateBranchError", (error) => {
@@ -139,25 +130,13 @@ export const walkThrough = CLICommand.make(
           );
           yield* Console.log(statusOutput);
 
-          const { confirm } = yield* runPrompt<{
-            confirm: boolean;
-          }>(() =>
-            prompt([
-              {
-                type: "confirm",
-                name: "confirm",
-                message:
-                  "This will lose all uncommitted work. Continue?",
-                initial: false,
-              },
-            ])
-          );
-
-          if (!confirm) {
-            return yield* Effect.fail(
-              new WalkThroughCancelledError()
+          yield* promptService
+            .confirmResetWithUncommittedChanges()
+            .pipe(
+              Effect.catchTag("PromptCancelledError", () =>
+                Effect.fail(new WalkThroughCancelledError())
+              )
             );
-          }
         }
       }
 
@@ -217,26 +196,9 @@ export const walkThrough = CLICommand.make(
         yield* applyDemoReset(commit.sha);
 
         // Prompt for continuation
-        const { action } = yield* runPrompt<{
-          action: "continue" | "cancel";
-        }>(() =>
-          prompt([
-            {
-              type: "select",
-              name: "action",
-              message: `Commit ${commitNumber}/${commits.length} applied. Next?`,
-              choices: [
-                {
-                  title: "Continue to next commit",
-                  value: "continue",
-                },
-                {
-                  title: "Cancel walk-through",
-                  value: "cancel",
-                },
-              ],
-            },
-          ])
+        const action = yield* promptService.selectWalkThroughAction(
+          commitNumber,
+          commits.length
         );
 
         if (action === "cancel") {
