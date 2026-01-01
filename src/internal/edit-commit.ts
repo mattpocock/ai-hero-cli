@@ -17,6 +17,7 @@ import type {
 } from "@effect/platform/Error";
 import type { CommandExecutor } from "@effect/platform/CommandExecutor";
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "../constants.js";
+import { GitService } from "../git-service.js";
 
 export class NotAGitRepoError extends Data.TaggedError(
   "NotAGitRepoError"
@@ -59,6 +60,7 @@ export const editCommit = CLICommand.make(
   ({ branch, lessonId }) =>
     Effect.gen(function* () {
       const cwd = process.cwd();
+      const gitService = yield* GitService;
 
       // Validate git repository
       const gitDirPath = path.join(cwd, ".git");
@@ -72,36 +74,21 @@ export const editCommit = CLICommand.make(
       }
 
       // Fetch origin
-      const gitFetchCommand = Command.make(
-        "git",
-        "fetch",
-        "origin"
-      ).pipe(
-        Command.workingDirectory(cwd),
-        Command.stdout("inherit"),
-        Command.stderr("inherit")
+      const fetchResult = yield* gitService.fetchOrigin().pipe(
+        Effect.catchTag("FailedToFetchOriginError", () =>
+          Effect.succeed({ failed: true as const })
+        ),
+        Effect.map(() => ({ failed: false as const }))
       );
 
-      const fetchExitCode = yield* Command.exitCode(
-        gitFetchCommand
-      );
-
-      if (fetchExitCode !== 0) {
+      if (fetchResult.failed) {
         yield* Console.error("Failed to fetch branch");
         process.exitCode = 1;
         return;
       }
 
       // Get current branch name
-      const currentBranchCommand = Command.make(
-        "git",
-        "branch",
-        "--show-current"
-      ).pipe(Command.workingDirectory(cwd));
-
-      const currentBranch = (yield* Command.string(
-        currentBranchCommand
-      )).trim();
+      const currentBranch = yield* gitService.getCurrentBranch();
 
       // Check if current branch is the target branch
       if (currentBranch === branch) {
@@ -130,28 +117,15 @@ export const editCommit = CLICommand.make(
       const targetSha = targetCommit.sha;
 
       // Get HEAD of target branch to know what to cherry-pick
-      const getTargetBranchHeadCommand = Command.make(
-        "git",
-        "rev-parse",
+      const targetBranchHead = yield* gitService.revParse(
         `origin/${branch}`
-      ).pipe(Command.workingDirectory(cwd));
-
-      const targetBranchHead = (yield* Command.string(
-        getTargetBranchHeadCommand
-      )).trim();
+      );
 
       // Count following commits on target branch
-      const countCommand = Command.make(
-        "git",
-        "rev-list",
-        "--count",
-        `${targetSha}..origin/${branch}`
-      ).pipe(Command.workingDirectory(cwd));
-
-      const countOutput = (yield* Command.string(
-        countCommand
-      )).trim();
-      const followingCommitCount = parseInt(countOutput, 10);
+      const followingCommitCount = yield* gitService.revListCount(
+        targetSha,
+        `origin/${branch}`
+      );
 
       if (followingCommitCount === 0) {
         yield* Console.log(
@@ -543,21 +517,16 @@ function resolveConflictLoop(
 ): Effect.Effect<
   void,
   BadArgument | PromptCancelledError | SystemError,
-  CommandExecutor
+  CommandExecutor | GitService
 > {
   return Effect.gen(function* () {
-    // Show git status
-    const statusCommand = Command.make(
-      "git",
-      "status",
-      "--short"
-    ).pipe(
-      Command.workingDirectory(cwd),
-      Command.stdout("inherit"),
-      Command.stderr("inherit")
-    );
+    const gitService = yield* GitService;
 
-    yield* Command.exitCode(statusCommand);
+    // Show git status
+    const status = yield* gitService.getStatusShort();
+    if (status) {
+      yield* Console.log(status);
+    }
 
     // Prompt user with options
     const { action } = yield* runPrompt<{

@@ -1,0 +1,27 @@
+# Claude Progress Log
+
+## 2026-01-01: edit-commit-part1
+
+Completed refactor to extract fetch, status, and ref commands from edit-commit.ts to git-service.
+
+### Changes made:
+
+**src/git-service.ts:**
+- Added `FailedToFetchOriginError` class with JSDoc explaining network/auth/remote issues
+- Added `InvalidRefError` class with JSDoc explaining ref resolution failures
+- Added `fetchOrigin()` method - fetches from origin remote, throws FailedToFetchOriginError on failure
+- Added `revParse(ref)` method - resolves git refs to full SHA, throws InvalidRefError on failure
+- Added `revListCount(from, to)` method - counts commits between two refs
+- Added `getStatusShort()` method - returns short git status output
+
+**src/internal/edit-commit.ts:**
+- Added GitService import
+- Replaced direct `git fetch origin` command with `gitService.fetchOrigin()`
+- Replaced `git branch --show-current` with `gitService.getCurrentBranch()`
+- Replaced `git rev-parse` command with `gitService.revParse()`
+- Replaced `git rev-list --count` command with `gitService.revListCount()`
+- Updated `resolveConflictLoop()` to use `gitService.getStatusShort()` instead of direct command
+
+### Verification:
+- pnpm typecheck: passed
+- pnpm test: passed (4 tests)

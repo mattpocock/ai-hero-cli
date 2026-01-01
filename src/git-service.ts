@@ -54,6 +54,26 @@ export class FailedToDeleteBranchError extends Data.TaggedError(
   message: string;
 }> {}
 
+/**
+ * Error thrown when git fetch origin fails.
+ * This can happen due to network issues, authentication problems,
+ * or the remote not being configured.
+ */
+export class FailedToFetchOriginError extends Data.TaggedError(
+  "FailedToFetchOriginError"
+)<{
+  message: string;
+}> {}
+
+/**
+ * Error thrown when a git ref cannot be resolved.
+ * This typically happens when the ref (branch, tag, or SHA) doesn't exist.
+ */
+export class InvalidRefError extends Data.TaggedError("InvalidRefError")<{
+  ref: string;
+  message: string;
+}> {}
+
 export class FailedToTrackBranchError extends Data.TaggedError(
   "FailedToTrackBranchError"
 )<{
@@ -128,6 +148,91 @@ Add upstream remote:
       });
 
       return {
+        /**
+         * Fetches the latest changes from the origin remote.
+         * This updates remote-tracking branches (e.g., origin/main) without
+         * modifying local branches or the working directory.
+         *
+         * @returns Effect that succeeds when fetch completes
+         * @throws FailedToFetchOriginError if fetch fails (network, auth, or remote issues)
+         */
+        fetchOrigin: Effect.fn("fetchOrigin")(function* () {
+          const exitCode = yield* runCommandWithExitCode(
+            "git",
+            "fetch",
+            "origin"
+          );
+
+          if (exitCode !== 0) {
+            return yield* Effect.fail(
+              new FailedToFetchOriginError({
+                message: `Failed to fetch from origin (exit code: ${exitCode})`,
+              })
+            );
+          }
+        }),
+
+        /**
+         * Resolves a git ref (branch name, tag, or partial SHA) to its full SHA.
+         * Uses `git rev-parse` which handles all ref types.
+         *
+         * @param ref - The ref to resolve (e.g., "main", "origin/main", "HEAD", or a SHA)
+         * @returns The full SHA of the resolved ref
+         * @throws InvalidRefError if the ref cannot be resolved
+         */
+        revParse: Effect.fn("revParse")(function* (ref: string) {
+          const result = yield* runCommandWithString(
+            "git",
+            "rev-parse",
+            ref
+          ).pipe(
+            Effect.catchAll(() =>
+              Effect.fail(
+                new InvalidRefError({
+                  ref,
+                  message: `Failed to resolve ref: ${ref}`,
+                })
+              )
+            )
+          );
+
+          return result;
+        }),
+
+        /**
+         * Counts the number of commits between two refs.
+         * Uses `git rev-list --count from..to` which counts commits reachable
+         * from `to` but not from `from`.
+         *
+         * @param from - Starting ref (exclusive)
+         * @param to - Ending ref (inclusive)
+         * @returns Number of commits in the range
+         */
+        revListCount: Effect.fn("revListCount")(function* (
+          from: string,
+          to: string
+        ) {
+          const countOutput = yield* runCommandWithString(
+            "git",
+            "rev-list",
+            "--count",
+            `${from}..${to}`
+          );
+
+          return parseInt(countOutput, 10);
+        }),
+
+        /**
+         * Gets the short status output from git.
+         * Uses `git status --short` which outputs one line per file with
+         * a two-letter status code (e.g., "M " for modified, "??" for untracked).
+         *
+         * @returns The short status output as a string
+         */
+        getStatusShort: Effect.fn("getStatusShort")(function* () {
+          return yield* runCommandWithString("git", "status", "--short");
+        }),
+
         ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(
           function* () {
             const cwd = config.cwd;
