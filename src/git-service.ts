@@ -1,5 +1,5 @@
 import { Command, FileSystem } from "@effect/platform";
-import { NodeContext } from "@effect/platform-node";
+import { NodeFileSystem } from "@effect/platform-node";
 import { Context, Data, Effect, Layer } from "effect";
 import * as path from "node:path";
 
@@ -69,7 +69,9 @@ export class FailedToFetchOriginError extends Data.TaggedError(
  * Error thrown when a git ref cannot be resolved.
  * This typically happens when the ref (branch, tag, or SHA) doesn't exist.
  */
-export class InvalidRefError extends Data.TaggedError("InvalidRefError")<{
+export class InvalidRefError extends Data.TaggedError(
+  "InvalidRefError"
+)<{
   ref: string;
   message: string;
 }> {}
@@ -131,7 +133,9 @@ export class FailedToCheckoutError extends Data.TaggedError(
  * Common causes: remote rejected push (force-with-lease safety),
  * network issues, or authentication problems.
  */
-export class FailedToPushError extends Data.TaggedError("FailedToPushError")<{
+export class FailedToPushError extends Data.TaggedError(
+  "FailedToPushError"
+)<{
   remote: string;
   branch: string;
   message: string;
@@ -142,7 +146,9 @@ export class FailedToPushError extends Data.TaggedError("FailedToPushError")<{
  * Common causes: network issues, authentication problems,
  * or the remote/branch doesn't exist.
  */
-export class FailedToFetchError extends Data.TaggedError("FailedToFetchError")<{
+export class FailedToFetchError extends Data.TaggedError(
+  "FailedToFetchError"
+)<{
   remote: string;
   branch: string;
   message: string;
@@ -153,7 +159,9 @@ export class FailedToFetchError extends Data.TaggedError("FailedToFetchError")<{
  * Conflicts occur when changes in the merged ref overlap with
  * changes in the current branch that cannot be automatically resolved.
  */
-export class MergeConflictError extends Data.TaggedError("MergeConflictError")<{
+export class MergeConflictError extends Data.TaggedError(
+  "MergeConflictError"
+)<{
   ref: string;
   message: string;
 }> {}
@@ -164,7 +172,9 @@ export class MergeConflictError extends Data.TaggedError("MergeConflictError")<{
  * when changes in the replayed commits overlap with the new base.
  * Unlike merge, rebase rewrites history - all rebased commits get new SHAs.
  */
-export class RebaseConflictError extends Data.TaggedError("RebaseConflictError")<{
+export class RebaseConflictError extends Data.TaggedError(
+  "RebaseConflictError"
+)<{
   onto: string;
   message: string;
 }> {}
@@ -174,7 +184,9 @@ export class RebaseConflictError extends Data.TaggedError("RebaseConflictError")
  * This occurs when trying to get the parent of the initial commit
  * in a repository, as it has no parent by definition.
  */
-export class NoParentCommitError extends Data.TaggedError("NoParentCommitError")<{
+export class NoParentCommitError extends Data.TaggedError(
+  "NoParentCommitError"
+)<{
   commitSha: string;
 }> {}
 
@@ -326,9 +338,15 @@ Add upstream remote:
          *
          * @returns The short status output as a string
          */
-        getStatusShort: Effect.fn("getStatusShort")(function* () {
-          return yield* runCommandWithString("git", "status", "--short");
-        }),
+        getStatusShort: Effect.fn("getStatusShort")(
+          function* () {
+            return yield* runCommandWithString(
+              "git",
+              "status",
+              "--short"
+            );
+          }
+        ),
 
         /**
          * Performs a hard reset to the specified SHA.
@@ -339,7 +357,9 @@ Add upstream remote:
          * @returns Effect that succeeds when reset completes
          * @throws FailedToResetError if the reset fails
          */
-        resetHard: Effect.fn("resetHard")(function* (sha: string) {
+        resetHard: Effect.fn("resetHard")(function* (
+          sha: string
+        ) {
           const exitCode = yield* runCommandWithExitCode(
             "git",
             "reset",
@@ -376,7 +396,12 @@ Add upstream remote:
          * @returns Effect that succeeds when restore completes
          */
         restoreStaged: Effect.fn("restoreStaged")(function* () {
-          yield* runCommandWithExitCode("git", "restore", "--staged", ".");
+          yield* runCommandWithExitCode(
+            "git",
+            "restore",
+            "--staged",
+            "."
+          );
         }),
 
         /**
@@ -423,7 +448,9 @@ Add upstream remote:
          * @returns Effect that succeeds when cherry-pick completes
          * @throws CherryPickConflictError if conflicts occur during cherry-pick
          */
-        cherryPick: Effect.fn("cherryPick")(function* (range: string) {
+        cherryPick: Effect.fn("cherryPick")(function* (
+          range: string
+        ) {
           const exitCode = yield* runCommandWithExitCode(
             "git",
             "cherry-pick",
@@ -447,22 +474,25 @@ Add upstream remote:
          * @returns Effect that succeeds when cherry-pick continues, or fails if more conflicts
          * @throws CherryPickConflictError if additional conflicts occur
          */
-        cherryPickContinue: Effect.fn("cherryPickContinue")(function* () {
-          const exitCode = yield* runCommandWithExitCode(
-            "git",
-            "cherry-pick",
-            "--continue"
-          );
-
-          if (exitCode !== 0) {
-            return yield* Effect.fail(
-              new CherryPickConflictError({
-                range: "continue",
-                message: "Cherry-pick continue encountered conflicts",
-              })
+        cherryPickContinue: Effect.fn("cherryPickContinue")(
+          function* () {
+            const exitCode = yield* runCommandWithExitCode(
+              "git",
+              "cherry-pick",
+              "--continue"
             );
+
+            if (exitCode !== 0) {
+              return yield* Effect.fail(
+                new CherryPickConflictError({
+                  range: "continue",
+                  message:
+                    "Cherry-pick continue encountered conflicts",
+                })
+              );
+            }
           }
-        }),
+        ),
 
         /**
          * Aborts an in-progress cherry-pick operation.
@@ -470,9 +500,15 @@ Add upstream remote:
          *
          * @returns Effect that succeeds when abort completes
          */
-        cherryPickAbort: Effect.fn("cherryPickAbort")(function* () {
-          yield* runCommandWithExitCode("git", "cherry-pick", "--abort");
-        }),
+        cherryPickAbort: Effect.fn("cherryPickAbort")(
+          function* () {
+            yield* runCommandWithExitCode(
+              "git",
+              "cherry-pick",
+              "--abort"
+            );
+          }
+        ),
 
         /**
          * Switches to an existing branch.
@@ -483,7 +519,9 @@ Add upstream remote:
          * @returns Effect that succeeds when checkout completes
          * @throws FailedToCheckoutError if checkout fails (branch not found, conflicts)
          */
-        checkout: Effect.fn("checkout")(function* (branch: string) {
+        checkout: Effect.fn("checkout")(function* (
+          branch: string
+        ) {
           const exitCode = yield* runCommandWithExitCode(
             "git",
             "checkout",
@@ -511,28 +549,27 @@ Add upstream remote:
          * @returns Effect that succeeds when push completes
          * @throws FailedToPushError if push fails (rejected, network, auth issues)
          */
-        pushForceWithLease: Effect.fn("pushForceWithLease")(function* (
-          remote: string,
-          branch: string
-        ) {
-          const exitCode = yield* runCommandWithExitCode(
-            "git",
-            "push",
-            remote,
-            branch,
-            "--force-with-lease"
-          );
-
-          if (exitCode !== 0) {
-            return yield* Effect.fail(
-              new FailedToPushError({
-                remote,
-                branch,
-                message: `Failed to push ${branch} to ${remote} (exit code: ${exitCode})`,
-              })
+        pushForceWithLease: Effect.fn("pushForceWithLease")(
+          function* (remote: string, branch: string) {
+            const exitCode = yield* runCommandWithExitCode(
+              "git",
+              "push",
+              remote,
+              branch,
+              "--force-with-lease"
             );
+
+            if (exitCode !== 0) {
+              return yield* Effect.fail(
+                new FailedToPushError({
+                  remote,
+                  branch,
+                  message: `Failed to push ${branch} to ${remote} (exit code: ${exitCode})`,
+                })
+              );
+            }
           }
-        }),
+        ),
 
         /**
          * Creates and switches to a new branch (git checkout -b).
@@ -542,25 +579,25 @@ Add upstream remote:
          * @returns Effect that succeeds when branch is created and checked out
          * @throws FailedToCreateBranchError if branch creation fails (e.g., branch already exists)
          */
-        checkoutNewBranch: Effect.fn("checkoutNewBranch")(function* (
-          branchName: string
-        ) {
-          const exitCode = yield* runCommandWithExitCode(
-            "git",
-            "checkout",
-            "-b",
-            branchName
-          );
-
-          if (exitCode !== 0) {
-            return yield* Effect.fail(
-              new FailedToCreateBranchError({
-                branchName,
-                message: `Failed to create branch ${branchName} (exit code: ${exitCode})`,
-              })
+        checkoutNewBranch: Effect.fn("checkoutNewBranch")(
+          function* (branchName: string) {
+            const exitCode = yield* runCommandWithExitCode(
+              "git",
+              "checkout",
+              "-b",
+              branchName
             );
+
+            if (exitCode !== 0) {
+              return yield* Effect.fail(
+                new FailedToCreateBranchError({
+                  branchName,
+                  message: `Failed to create branch ${branchName} (exit code: ${exitCode})`,
+                })
+              );
+            }
           }
-        }),
+        ),
 
         /**
          * Gets commit log in oneline format, reversed (oldest first).
@@ -570,17 +607,17 @@ Add upstream remote:
          * @param range - The commit range (e.g., "main..feature" or "HEAD~5..HEAD")
          * @returns The commit log output as a string
          */
-        getLogOnelineReverse: Effect.fn("getLogOnelineReverse")(function* (
-          range: string
-        ) {
-          return yield* runCommandWithString(
-            "git",
-            "log",
-            "--oneline",
-            "--reverse",
-            range
-          );
-        }),
+        getLogOnelineReverse: Effect.fn("getLogOnelineReverse")(
+          function* (range: string) {
+            return yield* runCommandWithString(
+              "git",
+              "log",
+              "--oneline",
+              "--reverse",
+              range
+            );
+          }
+        ),
 
         /**
          * Gets commit log in oneline format for a branch.
@@ -590,7 +627,9 @@ Add upstream remote:
          * @param branch - The branch to get log for (e.g., "main", "HEAD", "origin/main")
          * @returns The commit log output as a string
          */
-        getLogOneline: Effect.fn("getLogOneline")(function* (branch: string) {
+        getLogOneline: Effect.fn("getLogOneline")(function* (
+          branch: string
+        ) {
           return yield* runCommandWithString(
             "git",
             "log",
@@ -607,14 +646,18 @@ Add upstream remote:
          * @returns The full SHA of the parent commit
          * @throws NoParentCommitError if the commit has no parent (e.g., initial commit)
          */
-        getParentCommit: Effect.fn("getParentCommit")(function* (sha: string) {
+        getParentCommit: Effect.fn("getParentCommit")(function* (
+          sha: string
+        ) {
           const parentSha = yield* runCommandWithString(
             "git",
             "rev-parse",
             `${sha}^`
           ).pipe(
             Effect.catchAll(() =>
-              Effect.fail(new NoParentCommitError({ commitSha: sha }))
+              Effect.fail(
+                new NoParentCommitError({ commitSha: sha })
+              )
             )
           );
 
@@ -631,27 +674,26 @@ Add upstream remote:
          * @returns Effect that succeeds when branch is created and checked out
          * @throws FailedToCreateBranchError if branch creation fails (e.g., branch already exists)
          */
-        checkoutNewBranchAt: Effect.fn("checkoutNewBranchAt")(function* (
-          branchName: string,
-          sha: string
-        ) {
-          const exitCode = yield* runCommandWithExitCode(
-            "git",
-            "checkout",
-            "-b",
-            branchName,
-            sha
-          );
-
-          if (exitCode !== 0) {
-            return yield* Effect.fail(
-              new FailedToCreateBranchError({
-                branchName,
-                message: `Failed to create branch ${branchName} at ${sha} (exit code: ${exitCode})`,
-              })
+        checkoutNewBranchAt: Effect.fn("checkoutNewBranchAt")(
+          function* (branchName: string, sha: string) {
+            const exitCode = yield* runCommandWithExitCode(
+              "git",
+              "checkout",
+              "-b",
+              branchName,
+              sha
             );
+
+            if (exitCode !== 0) {
+              return yield* Effect.fail(
+                new FailedToCreateBranchError({
+                  branchName,
+                  message: `Failed to create branch ${branchName} at ${sha} (exit code: ${exitCode})`,
+                })
+              );
+            }
           }
-        }),
+        ),
 
         /**
          * Fetches a specific branch from a remote.
@@ -663,7 +705,10 @@ Add upstream remote:
          * @returns Effect that succeeds when fetch completes
          * @throws FailedToFetchError if fetch fails (network, auth, or remote/branch not found)
          */
-        fetch: Effect.fn("fetch")(function* (remote: string, branch: string) {
+        fetch: Effect.fn("fetch")(function* (
+          remote: string,
+          branch: string
+        ) {
           const exitCode = yield* runCommandWithExitCode(
             "git",
             "fetch",
@@ -692,7 +737,11 @@ Add upstream remote:
          * @throws MergeConflictError if conflicts occur during merge
          */
         merge: Effect.fn("merge")(function* (ref: string) {
-          const exitCode = yield* runCommandWithExitCode("git", "merge", ref);
+          const exitCode = yield* runCommandWithExitCode(
+            "git",
+            "merge",
+            ref
+          );
 
           if (exitCode !== 0) {
             return yield* Effect.fail(
@@ -716,7 +765,11 @@ Add upstream remote:
          * @throws RebaseConflictError if conflicts occur during rebase
          */
         rebase: Effect.fn("rebase")(function* (onto: string) {
-          const exitCode = yield* runCommandWithExitCode("git", "rebase", onto);
+          const exitCode = yield* runCommandWithExitCode(
+            "git",
+            "rebase",
+            onto
+          );
 
           if (exitCode !== 0) {
             return yield* Effect.fail(
@@ -827,7 +880,7 @@ Add upstream remote:
       };
     }),
     dependencies: [
-      NodeContext.layer,
+      NodeFileSystem.layer,
       defaultGitServiceConfigLayer,
     ],
   }

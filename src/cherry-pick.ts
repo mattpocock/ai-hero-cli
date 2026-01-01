@@ -3,7 +3,7 @@ import {
   Command as CLICommand,
   Options,
 } from "@effect/cli";
-import { Console, Data, Effect } from "effect";
+import { Console, Data, Effect, Option } from "effect";
 import { selectLessonCommit } from "./commit-utils.js";
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "./constants.js";
 import { GitService, GitServiceConfig } from "./git-service.js";
@@ -15,6 +15,76 @@ export class InvalidBranchOperationError extends Data.TaggedError(
 )<{
   message: string;
 }> {}
+
+/**
+ * Core cherry-pick logic, extracted for testability.
+ * Takes branch and lessonId as Effect Option.
+ */
+export const runCherryPick = ({
+  branch,
+  lessonId,
+}: {
+  branch: string;
+  lessonId: Option.Option<string>;
+}) =>
+  Effect.gen(function* () {
+    const git = yield* GitService;
+    const promptService = yield* PromptService;
+
+    // Validate git repository
+    yield* git.ensureIsGitRepo();
+
+    yield* git.ensureUpstreamBranchConnected({
+      targetBranch: branch,
+    });
+
+    const {
+      commit: targetCommit,
+      lessonId: selectedLessonId,
+    } = yield* selectLessonCommit({
+      branch,
+      lessonId,
+      promptMessage:
+        "Which lesson do you want to cherry-pick? (type to search)",
+      excludeCurrentBranch: true,
+    });
+
+    // Get current branch name and validate
+    const currentBranch = yield* git.getCurrentBranch();
+
+    // Check if current branch is the target branch
+    if (currentBranch === branch) {
+      return yield* new InvalidBranchOperationError({
+        message: `Cannot cherry-pick when on target branch "${branch}"`,
+      });
+    }
+
+    // Check if current branch is main
+    if (currentBranch === "main") {
+      yield* Console.log(
+        "You cannot cherry-pick onto the main branch."
+      );
+
+      const branchName =
+        yield* promptService.inputBranchName("working");
+
+      yield* git.checkoutNewBranch(branchName);
+
+      yield* Console.log(
+        `✓ Created and switched to ${branchName}`
+      );
+    }
+
+    yield* Console.log(
+      `Cherry-picking ${targetCommit.sha} onto current branch...\n`
+    );
+
+    yield* git.cherryPick(targetCommit.sha);
+
+    yield* Console.log(
+      `\n✓ Successfully cherry-picked lesson ${selectedLessonId}`
+    );
+  });
 
 export const cherryPick = CLICommand.make(
   "cherry-pick",
@@ -31,64 +101,7 @@ export const cherryPick = CLICommand.make(
     cwd: cwdOption,
   },
   ({ branch, cwd, lessonId }) =>
-    Effect.gen(function* () {
-      const git = yield* GitService;
-      const promptService = yield* PromptService;
-
-      // Validate git repository
-      yield* git.ensureIsGitRepo();
-
-      yield* git.ensureUpstreamBranchConnected({
-        targetBranch: branch,
-      });
-
-      const {
-        commit: targetCommit,
-        lessonId: selectedLessonId,
-      } = yield* selectLessonCommit({
-        branch,
-        lessonId,
-        promptMessage:
-          "Which lesson do you want to cherry-pick? (type to search)",
-        excludeCurrentBranch: true,
-      });
-
-      // Get current branch name and validate
-      const currentBranch = yield* git.getCurrentBranch();
-
-      // Check if current branch is the target branch
-      if (currentBranch === branch) {
-        return yield* new InvalidBranchOperationError({
-          message: `Cannot cherry-pick when on target branch "${branch}"`,
-        });
-      }
-
-      // Check if current branch is main
-      if (currentBranch === "main") {
-        yield* Console.log(
-          "You cannot cherry-pick onto the main branch."
-        );
-
-        const branchName =
-          yield* promptService.inputBranchName("working");
-
-        yield* git.checkoutNewBranch(branchName);
-
-        yield* Console.log(
-          `✓ Created and switched to ${branchName}`
-        );
-      }
-
-      yield* Console.log(
-        `Cherry-picking ${targetCommit.sha} onto current branch...\n`
-      );
-
-      yield* git.cherryPick(targetCommit.sha);
-
-      yield* Console.log(
-        `\n✓ Successfully cherry-picked lesson ${selectedLessonId}`
-      );
-    }).pipe(
+    runCherryPick({ branch, lessonId }).pipe(
       Effect.provideService(
         GitServiceConfig,
         GitServiceConfig.of({

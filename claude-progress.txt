@@ -1,51 +1,18 @@
-PromptService: implemented selectCherryPickConflictAction
-PromptService: implemented selectProblemOrSolution
-PromptService: implemented selectResetAction
-PromptService: implemented confirmResetWithUncommittedChanges
-PromptService: implemented inputBranchName
-PromptService: implemented selectLessonCommit
-PromptService: implemented selectExercise
-PromptService: implemented confirmProceedWithUncommittedChanges
-PromptService: implemented selectWalkThroughAction
-PromptService: implemented selectSubfolder
-PromptService: implemented selectExerciseAction
+The idea of this sprint of work is to take each part of this PRD, each PRD item should correspond to a unit test or several unit tests that test whether that feature works correctly. Then you can mark them as passing (true) if you run the tests and they pass.
 
-Migrated edit-commit.ts to use PromptService:
-- confirmReadyToCommit
-- confirmSaveToTargetBranch
-- confirmForcePush
-- selectCherryPickConflictAction (in resolveConflictLoop)
+To do this, you should mock the prompt-service and the git-service. I definitely don't want to be running git on every test. These tests should really just test the business logic.
 
-Migrated reset.ts to use PromptService:
-- selectProblemOrSolution
-- selectResetAction
-- inputBranchName
-- confirmResetWithUncommittedChanges
+I've added some examples in cherry-pick.test.ts.
 
-Migrated walk-through.ts to use PromptService:
-- inputBranchName (for working branch)
-- confirmResetWithUncommittedChanges
-- selectWalkThroughAction
+---
 
-Migrated exercise.ts to use PromptService:
-- selectExerciseAction (in runLesson)
-- selectExercise (in chooseLessonAndRunIt)
-- selectSubfolder (in selectSubfolderIndex)
+## Session 2026-01-01
 
-Migrated cherry-pick.ts to use PromptService:
-- inputBranchName (for working branch when on main)
+Added test for PRD: "User is prompted to create branch when on main" (cherry-pick command).
 
-Migrated commit-utils.ts to use PromptService:
-- selectLessonCommit (inline prompt replaced with promptService.selectLessonCommit)
+Changes:
+- Extracted `runCherryPick` function from cherry-pick.ts for testability
+- Added test verifying: when on main, prompts for branch name, creates branch, proceeds w/ cherry-pick
+- Fixed unused import (NodeContext) in git-service.ts
 
-Added confirmContinue to PromptService:
-- Generic confirm with custom message and optional default
-
-Migrated rebase-to-main.ts to use PromptService:
-- 4 confirmContinue calls migrated to promptService.confirmContinue
-
-Deleted prompt-utils.ts:
-- runPrompt and PromptCancelledError moved to prompt-service.ts
-- Updated imports in exercise.ts and edit-commit.ts
-
-ALL FILES MIGRATED - PromptService migration COMPLETE!
+PRD item marked as tested=true.

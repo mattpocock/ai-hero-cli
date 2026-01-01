@@ -1,217 +1,455 @@
 [
   {
-    "id": "edit-commit-part1",
-    "category": "refactor",
-    "description": "Extract fetch, status, and ref commands from edit-commit.ts to git-service",
+    "command": "cherry-pick",
+    "category": "user-flow",
+    "description": "User interactively selects and cherry-picks a lesson",
+    "tested": true,
     "steps": [
-      "Add fetchOrigin() method with FailedToFetchOriginError and JSDoc explaining git fetch origin behavior",
-      "Add revParse(ref) method with InvalidRefError and JSDoc explaining ref resolution",
-      "Add revListCount(from, to) method with JSDoc explaining commit counting between refs",
-      "Add getStatusShort() method with JSDoc explaining short status format output",
-      "Update edit-commit.ts to use these GitService methods instead of Command",
-      "Run pnpm typecheck to verify no errors"
-    ],
-    "passes": true
+      "User runs `ai-hero cherry-pick` without arguments",
+      "System fetches latest commits from upstream",
+      "User sees searchable autocomplete with available lessons",
+      "User types to filter lessons by ID or message",
+      "User selects a lesson (e.g., '01.02.03 Add new feature')",
+      "System displays: 'Cherry-picking <sha> onto current branch...'",
+      "System applies the commit to current branch",
+      "System displays: '✓ Successfully cherry-picked lesson 01.02.03'"
+    ]
   },
   {
-    "id": "edit-commit-part2",
-    "category": "refactor",
-    "description": "Extract reset, staging, and commit commands from edit-commit.ts to git-service",
+    "command": "cherry-pick",
+    "category": "user-flow",
+    "description": "User cherry-picks a specific lesson by ID",
+    "tested": true,
     "steps": [
-      "Add resetHard(sha) method with FailedToResetError and JSDoc explaining hard reset behavior and data loss risks",
-      "Add resetHead() method with JSDoc explaining soft reset of last commit (git reset HEAD^)",
-      "Add restoreStaged() method with JSDoc explaining unstaging all files (git restore --staged .)",
-      "Add stageAll() method with JSDoc explaining staging all changes (git add .)",
-      "Add commit(message) method with FailedToCommitError and JSDoc explaining commit creation",
-      "Update edit-commit.ts to use these GitService methods instead of Command",
-      "Run pnpm typecheck to verify no errors"
-    ],
-    "passes": true
+      "User runs `ai-hero cherry-pick 01.02.03`",
+      "System fetches latest commits from upstream",
+      "System finds commit matching lesson ID",
+      "System displays: 'Cherry-picking <sha> onto current branch...'",
+      "System applies the commit to current branch",
+      "System displays: '✓ Successfully cherry-picked lesson 01.02.03'"
+    ]
   },
   {
-    "id": "edit-commit-part3",
-    "category": "refactor",
-    "description": "Extract cherry-pick, checkout, and push commands from edit-commit.ts to git-service",
+    "command": "cherry-pick",
+    "category": "user-flow",
+    "description": "User is prompted to create branch when on main",
+    "tested": true,
     "steps": [
-      "Add cherryPick(sha) method with CherryPickConflictError and JSDoc explaining cherry-pick behavior and conflict scenarios",
-      "Add cherryPickContinue() method with JSDoc explaining how to continue after conflict resolution",
-      "Add cherryPickAbort() method with JSDoc explaining how to abort and restore pre-cherry-pick state",
-      "Add checkout(branch) method with FailedToCheckoutError and JSDoc explaining branch switching",
-      "Add pushForceWithLease(remote, branch) method with FailedToPushError and JSDoc explaining force-with-lease safety vs force",
-      "Update edit-commit.ts to use these GitService methods instead of Command",
-      "Run pnpm typecheck to verify no errors"
-    ],
-    "passes": true
+      "User is on 'main' branch",
+      "User runs `ai-hero cherry-pick 01.02.03`",
+      "System displays: 'You cannot cherry-pick onto the main branch.'",
+      "System prompts: 'Enter name of your new working branch:'",
+      "User enters branch name (e.g., 'matt/feature-work')",
+      "System creates and switches to new branch",
+      "System displays: '✓ Created and switched to matt/feature-work'",
+      "System proceeds with cherry-pick on new branch"
+    ]
   },
   {
-    "id": "walk-through",
-    "category": "refactor",
-    "description": "Extract git commands from walk-through.ts to git-service",
+    "command": "cherry-pick",
+    "category": "user-flow",
+    "description": "User cancels lesson selection",
+    "tested": false,
     "steps": [
-      "Add checkoutNewBranch(branchName) method with FailedToCreateBranchError and JSDoc explaining branch creation (git checkout -b)",
-      "Add getLogOnelineReverse(range) method with JSDoc explaining reversed commit log format and range syntax",
-      "Update walk-through.ts to use GitService instead of Command",
-      "Run pnpm typecheck to verify no errors"
-    ],
-    "passes": true
+      "User runs `ai-hero cherry-pick`",
+      "User sees lesson selection prompt",
+      "User presses Ctrl+C to cancel",
+      "System exits gracefully with no error message",
+      "Exit code is 0"
+    ]
   },
   {
-    "id": "reset",
-    "category": "refactor",
-    "description": "Extract git commands from reset.ts to git-service",
+    "command": "cherry-pick",
+    "category": "user-flow",
+    "description": "User cherry-picks from custom source branch",
+    "tested": false,
     "steps": [
-      "Add checkoutNewBranchAt(branchName, sha) method with JSDoc explaining branch creation at specific commit (git checkout -b <name> <sha>)",
-      "Update reset.ts to use GitService instead of Command",
-      "Run pnpm typecheck to verify no errors"
-    ],
-    "passes": true
+      "User runs `ai-hero cherry-pick --branch custom-lessons`",
+      "System fetches 'custom-lessons' branch from upstream",
+      "User sees lessons from that branch",
+      "User selects a lesson",
+      "System cherry-picks from the custom branch"
+    ]
   },
   {
-    "id": "cherry-pick",
-    "category": "refactor",
-    "description": "Extract git commands from cherry-pick.ts to git-service",
+    "command": "cherry-pick",
+    "category": "error",
+    "description": "User runs cherry-pick outside git repo",
+    "tested": false,
     "steps": [
-      "Update cherry-pick.ts to use GitService.checkoutNewBranch",
-      "Update cherry-pick.ts to use GitService.cherryPick",
-      "Run pnpm typecheck to verify no errors"
-    ],
-    "dependencies": ["edit-commit-part3", "walk-through"],
-    "passes": true
+      "User is in directory without .git folder",
+      "User runs `ai-hero cherry-pick`",
+      "System displays: 'Error: Current directory is not a git repository: <path>'",
+      "Exit code is 1"
+    ]
   },
   {
-    "id": "pull",
-    "category": "refactor",
-    "description": "Extract git commands from pull.ts to git-service",
+    "command": "cherry-pick",
+    "category": "error",
+    "description": "User runs cherry-pick without valid upstream",
+    "tested": false,
     "steps": [
-      "Add fetch(remote, branch) method with JSDoc explaining remote fetch behavior and ref updates",
-      "Add merge(ref) method with MergeConflictError and JSDoc explaining merge behavior and conflict scenarios",
-      "Update pull.ts to use GitService instead of Command",
-      "Run pnpm typecheck to verify no errors"
-    ],
-    "passes": true
+      "User has no upstream remote configured",
+      "User runs `ai-hero cherry-pick`",
+      "System displays: 'Error: No valid upstream remote found.'",
+      "System shows instructions to add upstream remote",
+      "Exit code is 1"
+    ]
   },
   {
-    "id": "rebase-to-main",
-    "category": "refactor",
-    "description": "Extract git commands from rebase-to-main.ts to git-service",
+    "command": "cherry-pick",
+    "category": "error",
+    "description": "User requests non-existent lesson",
+    "tested": true,
     "steps": [
-      "Add rebase(onto) method with RebaseConflictError and JSDoc explaining rebase behavior, conflict handling, and history rewriting implications",
-      "Update rebase-to-main.ts to use GitService instead of Command",
-      "Run pnpm typecheck to verify no errors"
-    ],
-    "dependencies": ["edit-commit-part3"],
-    "passes": true
+      "User runs `ai-hero cherry-pick 99.99.99`",
+      "System fetches upstream branch",
+      "System cannot find matching lesson",
+      "System displays: 'Error: No commit found for lesson 99.99.99 on branch live-run-through'",
+      "Exit code is 1"
+    ]
   },
   {
-    "id": "commit-utils",
-    "category": "refactor",
-    "description": "Extract git commands from commit-utils.ts to git-service",
+    "command": "cherry-pick",
+    "category": "error",
+    "description": "User attempts cherry-pick from same branch",
+    "tested": false,
     "steps": [
-      "Add getLogOneline(branch) method with JSDoc explaining oneline log format and branch parameter",
-      "Add getParentCommit(sha) method with NoParentCommitError and JSDoc explaining parent ref syntax (sha^)",
-      "Update commit-utils.ts to use GitService instead of Command",
-      "Run pnpm typecheck to verify no errors"
-    ],
-    "passes": true
+      "User is on 'live-run-through' branch",
+      "User runs `ai-hero cherry-pick`",
+      "System displays: 'Error: Cannot cherry-pick when on target branch \"live-run-through\"'",
+      "Exit code is 1"
+    ]
   },
   {
-    "id": "get-diffs",
-    "category": "refactor",
-    "description": "Extract git commands from get-diffs.ts to git-service",
+    "command": "cherry-pick",
+    "category": "error",
+    "description": "Cherry-pick results in merge conflict",
+    "tested": false,
     "steps": [
-      "Update get-diffs.ts to use GitService.fetchOrigin",
-      "Update get-diffs.ts to use GitService.getLogOnelineReverse",
-      "Run pnpm typecheck to verify no errors"
-    ],
-    "dependencies": ["edit-commit-part1", "walk-through"],
-    "passes": true
+      "User has conflicting changes on current branch",
+      "User runs `ai-hero cherry-pick 01.02.03`",
+      "System attempts to apply commit",
+      "Git encounters merge conflict",
+      "System displays: 'Error: Cherry-pick conflict on range <sha>'",
+      "Exit code is 1"
+    ]
   },
   {
-    "id": "diffs-to-repo",
-    "category": "refactor",
-    "description": "Extract git commands from diffs-to-repo.ts to git-service",
+    "command": "cherry-pick",
+    "category": "error",
+    "description": "Branch creation fails during main protection flow",
+    "tested": false,
     "steps": [
-      "Update diffs-to-repo.ts to use GitService.fetchOrigin",
-      "Update diffs-to-repo.ts to use GitService.getLogOnelineReverse",
-      "Run pnpm typecheck to verify no errors"
-    ],
-    "dependencies": ["edit-commit-part1", "walk-through"],
-    "passes": true
+      "User is on 'main' branch",
+      "User runs `ai-hero cherry-pick 01.02.03`",
+      "User is prompted for branch name",
+      "User enters name of branch that already exists",
+      "System displays: 'Error: Failed to create branch <name> (exit code: <code>)'",
+      "Exit code is 1"
+    ]
   },
   {
-    "id": "test-fetch-status-ref",
-    "category": "test",
-    "description": "Add unit tests for fetch, status, and ref git-service methods",
+    "command": "cherry-pick",
+    "category": "behavior",
+    "description": "Already-applied lessons are excluded from selection",
+    "tested": true,
     "steps": [
-      "Create src/git-service.test.ts if not exists",
-      "Add tests for fetchOrigin() with mocked Command",
-      "Add tests for revParse() including InvalidRefError case",
-      "Add tests for revListCount() with various ranges",
-      "Add tests for getStatusShort() output parsing",
-      "Run pnpm test to verify tests pass"
-    ],
-    "dependencies": ["edit-commit-part1", "get-diffs", "diffs-to-repo"],
-    "passes": true
+      "User has already cherry-picked lesson 01.01.01 to current branch",
+      "User runs `ai-hero cherry-pick`",
+      "User sees lesson list",
+      "Lesson 01.01.01 is NOT shown in the list",
+      "User can only select lessons not yet applied"
+    ]
   },
   {
-    "id": "test-reset-staging-commit",
-    "category": "test",
-    "description": "Add unit tests for reset, staging, and commit git-service methods",
+    "command": "cherry-pick",
+    "category": "behavior",
+    "description": "Multiple commits with same lesson ID uses latest",
+    "tested": true,
     "steps": [
-      "Add tests for resetHard() including FailedToResetError case",
-      "Add tests for resetHead()",
-      "Add tests for restoreStaged()",
-      "Add tests for stageAll()",
-      "Add tests for commit() including FailedToCommitError case",
-      "Run pnpm test to verify tests pass"
-    ],
-    "dependencies": ["edit-commit-part2", "walk-through", "reset"],
-    "passes": true
+      "Target branch has two commits with lesson ID 01.01.01",
+      "User runs `ai-hero cherry-pick 01.01.01`",
+      "System selects the latest (most recent) commit with that ID",
+      "System cherry-picks that commit"
+    ]
   },
   {
-    "id": "test-cherry-pick-checkout-push",
-    "category": "test",
-    "description": "Add unit tests for cherry-pick, checkout, and push git-service methods",
+    "command": "reset",
+    "category": "user-flow",
+    "description": "User interactively resets to solution state",
+    "tested": false,
     "steps": [
-      "Add tests for cherryPick() including CherryPickConflictError case",
-      "Add tests for cherryPickContinue()",
-      "Add tests for cherryPickAbort()",
-      "Add tests for checkout() including FailedToCheckoutError case",
-      "Add tests for checkoutNewBranch() including FailedToCreateBranchError case",
-      "Add tests for checkoutNewBranchAt()",
-      "Add tests for pushForceWithLease() including FailedToPushError case",
-      "Run pnpm test to verify tests pass"
-    ],
-    "dependencies": ["edit-commit-part3", "cherry-pick", "rebase-to-main"],
-    "passes": true
+      "User runs `ai-hero reset`",
+      "System fetches latest commits from upstream",
+      "User sees searchable autocomplete with available lessons",
+      "User selects a lesson",
+      "System displays: 'Found commit: <sha> <message>'",
+      "User is prompted: 'Start the exercise or view final code?'",
+      "User selects 'Final code'",
+      "User is prompted: 'How would you like to proceed?'",
+      "User selects 'Reset current branch'",
+      "System displays: 'Resetting to <commit> (final code)...'",
+      "System displays: '✓ Reset to lesson <id> (final code)'"
+    ]
   },
   {
-    "id": "test-log-merge-rebase",
-    "category": "test",
-    "description": "Add unit tests for log, merge, and rebase git-service methods",
+    "command": "reset",
+    "category": "user-flow",
+    "description": "User resets to problem state (before solution)",
+    "tested": false,
     "steps": [
-      "Add tests for getLogOneline() output parsing",
-      "Add tests for getLogOnelineReverse() output parsing",
-      "Add tests for getParentCommit() including NoParentCommitError case",
-      "Add tests for fetch(remote, branch)",
-      "Add tests for merge() including MergeConflictError case",
-      "Add tests for rebase() including RebaseConflictError case",
-      "Run pnpm test to verify tests pass"
-    ],
-    "dependencies": ["commit-utils", "pull", "rebase-to-main"],
-    "passes": true
+      "User runs `ai-hero reset`",
+      "User selects a lesson",
+      "User is prompted: 'Start the exercise or view final code?'",
+      "User selects 'Start the exercise'",
+      "System resets to the parent commit of the lesson",
+      "System displays: '✓ Reset to lesson <id> (problem state)'"
+    ]
   },
   {
-    "id": "remove-generic-helpers",
-    "category": "refactor",
-    "description": "Remove exposed runCommandWithExitCode and runCommandWithString from git-service public API",
+    "command": "reset",
+    "category": "user-flow",
+    "description": "User resets to solution using --solution flag",
+    "tested": false,
     "steps": [
-      "Make runCommandWithExitCode private (internal only)",
-      "Make runCommandWithString private (internal only)",
-      "Update any external usages to use named methods",
-      "Run pnpm typecheck to verify no errors"
-    ],
-    "dependencies": ["edit-commit-part1", "edit-commit-part2", "edit-commit-part3", "walk-through", "reset", "cherry-pick", "pull", "rebase-to-main", "commit-utils", "get-diffs", "diffs-to-repo"],
-    "passes": true
+      "User runs `ai-hero reset 01.02.03 --solution`",
+      "System skips state selection prompt",
+      "User is prompted for action (reset or create branch)",
+      "User selects action",
+      "System resets to solution commit"
+    ]
+  },
+  {
+    "command": "reset",
+    "category": "user-flow",
+    "description": "User resets to problem using --problem flag",
+    "tested": false,
+    "steps": [
+      "User runs `ai-hero reset 01.02.03 --problem`",
+      "System skips state selection prompt",
+      "System uses parent commit of lesson",
+      "User is prompted for action",
+      "System resets to problem state"
+    ]
+  },
+  {
+    "command": "reset",
+    "category": "user-flow",
+    "description": "User creates new branch from lesson",
+    "tested": false,
+    "steps": [
+      "User runs `ai-hero reset 01.02.03`",
+      "User selects state (problem or solution)",
+      "User is prompted: 'How would you like to proceed?'",
+      "User selects 'Create new branch from commit'",
+      "User is prompted: 'Enter new branch name:'",
+      "User enters 'matt/lesson-work'",
+      "System displays: 'Creating branch matt/lesson-work from <commit> (<state>)...'",
+      "System displays: '✓ Created and checked out branch: matt/lesson-work'"
+    ]
+  },
+  {
+    "command": "reset",
+    "category": "user-flow",
+    "description": "User is forced to create branch when on main",
+    "tested": false,
+    "steps": [
+      "User is on 'main' branch",
+      "User runs `ai-hero reset 01.02.03`",
+      "User selects state",
+      "System displays: 'You cannot reset the main branch. Creating a new branch...'",
+      "System skips action selection prompt",
+      "User is prompted for branch name",
+      "System creates new branch at target commit"
+    ]
+  },
+  {
+    "command": "reset",
+    "category": "user-flow",
+    "description": "User is warned about uncommitted changes",
+    "tested": false,
+    "steps": [
+      "User has uncommitted changes in working directory",
+      "User runs `ai-hero reset 01.02.03`",
+      "User selects state and 'Reset current branch'",
+      "System displays: 'Warning: You have uncommitted changes:'",
+      "System shows git status output",
+      "User is prompted: 'This will lose all uncommitted work. Continue?'",
+      "Default answer is NO",
+      "User confirms YES",
+      "System performs hard reset"
+    ]
+  },
+  {
+    "command": "reset",
+    "category": "user-flow",
+    "description": "User cancels reset due to uncommitted changes",
+    "tested": false,
+    "steps": [
+      "User has uncommitted changes",
+      "User runs `ai-hero reset 01.02.03`",
+      "User selects 'Reset current branch'",
+      "System warns about uncommitted changes",
+      "User is prompted to confirm",
+      "User selects NO (default)",
+      "System displays: 'Reset cancelled'",
+      "No changes are made to the repository"
+    ]
+  },
+  {
+    "command": "reset",
+    "category": "user-flow",
+    "description": "User runs reset in demo mode",
+    "tested": false,
+    "steps": [
+      "User runs `ai-hero reset 01.02.03 --demo`",
+      "System skips state selection (uses solution)",
+      "System skips action selection (uses reset-current)",
+      "System displays: 'Resetting to <commit> (final code)...'",
+      "System performs hard reset to commit",
+      "System displays: 'Undoing commit and unstaging changes...'",
+      "System soft resets HEAD^ (undo commit)",
+      "System unstages all changes",
+      "System displays: '✓ Demo mode: Reset to lesson <id> with unstaged changes'",
+      "Files are in working directory, nothing staged or committed"
+    ]
+  },
+  {
+    "command": "reset",
+    "category": "user-flow",
+    "description": "User cancels lesson selection",
+    "tested": false,
+    "steps": [
+      "User runs `ai-hero reset`",
+      "User sees lesson selection prompt",
+      "User presses Ctrl+C",
+      "System exits gracefully with no error message",
+      "Exit code is 0"
+    ]
+  },
+  {
+    "command": "reset",
+    "category": "error",
+    "description": "User runs reset outside git repo",
+    "tested": false,
+    "steps": [
+      "User is in directory without .git folder",
+      "User runs `ai-hero reset`",
+      "System displays: 'Error: Current directory is not a git repository: <path>'",
+      "Exit code is 1"
+    ]
+  },
+  {
+    "command": "reset",
+    "category": "error",
+    "description": "User runs reset without valid upstream",
+    "tested": false,
+    "steps": [
+      "User has no upstream remote configured",
+      "User runs `ai-hero reset`",
+      "System displays: 'Error: No valid upstream remote found.'",
+      "System shows instructions to add upstream remote",
+      "Exit code is 1"
+    ]
+  },
+  {
+    "command": "reset",
+    "category": "error",
+    "description": "User requests non-existent lesson",
+    "tested": false,
+    "steps": [
+      "User runs `ai-hero reset 99.99.99`",
+      "System fetches upstream branch",
+      "System cannot find matching lesson",
+      "System displays: 'Error: No commit found for lesson 99.99.99 on branch live-run-through'",
+      "Exit code is 1"
+    ]
+  },
+  {
+    "command": "reset",
+    "category": "error",
+    "description": "User requests problem state for root commit",
+    "tested": false,
+    "steps": [
+      "First lesson commit is the initial commit (no parent)",
+      "User runs `ai-hero reset 01.01.01 --problem`",
+      "System tries to get parent commit",
+      "System displays: 'Error: Commit <sha> has no parent commit. Repository may be in an invalid state.'",
+      "Exit code is 1"
+    ]
+  },
+  {
+    "command": "reset",
+    "category": "error",
+    "description": "User provides conflicting state flags",
+    "tested": false,
+    "steps": [
+      "User runs `ai-hero reset --problem --solution`",
+      "System displays: 'Error: Cannot use both --problem and --solution flags'",
+      "Exit code is 1"
+    ]
+  },
+  {
+    "command": "reset",
+    "category": "error",
+    "description": "User uses --demo with state flags",
+    "tested": false,
+    "steps": [
+      "User runs `ai-hero reset --demo --problem`",
+      "System displays: 'Error: Cannot use --demo with --problem or --solution flags'",
+      "Exit code is 1"
+    ]
+  },
+  {
+    "command": "reset",
+    "category": "error",
+    "description": "User attempts reset when on target branch",
+    "tested": false,
+    "steps": [
+      "User is on 'live-run-through' branch",
+      "User runs `ai-hero reset 01.02.03`",
+      "User selects state and 'Reset current branch'",
+      "System displays: 'Error: Cannot reset current branch when on target branch \"live-run-through\"'",
+      "Exit code is 1"
+    ]
+  },
+  {
+    "command": "reset",
+    "category": "error",
+    "description": "User tries to create branch that exists",
+    "tested": false,
+    "steps": [
+      "User runs `ai-hero reset 01.02.03`",
+      "User selects 'Create new branch'",
+      "User enters name of existing branch",
+      "System displays: 'Error: Failed to create branch <name>'",
+      "Exit code is 1"
+    ]
+  },
+  {
+    "command": "reset",
+    "category": "behavior",
+    "description": "Lesson IDs are normalized to standard format",
+    "tested": false,
+    "steps": [
+      "User runs `ai-hero reset 1.1.1`",
+      "System normalizes to '01.01.01'",
+      "System finds matching commit",
+      "Reset proceeds normally"
+    ]
+  },
+  {
+    "command": "reset",
+    "category": "user-flow",
+    "description": "User resets from custom source branch",
+    "tested": false,
+    "steps": [
+      "User runs `ai-hero reset --branch custom-lessons`",
+      "System fetches 'custom-lessons' branch from upstream",
+      "User sees lessons from that branch",
+      "User selects lesson and state",
+      "System resets from the custom branch"
+    ]
   }
 ]
