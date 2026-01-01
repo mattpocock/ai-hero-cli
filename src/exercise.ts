@@ -27,8 +27,10 @@ import {
   envFilePathOption,
   rootOption,
 } from "./options.js";
-import { type PromptCancelledError } from "./prompt-utils.js";
-import { PromptService } from "./prompt-service.js";
+import {
+  type PromptCancelledError,
+  PromptService,
+} from "./prompt-service.js";
 
 class LessonNotFoundError extends Data.TaggedError(
   "LessonNotFoundError"

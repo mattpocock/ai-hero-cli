@@ -7,10 +7,12 @@ import { Console, Data, Effect } from "effect";
 import { existsSync } from "node:fs";
 import * as path from "node:path";
 import { selectLessonCommit } from "../commit-utils.js";
-import type { PromptCancelledError } from "../prompt-utils.js";
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "../constants.js";
 import { GitService } from "../git-service.js";
-import { PromptService } from "../prompt-service.js";
+import {
+  type PromptCancelledError,
+  PromptService,
+} from "../prompt-service.js";
 import type { CommandExecutor } from "@effect/platform";
 import type {
   BadArgument,

@@ -38,4 +38,14 @@ Migrated cherry-pick.ts to use PromptService:
 Migrated commit-utils.ts to use PromptService:
 - selectLessonCommit (inline prompt replaced with promptService.selectLessonCommit)
 
-ALL FILES MIGRATED - PromptService migration complete!
+Added confirmContinue to PromptService:
+- Generic confirm with custom message and optional default
+
+Migrated rebase-to-main.ts to use PromptService:
+- 4 confirmContinue calls migrated to promptService.confirmContinue
+
+Deleted prompt-utils.ts:
+- runPrompt and PromptCancelledError moved to prompt-service.ts
+- Updated imports in exercise.ts and edit-commit.ts
+
+ALL FILES MIGRATED - PromptService migration COMPLETE!

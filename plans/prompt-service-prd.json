@@ -203,6 +203,20 @@
   },
   {
     "service": "PromptService",
+    "method": "confirmContinue",
+    "category": "behavior",
+    "status": "DONE",
+    "description": "Generic confirmation prompt with custom message",
+    "steps": [
+      "Method receives message string and optional defaultToContinue boolean",
+      "Displays the custom message as a confirm prompt",
+      "Default is true (yes) unless specified otherwise",
+      "Returns void on confirmation",
+      "Throws PromptCancelledError if user declines or cancels"
+    ]
+  },
+  {
+    "service": "PromptService",
     "method": "*",
     "category": "error",
     "description": "User cancels any prompt with Ctrl+C",
@@ -253,8 +267,10 @@
       "src/internal/walk-through.ts",
       "src/exercise.ts",
       "src/cherry-pick.ts",
-      "src/commit-utils.ts"
+      "src/commit-utils.ts",
+      "src/internal/rebase-to-main.ts"
     ],
-    "remainingFiles": []
+    "remainingFiles": [],
+    "notes": "prompt-utils.ts deleted - runPrompt and PromptCancelledError moved to prompt-service.ts"
   }
 ]

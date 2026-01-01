@@ -1,9 +1,21 @@
-import { Effect } from "effect";
+import { Data, Effect } from "effect";
 import { prompt } from "prompts";
-import {
-  PromptCancelledError,
-  runPrompt,
-} from "./prompt-utils.js";
+
+export class PromptCancelledError extends Data.TaggedError(
+  "PromptCancelledError"
+) {}
+
+const runPrompt = <T extends object>(promptFn: () => Promise<T>) => {
+  return Effect.gen(function* () {
+    const result = yield* Effect.promise(() => promptFn());
+
+    if (Object.keys(result).length === 0) {
+      return yield* new PromptCancelledError();
+    }
+
+    return result;
+  });
+};
 
 /**
  * Normalizes exercise numbers for fuzzy matching.
@@ -632,6 +644,35 @@ export class PromptService extends Effect.Service<PromptService>()(
         return action;
       });
 
+      /**
+       * Generic confirmation prompt with custom message.
+       * Default is true (yes).
+       *
+       * @param message - The message to display
+       * @param defaultToContinue - Whether to default to yes (true) or no (false)
+       * @throws PromptCancelledError if user declines or cancels
+       */
+      const confirmContinue = Effect.fn("confirmContinue")(
+        function* (message: string, defaultToContinue: boolean = true) {
+          const { confirm } = yield* runPrompt<{
+            confirm: boolean;
+          }>(() =>
+            prompt([
+              {
+                type: "confirm",
+                name: "confirm",
+                message,
+                initial: defaultToContinue,
+              },
+            ])
+          );
+
+          if (!confirm) {
+            return yield* new PromptCancelledError();
+          }
+        }
+      );
+
       return {
         confirmReadyToCommit,
         confirmSaveToTargetBranch,
@@ -647,6 +688,7 @@ export class PromptService extends Effect.Service<PromptService>()(
         selectWalkThroughAction,
         selectSubfolder,
         selectExerciseAction,
+        confirmContinue,
       };
     }),
     dependencies: [],

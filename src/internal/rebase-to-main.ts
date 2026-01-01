@@ -9,7 +9,7 @@ import {
   GitServiceConfig,
   RebaseConflictError,
 } from "../git-service.js";
-import { confirmContinue } from "../prompt-utils.js";
+import { PromptService } from "../prompt-service.js";
 
 export const rebaseToMain = CLICommand.make(
   "rebase-to-main",
@@ -28,6 +28,7 @@ export const rebaseToMain = CLICommand.make(
   (opts) =>
     Effect.gen(function* () {
       const git = yield* GitService;
+      const promptService = yield* PromptService;
 
       yield* git.ensureIsGitRepo();
 
@@ -52,7 +53,7 @@ export const rebaseToMain = CLICommand.make(
         );
       }
 
-      yield* confirmContinue(
+      yield* promptService.confirmContinue(
         `Do you want to checkout ${opts.target}?`
       );
 
@@ -68,7 +69,7 @@ export const rebaseToMain = CLICommand.make(
         )
       );
 
-      yield* confirmContinue(`Do you want to rebase to main?`);
+      yield* promptService.confirmContinue(`Do you want to rebase to main?`);
 
       yield* git.rebase("main").pipe(
         Effect.mapError(
@@ -82,7 +83,7 @@ export const rebaseToMain = CLICommand.make(
         )
       );
 
-      yield* confirmContinue(
+      yield* promptService.confirmContinue(
         `Do you want to force push to ${opts.target}?`
       );
 
@@ -98,7 +99,7 @@ export const rebaseToMain = CLICommand.make(
         )
       );
 
-      yield* confirmContinue(`Do you want to checkout main?`);
+      yield* promptService.confirmContinue(`Do you want to checkout main?`);
 
       yield* git.checkout("main").pipe(
         Effect.mapError(
