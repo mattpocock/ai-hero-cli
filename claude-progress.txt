@@ -1,5 +1,33 @@
 # Claude Progress Log
 
+## 2026-01-01: edit-commit-part2
+
+Completed refactor to extract reset, staging, and commit commands from edit-commit.ts to git-service.
+
+### Changes made:
+
+**src/git-service.ts:**
+- Added `FailedToResetError` class with JSDoc explaining filesystem/permission issues
+- Added `FailedToCommitError` class with JSDoc explaining commit failure causes
+- Added `resetHard(sha)` method - hard reset to SHA, throws FailedToResetError on failure
+- Added `resetHead()` method - soft reset of last commit (git reset HEAD^)
+- Added `restoreStaged()` method - unstages all files (git restore --staged .)
+- Added `stageAll()` method - stages all changes (git add .)
+- Added `commit(message)` method - creates commit, throws FailedToCommitError on failure
+
+**src/internal/edit-commit.ts:**
+- Replaced `git reset --hard <sha>` command with `gitService.resetHard()`
+- Replaced `git reset HEAD^` command with `gitService.resetHead()`
+- Replaced `git restore --staged .` command with `gitService.restoreStaged()`
+- Replaced `git add .` command with `gitService.stageAll()`
+- Replaced `git commit -m` command with `gitService.commit()`
+
+### Verification:
+- pnpm typecheck: passed
+- pnpm test: passed (4 tests)
+
+---
+
 ## 2026-01-01: edit-commit-part1
 
 Completed refactor to extract fetch, status, and ref commands from edit-commit.ts to git-service.

@@ -144,22 +144,14 @@ export const editCommit = CLICommand.make(
         `Resetting to ${targetSha} (${selectedLessonId})...`
       );
 
-      const resetCommand = Command.make(
-        "git",
-        "reset",
-        "--hard",
-        targetSha
-      ).pipe(
-        Command.workingDirectory(cwd),
-        Command.stdout("inherit"),
-        Command.stderr("inherit")
+      const resetResult = yield* gitService.resetHard(targetSha).pipe(
+        Effect.catchTag("FailedToResetError", () =>
+          Effect.succeed({ failed: true as const })
+        ),
+        Effect.map(() => ({ failed: false as const }))
       );
 
-      const resetExitCode = yield* Command.exitCode(
-        resetCommand
-      ).pipe(Effect.catchAll(() => Effect.succeed(1)));
-
-      if (resetExitCode !== 0) {
+      if (resetResult.failed) {
         yield* Console.error("Failed to reset");
         process.exitCode = 1;
         return;
@@ -170,46 +162,8 @@ export const editCommit = CLICommand.make(
         "Undoing commit and unstaging changes..."
       );
 
-      const undoCommand = Command.make(
-        "git",
-        "reset",
-        "HEAD^"
-      ).pipe(
-        Command.workingDirectory(cwd),
-        Command.stdout("inherit"),
-        Command.stderr("inherit")
-      );
-
-      const undoExitCode = yield* Command.exitCode(
-        undoCommand
-      ).pipe(Effect.catchAll(() => Effect.succeed(1)));
-
-      if (undoExitCode !== 0) {
-        yield* Console.error("Failed to undo commit");
-        process.exitCode = 1;
-        return;
-      }
-
-      const unstageCommand = Command.make(
-        "git",
-        "restore",
-        "--staged",
-        "."
-      ).pipe(
-        Command.workingDirectory(cwd),
-        Command.stdout("inherit"),
-        Command.stderr("inherit")
-      );
-
-      const unstageExitCode = yield* Command.exitCode(
-        unstageCommand
-      ).pipe(Effect.catchAll(() => Effect.succeed(1)));
-
-      if (unstageExitCode !== 0) {
-        yield* Console.error("Failed to unstage changes");
-        process.exitCode = 1;
-        return;
-      }
+      yield* gitService.resetHead();
+      yield* gitService.restoreStaged();
 
       yield* Console.log(
         "✓ Reset complete with unstaged changes"
@@ -243,39 +197,17 @@ export const editCommit = CLICommand.make(
         `Committing with original message: "${originalMessage}"`
       );
 
-      // Add all files
-      const addCommand = Command.make("git", "add", ".").pipe(
-        Command.workingDirectory(cwd),
-        Command.stdout("inherit"),
-        Command.stderr("inherit")
+      // Add all files and commit
+      yield* gitService.stageAll();
+
+      const commitResult = yield* gitService.commit(originalMessage).pipe(
+        Effect.catchTag("FailedToCommitError", () =>
+          Effect.succeed({ failed: true as const })
+        ),
+        Effect.map(() => ({ failed: false as const }))
       );
 
-      const addExitCode = yield* Command.exitCode(
-        addCommand
-      ).pipe(Effect.catchAll(() => Effect.succeed(1)));
-
-      if (addExitCode !== 0) {
-        yield* Console.error("Failed to add files");
-        process.exitCode = 1;
-        return;
-      }
-
-      const commitCommand = Command.make(
-        "git",
-        "commit",
-        "-m",
-        originalMessage
-      ).pipe(
-        Command.workingDirectory(cwd),
-        Command.stdout("inherit"),
-        Command.stderr("inherit")
-      );
-
-      const commitExitCode = yield* Command.exitCode(
-        commitCommand
-      ).pipe(Effect.catchAll(() => Effect.succeed(1)));
-
-      if (commitExitCode !== 0) {
+      if (commitResult.failed) {
         return yield* Effect.fail(
           new CommitFailedError({
             message:
@@ -378,22 +310,14 @@ export const editCommit = CLICommand.make(
         return;
       }
 
-      const resetToCurrentCommand = Command.make(
-        "git",
-        "reset",
-        "--hard",
-        currentBranch
-      ).pipe(
-        Command.workingDirectory(cwd),
-        Command.stdout("inherit"),
-        Command.stderr("inherit")
+      const resetToCurrentResult = yield* gitService.resetHard(currentBranch).pipe(
+        Effect.catchTag("FailedToResetError", () =>
+          Effect.succeed({ failed: true as const })
+        ),
+        Effect.map(() => ({ failed: false as const }))
       );
 
-      const resetToCurrentExitCode = yield* Command.exitCode(
-        resetToCurrentCommand
-      ).pipe(Effect.catchAll(() => Effect.succeed(1)));
-
-      if (resetToCurrentExitCode !== 0) {
+      if (resetToCurrentResult.failed) {
         yield* Console.error(
           `Failed to reset ${branch} to ${currentBranch}.`
         );

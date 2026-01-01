@@ -26,7 +26,7 @@
       "Update edit-commit.ts to use these GitService methods instead of Command",
       "Run pnpm typecheck to verify no errors"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "edit-commit-part3",

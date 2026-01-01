@@ -81,6 +81,27 @@ export class FailedToTrackBranchError extends Data.TaggedError(
   message: string;
 }> {}
 
+/**
+ * Error thrown when git reset --hard fails.
+ * This can happen due to permission issues or filesystem problems.
+ */
+export class FailedToResetError extends Data.TaggedError(
+  "FailedToResetError"
+)<{
+  sha: string;
+  message: string;
+}> {}
+
+/**
+ * Error thrown when git commit fails.
+ * Common causes: nothing to commit, pre-commit hook failure, or git configuration issues.
+ */
+export class FailedToCommitError extends Data.TaggedError(
+  "FailedToCommitError"
+)<{
+  message: string;
+}> {}
+
 export class GitService extends Effect.Service<GitService>()(
   "GitService",
   {
@@ -231,6 +252,90 @@ Add upstream remote:
          */
         getStatusShort: Effect.fn("getStatusShort")(function* () {
           return yield* runCommandWithString("git", "status", "--short");
+        }),
+
+        /**
+         * Performs a hard reset to the specified SHA.
+         * WARNING: This discards all uncommitted changes and moves HEAD to the target.
+         * Any uncommitted work in the working directory and staging area will be lost.
+         *
+         * @param sha - The commit SHA to reset to
+         * @returns Effect that succeeds when reset completes
+         * @throws FailedToResetError if the reset fails
+         */
+        resetHard: Effect.fn("resetHard")(function* (sha: string) {
+          const exitCode = yield* runCommandWithExitCode(
+            "git",
+            "reset",
+            "--hard",
+            sha
+          );
+
+          if (exitCode !== 0) {
+            return yield* Effect.fail(
+              new FailedToResetError({
+                sha,
+                message: `Failed to reset to ${sha} (exit code: ${exitCode})`,
+              })
+            );
+          }
+        }),
+
+        /**
+         * Performs a soft reset of the last commit (git reset HEAD^).
+         * This undoes the last commit but keeps all changes in the working directory.
+         * The changes from the undone commit become unstaged modifications.
+         *
+         * @returns Effect that succeeds when reset completes
+         */
+        resetHead: Effect.fn("resetHead")(function* () {
+          yield* runCommandWithExitCode("git", "reset", "HEAD^");
+        }),
+
+        /**
+         * Unstages all staged files (git restore --staged .).
+         * This moves files from the staging area back to unstaged state
+         * without discarding any modifications.
+         *
+         * @returns Effect that succeeds when restore completes
+         */
+        restoreStaged: Effect.fn("restoreStaged")(function* () {
+          yield* runCommandWithExitCode("git", "restore", "--staged", ".");
+        }),
+
+        /**
+         * Stages all changes in the working directory (git add .).
+         * This adds all modified, deleted, and new files to the staging area.
+         *
+         * @returns Effect that succeeds when staging completes
+         */
+        stageAll: Effect.fn("stageAll")(function* () {
+          yield* runCommandWithExitCode("git", "add", ".");
+        }),
+
+        /**
+         * Creates a new commit with the specified message.
+         * All currently staged changes will be included in the commit.
+         *
+         * @param message - The commit message
+         * @returns Effect that succeeds when commit completes
+         * @throws FailedToCommitError if the commit fails (e.g., nothing staged, hook failure)
+         */
+        commit: Effect.fn("commit")(function* (message: string) {
+          const exitCode = yield* runCommandWithExitCode(
+            "git",
+            "commit",
+            "-m",
+            message
+          );
+
+          if (exitCode !== 0) {
+            return yield* Effect.fail(
+              new FailedToCommitError({
+                message: `Failed to commit (exit code: ${exitCode})`,
+              })
+            );
+          }
         }),
 
         ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(
