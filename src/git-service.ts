@@ -493,6 +493,54 @@ Add upstream remote:
           }
         }),
 
+        /**
+         * Creates and switches to a new branch (git checkout -b).
+         * The branch is created at the current HEAD position.
+         *
+         * @param branchName - The name of the new branch to create
+         * @returns Effect that succeeds when branch is created and checked out
+         * @throws FailedToCreateBranchError if branch creation fails (e.g., branch already exists)
+         */
+        checkoutNewBranch: Effect.fn("checkoutNewBranch")(function* (
+          branchName: string
+        ) {
+          const exitCode = yield* runCommandWithExitCode(
+            "git",
+            "checkout",
+            "-b",
+            branchName
+          );
+
+          if (exitCode !== 0) {
+            return yield* Effect.fail(
+              new FailedToCreateBranchError({
+                branchName,
+                message: `Failed to create branch ${branchName} (exit code: ${exitCode})`,
+              })
+            );
+          }
+        }),
+
+        /**
+         * Gets commit log in oneline format, reversed (oldest first).
+         * Uses `git log --oneline --reverse` with a range specifier.
+         * Each line contains: <short-sha> <commit-message>
+         *
+         * @param range - The commit range (e.g., "main..feature" or "HEAD~5..HEAD")
+         * @returns The commit log output as a string
+         */
+        getLogOnelineReverse: Effect.fn("getLogOnelineReverse")(function* (
+          range: string
+        ) {
+          return yield* runCommandWithString(
+            "git",
+            "log",
+            "--oneline",
+            "--reverse",
+            range
+          );
+        }),
+
         ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(
           function* () {
             const cwd = config.cwd;

@@ -1,12 +1,5 @@
 import { Command as CLICommand, Options } from "@effect/cli";
-import { Command } from "@effect/platform";
-import {
-  Config,
-  ConfigProvider,
-  Console,
-  Data,
-  Effect,
-} from "effect";
+import { Console, Data, Effect } from "effect";
 import prompt from "prompts";
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "../constants.js";
 import { GitService, GitServiceConfig } from "../git-service.js";
@@ -44,18 +37,6 @@ export class HardResetFailedError extends Data.TaggedError(
   message: string;
 }> {}
 
-export class UndoCommitFailedError extends Data.TaggedError(
-  "UndoCommitFailedError"
-)<{
-  message: string;
-}> {}
-
-export class UnstageFailedError extends Data.TaggedError(
-  "UnstageFailedError"
-)<{
-  message: string;
-}> {}
-
 const applyDemoReset = (commitSha: string) =>
   Effect.gen(function* () {
     const git = yield* GitService;
@@ -63,60 +44,25 @@ const applyDemoReset = (commitSha: string) =>
     yield* Console.log(`\nResetting to ${commitSha}...`);
 
     // Hard reset to commit
-    const hardResetExitCode = yield* git.runCommandWithExitCode(
-      "git",
-      "reset",
-      "--hard",
-      commitSha
+    yield* git.resetHard(commitSha).pipe(
+      Effect.catchTag("FailedToResetError", () => {
+        process.exitCode = 1;
+        return Effect.fail(
+          new HardResetFailedError({
+            commitSha,
+            message: "Hard reset failed",
+          })
+        );
+      })
     );
-
-    if (hardResetExitCode !== 0) {
-      yield* Console.error("Failed to reset to commit");
-      process.exitCode = 1;
-      return yield* Effect.fail(
-        new HardResetFailedError({
-          commitSha,
-          message: "Hard reset failed",
-        })
-      );
-    }
 
     // Undo commit (move HEAD back, keep changes)
     yield* Console.log("Undoing commit...");
-    const undoExitCode = yield* git.runCommandWithExitCode(
-      "git",
-      "reset",
-      "HEAD^"
-    );
-
-    if (undoExitCode !== 0) {
-      yield* Console.error("Failed to undo commit");
-      process.exitCode = 1;
-      return yield* Effect.fail(
-        new UndoCommitFailedError({
-          message: "Undo commit failed",
-        })
-      );
-    }
+    yield* git.resetHead();
 
     // Unstage all changes
     yield* Console.log("Unstaging changes...");
-    const unstageExitCode = yield* git.runCommandWithExitCode(
-      "git",
-      "restore",
-      "--staged",
-      "."
-    );
-
-    if (unstageExitCode !== 0) {
-      yield* Console.error("Failed to unstage changes");
-      process.exitCode = 1;
-      return yield* Effect.fail(
-        new UnstageFailedError({
-          message: "Unstage failed",
-        })
-      );
-    }
+    yield* git.restoreStaged();
 
     yield* Console.log(
       "✓ Commit applied with unstaged changes\n"
@@ -140,7 +86,6 @@ export const walkThrough = CLICommand.make(
   ({ liveBranch, mainBranch }) =>
     Effect.gen(function* () {
       const git = yield* GitService;
-      const config = yield* GitServiceConfig;
 
       // Validate git repo
       yield* git.ensureIsGitRepo();
@@ -168,24 +113,17 @@ export const walkThrough = CLICommand.make(
           ])
         );
 
-        const createBranchExitCode =
-          yield* git.runCommandWithExitCode(
-            "git",
-            "checkout",
-            "-b",
-            branchName
-          );
-
-        if (createBranchExitCode !== 0) {
-          yield* Console.error("Failed to create branch");
-          process.exitCode = 1;
-          return yield* Effect.fail(
-            new InvalidBranchError({
-              branch: branchName,
-              message: "Failed to create branch",
-            })
-          );
-        }
+        yield* git.checkoutNewBranch(branchName).pipe(
+          Effect.catchTag("FailedToCreateBranchError", (error) => {
+            process.exitCode = 1;
+            return Effect.fail(
+              new InvalidBranchError({
+                branch: branchName,
+                message: error.message,
+              })
+            );
+          })
+        );
 
         yield* Console.log(
           `✓ Created and switched to ${branchName}`
@@ -228,15 +166,9 @@ export const walkThrough = CLICommand.make(
         `\nRetrieving commits between ${mainBranch} and ${liveBranch}...`
       );
 
-      const gitLogCommand = Command.make(
-        "git",
-        "log",
-        "--oneline",
-        "--reverse",
+      const commitHistory = yield* git.getLogOnelineReverse(
         `${mainBranch}..${liveBranch}`
-      ).pipe(Command.workingDirectory(config.cwd));
-
-      const commitHistory = yield* Command.string(gitLogCommand);
+      );
 
       type WalkThroughCommit = {
         sha: string;
@@ -322,21 +254,12 @@ export const walkThrough = CLICommand.make(
       );
       yield* Console.log(`Returning to ${liveBranch}...`);
 
-      const finalResetExitCode =
-        yield* git.runCommandWithExitCode(
-          "git",
-          "reset",
-          "--hard",
-          liveBranch
-        );
-
-      if (finalResetExitCode !== 0) {
-        yield* Console.error(
-          `Failed to return to ${liveBranch}`
-        );
-        process.exitCode = 1;
-        return yield* Effect.succeed(void 0);
-      }
+      yield* git.resetHard(liveBranch).pipe(
+        Effect.catchTag("FailedToResetError", () => {
+          process.exitCode = 1;
+          return Effect.succeed(void 0);
+        })
+      );
 
       yield* Console.log(`✓ Returned to ${liveBranch}`);
       yield* Console.log("=".repeat(60));

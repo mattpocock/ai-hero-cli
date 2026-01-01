@@ -1,5 +1,32 @@
 # Claude Progress Log
 
+## 2026-01-01: walk-through
+
+Completed refactor to extract git commands from walk-through.ts to git-service.
+
+### Changes made:
+
+**src/git-service.ts:**
+- Added `checkoutNewBranch(branchName)` method - creates and switches to new branch (git checkout -b), throws FailedToCreateBranchError on failure
+- Added `getLogOnelineReverse(range)` method - returns commit log in oneline format, reversed (oldest first)
+
+**src/internal/walk-through.ts:**
+- Removed `Command` import from `@effect/platform` (no longer needed)
+- Removed unused `Config` and `ConfigProvider` imports
+- Removed unused `UndoCommitFailedError` and `UnstageFailedError` error classes
+- Replaced `git checkout -b` command with `gitService.checkoutNewBranch()`
+- Replaced `git log --oneline --reverse` command with `gitService.getLogOnelineReverse()`
+- Replaced `git reset --hard` commands with `gitService.resetHard()`
+- Replaced `git reset HEAD^` command with `gitService.resetHead()`
+- Replaced `git restore --staged .` command with `gitService.restoreStaged()`
+- Removed unused `config` variable (was only used for cwd in Command)
+
+### Verification:
+- pnpm typecheck: passed
+- pnpm test: passed (4 tests)
+
+---
+
 ## 2026-01-01: edit-commit-part3
 
 Completed refactor to extract cherry-pick, checkout, and push commands from edit-commit.ts to git-service.
