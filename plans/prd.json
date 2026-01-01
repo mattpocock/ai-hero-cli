@@ -75,7 +75,7 @@
     "command": "cherry-pick",
     "category": "error",
     "description": "User runs cherry-pick outside git repo",
-    "tested": false,
+    "tested": true,
     "steps": [
       "User is in directory without .git folder",
       "User runs `ai-hero cherry-pick`",

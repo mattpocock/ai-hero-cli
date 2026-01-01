@@ -16,3 +16,15 @@ Changes:
 - Fixed unused import (NodeContext) in git-service.ts
 
 PRD item marked as tested=true.
+
+---
+
+## Session 2026-01-01 (cont.)
+
+Added test for PRD: "User runs cherry-pick outside git repo" (cherry-pick error case).
+
+Changes:
+- Added test in cherry-pick.test.ts that mocks ensureIsGitRepo to fail with NotAGitRepoError
+- Verified runCherryPick propagates NotAGitRepoError with correct path/message
+
+PRD item marked as tested=true.

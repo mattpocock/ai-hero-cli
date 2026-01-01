@@ -10,6 +10,7 @@ import {
 import {
   GitService,
   GitServiceConfig,
+  NotAGitRepoError,
 } from "../src/git-service.js";
 import { PromptService } from "../src/prompt-service.js";
 
@@ -371,6 +372,52 @@ newer456 01.01.01 Updated version`;
           // Assert: cherry-pick was called
           expect(cherryPickCalled).toBe(true);
           expect(cherryPickSha).toBe("def5678");
+        })
+    );
+  });
+
+  describe("PRD: User runs cherry-pick outside git repo", () => {
+    it.effect(
+      "should fail with NotAGitRepoError when not in a git repository",
+      () =>
+        Effect.gen(function* () {
+          const mockGitService = fromPartial<GitService>({
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(
+              function* () {
+                return yield* Effect.fail(
+                  new NotAGitRepoError({
+                    path: "/not/a/repo",
+                    message:
+                      "Current directory is not a git repository: /not/a/repo",
+                  })
+                );
+              }
+            ),
+          });
+
+          const mockPromptService = fromPartial<PromptService>({});
+
+          const testLayer = Layer.mergeAll(
+            Layer.succeed(GitService, mockGitService),
+            Layer.succeed(PromptService, mockPromptService),
+            Layer.succeed(GitServiceConfig, {
+              cwd: "/not/a/repo",
+            }),
+            NodeContext.layer
+          );
+
+          const result = yield* runCherryPick({
+            branch: "live-run-through",
+            lessonId: Option.none(),
+          }).pipe(Effect.provide(testLayer), Effect.flip);
+
+          expect(result).toBeInstanceOf(NotAGitRepoError);
+          if (result instanceof NotAGitRepoError) {
+            expect(result.path).toBe("/not/a/repo");
+            expect(result.message).toContain(
+              "not a git repository"
+            );
+          }
         })
     );
   });
