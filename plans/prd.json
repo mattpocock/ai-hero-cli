@@ -405,7 +405,7 @@
     "command": "reset",
     "category": "error",
     "description": "User attempts reset when on target branch",
-    "tested": false,
+    "tested": true,
     "steps": [
       "User is on 'live-run-through' branch",
       "User runs `ai-hero reset 01.02.03`",

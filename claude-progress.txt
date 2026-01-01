@@ -105,3 +105,17 @@ Changes:
 - Added CherryPickConflictError import to cherry-pick.test.ts
 
 PRD item marked as tested=true.
+
+---
+
+## Session 2026-01-01 (cont. 8)
+
+Added test for PRD: "User attempts reset when on target branch" (reset error case).
+
+Changes:
+- Added test in reset.test.ts that mocks getCurrentBranch to return target branch name
+- Mocks selectResetAction to return "reset-current"
+- Verified runReset fails with InvalidBranchOperationError when user is on target branch
+- Added InvalidBranchOperationError import to reset.test.ts
+
+PRD item marked as tested=true.

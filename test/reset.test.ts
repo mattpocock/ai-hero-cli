@@ -10,7 +10,7 @@ import {
   NotAGitRepoError,
 } from "../src/git-service.js";
 import { PromptService } from "../src/prompt-service.js";
-import { runReset } from "../src/reset.js";
+import { InvalidBranchOperationError, runReset } from "../src/reset.js";
 
 /**
  * Tests for the reset command business logic.
@@ -169,6 +169,79 @@ Add upstream remote:
           if (result instanceof CommitNotFoundError) {
             expect(result.lessonId).toBe("99.99.99");
             expect(result.branch).toBe("live-run-through");
+          }
+        })
+    );
+  });
+
+  describe("PRD: User attempts reset when on target branch", () => {
+    it.effect(
+      "should fail with InvalidBranchOperationError when on target branch and selecting reset-current",
+      () =>
+        Effect.gen(function* () {
+          const mockGitService = fromPartial<GitService>({
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(
+              function* () {}
+            ),
+            ensureUpstreamBranchConnected: Effect.fn(
+              "ensureUpstreamBranchConnected"
+            )(function* (_opts: { targetBranch: string }) {}),
+            getLogOneline: Effect.fn("getLogOneline")(function* (
+              _branch: string
+            ) {
+              return `abc1234 01.02.03 Add new feature`;
+            }),
+            getCurrentBranch: Effect.fn("getCurrentBranch")(
+              function* () {
+                // User is on the same branch they're trying to reset from
+                return "live-run-through";
+              }
+            ),
+          });
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectLessonCommit: Effect.fn("selectLessonCommit")(
+              function* (
+                _commits: Array<{ lessonId: string; message: string }>,
+                _promptMessage: string
+              ) {
+                return "01.02.03";
+              }
+            ),
+            selectProblemOrSolution: Effect.fn(
+              "selectProblemOrSolution"
+            )(function* () {
+              return "solution" as const;
+            }),
+            selectResetAction: Effect.fn("selectResetAction")(
+              function* (_branch: string) {
+                return "reset-current" as const;
+              }
+            ),
+          });
+
+          const testLayer = Layer.mergeAll(
+            Layer.succeed(GitService, mockGitService),
+            Layer.succeed(PromptService, mockPromptService),
+            Layer.succeed(GitServiceConfig, {
+              cwd: "/test/repo",
+            }),
+            NodeContext.layer
+          );
+
+          const result = yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.some("01.02.03"),
+            problem: false,
+            solution: false,
+            demo: false,
+          }).pipe(Effect.provide(testLayer), Effect.flip);
+
+          expect(result).toBeInstanceOf(InvalidBranchOperationError);
+          if (result instanceof InvalidBranchOperationError) {
+            expect(result.message).toContain(
+              'Cannot reset current branch when on target branch "live-run-through"'
+            );
           }
         })
     );
