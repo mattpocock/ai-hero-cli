@@ -101,6 +101,7 @@
     "service": "PromptService",
     "method": "inputBranchName",
     "category": "behavior",
+    "status": "DONE",
     "description": "Prompts user to enter a new branch name",
     "steps": [
       "Method receives context: 'working' or 'new'",

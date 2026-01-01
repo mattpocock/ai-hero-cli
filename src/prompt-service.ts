@@ -197,6 +197,34 @@ export class PromptService extends Effect.Service<PromptService>()(
         }
       });
 
+      /**
+       * Prompts user to enter a new branch name.
+       *
+       * @param context - 'working' or 'new' to determine the prompt message
+       * @returns The entered branch name
+       * @throws PromptCancelledError if user presses Ctrl+C
+       */
+      const inputBranchName = Effect.fn("inputBranchName")(function* (
+        context: "working" | "new"
+      ) {
+        const message =
+          context === "working"
+            ? "Enter name of your new working branch:"
+            : "Enter new branch name:";
+
+        const { branchName } = yield* runPrompt<{ branchName: string }>(() =>
+          prompt([
+            {
+              type: "text",
+              name: "branchName",
+              message,
+            },
+          ])
+        );
+
+        return branchName;
+      });
+
       return {
         confirmReadyToCommit,
         confirmSaveToTargetBranch,
@@ -205,6 +233,7 @@ export class PromptService extends Effect.Service<PromptService>()(
         selectProblemOrSolution,
         selectResetAction,
         confirmResetWithUncommittedChanges,
+        inputBranchName,
       };
     }),
     dependencies: [],

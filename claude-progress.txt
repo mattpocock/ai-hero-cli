@@ -2,3 +2,4 @@ PromptService: implemented selectCherryPickConflictAction
 PromptService: implemented selectProblemOrSolution
 PromptService: implemented selectResetAction
 PromptService: implemented confirmResetWithUncommittedChanges
+PromptService: implemented inputBranchName
