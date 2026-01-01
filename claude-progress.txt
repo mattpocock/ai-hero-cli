@@ -1,2 +1,3 @@
 PromptService: implemented selectCherryPickConflictAction
 PromptService: implemented selectProblemOrSolution
+PromptService: implemented selectResetAction

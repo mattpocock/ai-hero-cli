@@ -73,6 +73,7 @@
     "service": "PromptService",
     "method": "selectResetAction",
     "category": "behavior",
+    "status": "DONE",
     "description": "Prompts user to choose reset method",
     "steps": [
       "Method receives current branch name for display",

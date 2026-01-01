@@ -25,6 +25,7 @@ describe("PromptService", () => {
         expect(typeof service.confirmForcePush).toBe("function");
         expect(typeof service.selectCherryPickConflictAction).toBe("function");
         expect(typeof service.selectProblemOrSolution).toBe("function");
+        expect(typeof service.selectResetAction).toBe("function");
       }).pipe(Effect.provide(PromptService.Default))
     );
   });

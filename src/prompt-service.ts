@@ -140,12 +140,45 @@ export class PromptService extends Effect.Service<PromptService>()(
         }
       );
 
+      /**
+       * Prompts user to choose reset method.
+       *
+       * @param _branch - The current branch name (for display context)
+       * @returns 'reset-current' | 'create-branch'
+       * @throws PromptCancelledError if user presses Ctrl+C
+       */
+      const selectResetAction = Effect.fn("selectResetAction")(function* (
+        _branch: string
+      ) {
+        const { action } = yield* runPrompt<{
+          action: "reset-current" | "create-branch";
+        }>(() =>
+          prompt([
+            {
+              type: "select",
+              name: "action",
+              message: "How would you like to proceed?",
+              choices: [
+                { title: "Reset current branch", value: "reset-current" },
+                {
+                  title: "Create new branch from commit",
+                  value: "create-branch",
+                },
+              ],
+            },
+          ])
+        );
+
+        return action;
+      });
+
       return {
         confirmReadyToCommit,
         confirmSaveToTargetBranch,
         confirmForcePush,
         selectCherryPickConflictAction,
         selectProblemOrSolution,
+        selectResetAction,
       };
     }),
     dependencies: [],
