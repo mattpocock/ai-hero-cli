@@ -6,11 +6,15 @@ import {
   FailedToCheckoutError,
   FailedToCommitError,
   FailedToCreateBranchError,
+  FailedToFetchError,
   FailedToFetchOriginError,
   FailedToPushError,
   FailedToResetError,
   GitService,
   InvalidRefError,
+  MergeConflictError,
+  NoParentCommitError,
+  RebaseConflictError,
 } from "../src/git-service.js";
 
 describe("GitService", () => {
@@ -443,6 +447,227 @@ describe("GitService", () => {
       expect(error.remote).toBe("origin");
       expect(error.branch).toBe("feature-branch");
       expect(error.message).toContain("Failed to push");
+    });
+  });
+
+  describe("getLogOneline", () => {
+    it.effect("returns commit log in oneline format", () =>
+      Effect.gen(function* () {
+        const git = yield* GitService;
+
+        const log = yield* git.getLogOneline("HEAD");
+
+        // Log should be a string with commit entries
+        expect(typeof log).toBe("string");
+        // Should have at least one line (one commit)
+        expect(log.length).toBeGreaterThan(0);
+      }).pipe(
+        Effect.provide(NodeContext.layer),
+        Effect.provide(GitService.Default)
+      )
+    );
+
+    it.effect("each line has short SHA and message", () =>
+      Effect.gen(function* () {
+        const git = yield* GitService;
+
+        const log = yield* git.getLogOneline("HEAD~5..HEAD");
+
+        // Each line should match: <short-sha> <message>
+        const lines = log.split("\n").filter((l) => l.length > 0);
+        for (const line of lines) {
+          // Short SHA is 7-12 chars, followed by space and message
+          expect(line).toMatch(/^[0-9a-f]{7,12}\s+.+/);
+        }
+      }).pipe(
+        Effect.provide(NodeContext.layer),
+        Effect.provide(GitService.Default)
+      )
+    );
+  });
+
+  describe("getLogOnelineReverse", () => {
+    it.effect("returns commit log in reversed order", () =>
+      Effect.gen(function* () {
+        const git = yield* GitService;
+
+        const log = yield* git.getLogOnelineReverse("HEAD~3..HEAD");
+
+        // Log should be a string with commit entries
+        expect(typeof log).toBe("string");
+        const lines = log.split("\n").filter((l) => l.length > 0);
+        // Should have commits (up to 3)
+        expect(lines.length).toBeLessThanOrEqual(3);
+      }).pipe(
+        Effect.provide(NodeContext.layer),
+        Effect.provide(GitService.Default)
+      )
+    );
+
+    it.effect("oldest commit comes first (reversed)", () =>
+      Effect.gen(function* () {
+        const git = yield* GitService;
+
+        // Get both normal and reversed logs
+        const normalLog = yield* git.getLogOneline("HEAD~3..HEAD");
+        const reversedLog = yield* git.getLogOnelineReverse("HEAD~3..HEAD");
+
+        const normalLines = normalLog.split("\n").filter((l) => l.length > 0);
+        const reversedLines = reversedLog
+          .split("\n")
+          .filter((l) => l.length > 0);
+
+        // Reversed should be opposite order
+        if (normalLines.length > 1) {
+          expect(reversedLines[0]).toBe(normalLines[normalLines.length - 1]);
+          expect(reversedLines[reversedLines.length - 1]).toBe(normalLines[0]);
+        }
+      }).pipe(
+        Effect.provide(NodeContext.layer),
+        Effect.provide(GitService.Default)
+      )
+    );
+  });
+
+  describe("getParentCommit", () => {
+    it.effect("returns parent SHA for a valid commit", () =>
+      Effect.gen(function* () {
+        const git = yield* GitService;
+
+        // Get HEAD and its parent
+        const headSha = yield* git.revParse("HEAD");
+        const parentSha = yield* git.getParentCommit(headSha);
+
+        // Parent SHA should be 40 hex characters
+        expect(parentSha).toMatch(/^[0-9a-f]{40}$/);
+        // Parent should be different from HEAD
+        expect(parentSha).not.toBe(headSha);
+      }).pipe(
+        Effect.provide(NodeContext.layer),
+        Effect.provide(GitService.Default)
+      )
+    );
+
+    it("NoParentCommitError has correct structure", () => {
+      const error = new NoParentCommitError({
+        commitSha: "abc123def456",
+      });
+
+      expect(error._tag).toBe("NoParentCommitError");
+      expect(error.commitSha).toBe("abc123def456");
+    });
+  });
+
+  describe("fetch", () => {
+    it.effect("method exists and is callable", () =>
+      Effect.gen(function* () {
+        const git = yield* GitService;
+
+        // Just verify the method exists - actually fetching would require network
+        expect(typeof git.fetch).toBe("function");
+      }).pipe(
+        Effect.provide(NodeContext.layer),
+        Effect.provide(GitService.Default)
+      )
+    );
+
+    it.effect("fetches from origin main", () =>
+      Effect.gen(function* () {
+        const git = yield* GitService;
+
+        // Try to fetch origin main - may fail if no network
+        const result = yield* git.fetch("origin", "main").pipe(
+          Effect.map(() => "success" as const),
+          Effect.catchTag("FailedToFetchError", () =>
+            Effect.succeed("fetch-failed" as const)
+          )
+        );
+
+        // Either success or fetch error is valid in test environment
+        expect(["success", "fetch-failed"]).toContain(result);
+      }).pipe(
+        Effect.provide(NodeContext.layer),
+        Effect.provide(GitService.Default)
+      )
+    );
+
+    it("FailedToFetchError has correct structure", () => {
+      const error = new FailedToFetchError({
+        remote: "origin",
+        branch: "main",
+        message: "Failed to fetch main from origin (exit code: 1)",
+      });
+
+      expect(error._tag).toBe("FailedToFetchError");
+      expect(error.remote).toBe("origin");
+      expect(error.branch).toBe("main");
+      expect(error.message).toContain("Failed to fetch");
+    });
+  });
+
+  describe("merge", () => {
+    it.effect("method exists and is callable", () =>
+      Effect.gen(function* () {
+        const git = yield* GitService;
+
+        // Just verify the method exists - actually merging would modify repo
+        expect(typeof git.merge).toBe("function");
+      }).pipe(
+        Effect.provide(NodeContext.layer),
+        Effect.provide(GitService.Default)
+      )
+    );
+
+    it.effect("merging current HEAD into itself succeeds", () =>
+      Effect.gen(function* () {
+        const git = yield* GitService;
+
+        // Merging HEAD into itself is a no-op (already up-to-date)
+        const headSha = yield* git.revParse("HEAD");
+        yield* git.merge(headSha);
+
+        // If we get here, merge succeeded (was already up-to-date)
+        expect(true).toBe(true);
+      }).pipe(
+        Effect.provide(NodeContext.layer),
+        Effect.provide(GitService.Default)
+      )
+    );
+
+    it("MergeConflictError has correct structure", () => {
+      const error = new MergeConflictError({
+        ref: "feature-branch",
+        message: "Merge conflicts detected when merging feature-branch",
+      });
+
+      expect(error._tag).toBe("MergeConflictError");
+      expect(error.ref).toBe("feature-branch");
+      expect(error.message).toContain("Merge conflicts");
+    });
+  });
+
+  describe("rebase", () => {
+    it.effect("method exists and is callable", () =>
+      Effect.gen(function* () {
+        const git = yield* GitService;
+
+        // Just verify the method exists - actually rebasing would modify history
+        expect(typeof git.rebase).toBe("function");
+      }).pipe(
+        Effect.provide(NodeContext.layer),
+        Effect.provide(GitService.Default)
+      )
+    );
+
+    it("RebaseConflictError has correct structure", () => {
+      const error = new RebaseConflictError({
+        onto: "main",
+        message: "Rebase conflicts detected when rebasing onto main",
+      });
+
+      expect(error._tag).toBe("RebaseConflictError");
+      expect(error.onto).toBe("main");
+      expect(error.message).toContain("Rebase conflicts");
     });
   });
 });

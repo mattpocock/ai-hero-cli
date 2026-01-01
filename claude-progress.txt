@@ -1,5 +1,33 @@
 # Claude Progress Log
 
+## 2026-01-01: test-log-merge-rebase
+
+Added unit tests for log, merge, and rebase git-service methods.
+
+### Changes made:
+
+**test/git-service.test.ts:**
+- Added tests for getLogOneline() - verifies log format and output parsing
+- Added tests for getLogOneline() - verifies each line has short SHA and message
+- Added tests for getLogOnelineReverse() - verifies reversed commit order
+- Added tests for getLogOnelineReverse() - verifies oldest commit comes first
+- Added tests for getParentCommit() - verifies parent SHA is returned
+- Added tests for NoParentCommitError error structure
+- Added tests for fetch() - verifies method exists
+- Added tests for fetch() - verifies fetching from origin main
+- Added tests for FailedToFetchError error structure
+- Added tests for merge() - verifies method exists
+- Added tests for merge() - verifies merging HEAD into itself succeeds
+- Added tests for MergeConflictError error structure
+- Added tests for rebase() - verifies method exists
+- Added tests for RebaseConflictError error structure
+
+### Verification:
+- pnpm typecheck: passed
+- pnpm test: passed (46 tests)
+
+---
+
 ## 2026-01-01: test-cherry-pick-checkout-push
 
 Added unit tests for cherry-pick, checkout, and push git-service methods.

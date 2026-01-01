@@ -199,7 +199,7 @@
       "Run pnpm test to verify tests pass"
     ],
     "dependencies": ["commit-utils", "pull", "rebase-to-main"],
-    "passes": false
+    "passes": true
   },
   {
     "id": "remove-generic-helpers",
