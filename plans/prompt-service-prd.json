@@ -250,10 +250,10 @@
     "migratedFiles": [
       "src/internal/edit-commit.ts",
       "src/reset.ts",
-      "src/internal/walk-through.ts"
+      "src/internal/walk-through.ts",
+      "src/exercise.ts"
     ],
     "remainingFiles": [
-      "src/exercise.ts",
       "src/cherry-pick.ts",
       "src/commit-utils.ts"
     ]

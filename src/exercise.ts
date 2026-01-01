@@ -15,7 +15,6 @@ import {
 } from "effect";
 import { execSync } from "node:child_process";
 import * as path from "path";
-import prompt from "prompts";
 import { styleText } from "node:util";
 import type {
   InvalidPathError,
@@ -28,10 +27,8 @@ import {
   envFilePathOption,
   rootOption,
 } from "./options.js";
-import {
-  runPrompt,
-  type PromptCancelledError,
-} from "./prompt-utils.js";
+import { type PromptCancelledError } from "./prompt-utils.js";
+import { PromptService } from "./prompt-service.js";
 
 class LessonNotFoundError extends Data.TaggedError(
   "LessonNotFoundError"
@@ -80,10 +77,11 @@ const runLesson: (opts: {
   | PlatformError
   | InvalidPathError
   | PathNumberIsNaNError,
-  LessonParserService | FileSystem.FileSystem
+  LessonParserService | FileSystem.FileSystem | PromptService
 > = Effect.fn("runLesson")(function* (opts) {
   const { cwd, envFilePath, lesson, root } = opts;
   const service = yield* LessonParserService;
+  const promptService = yield* PromptService;
   const lessons = yield* service.getLessonsFromRepo(root);
 
   const foundLessonIndex = lessons.findIndex(
@@ -233,79 +231,18 @@ const runLesson: (opts: {
     result = "failed";
   }
 
-  const lessonNoun = isExplainer
-    ? {
-        successMessage: `Explainer executed! Once you've read the readme and understand the code, you can go to the next exercise.`,
-        failureMessage: `Looks like the explainer errored! Want to try again?`,
-        lowercase: "explainer",
-        readmeMessage: `Once you've read the readme, you can go to the next exercise.`,
-      }
-    : {
-        successMessage: "Exercise complete! What's next?",
-        failureMessage: `Looks like the exercise errored! Want to try again?`,
-        lowercase: "exercise",
-        readmeMessage:
-          "Once you've read the readme, you can go to the next exercise.",
-      };
-
-  const { choice } = yield* runPrompt<{
-    choice:
-      | "run-again"
-      | "next-exercise"
-      | "previous-exercise"
-      | "choose-exercise"
-      | "finish";
-  }>(() =>
-    prompt([
-      {
-        type: "select",
-        name: "choice",
-        message:
-          result === "success"
-            ? lessonNoun.successMessage
-            : result === "readme-only"
-            ? lessonNoun.readmeMessage
-            : lessonNoun.failureMessage,
-        choices: [
-          ...(result === "readme-only"
-            ? []
-            : [
-                {
-                  title:
-                    result === "failed"
-                      ? `🔄 Run the ${lessonNoun.lowercase} again`
-                      : `🔄 Try the ${lessonNoun.lowercase} again`,
-                  value: "run-again",
-                },
-              ]),
-          ...(nextExerciseToRun
-            ? [
-                {
-                  title: `➡️  Run the next exercise: ${nextExerciseToRun?.lessonNumber}-${nextExerciseToRun?.lessonName} ${nextExerciseToRun?.subfolder}`,
-                  value: "next-exercise",
-                },
-              ]
-            : []),
-          ...(previousExerciseToRun
-            ? [
-                {
-                  title: `⬅️  Run the previous exercise: ${previousExerciseToRun?.lessonNumber}-${previousExerciseToRun?.lessonName} ${previousExerciseToRun?.subfolder}`,
-                  value: "previous-exercise",
-                },
-              ]
-            : []),
-          {
-            title: "📋 Choose a new exercise",
-            value: "choose-exercise",
-          },
-          {
-            title: "✅ Finish",
-            value: "finish",
-          },
-        ],
-      },
-    ])
-  );
+  const choice = yield* promptService.selectExerciseAction({
+    result,
+    hasNext: !!nextExerciseToRun,
+    hasPrevious: !!previousExerciseToRun,
+    nextLabel: nextExerciseToRun
+      ? `${nextExerciseToRun.lessonNumber}-${nextExerciseToRun.lessonName} ${nextExerciseToRun.subfolder}`
+      : undefined,
+    previousLabel: previousExerciseToRun
+      ? `${previousExerciseToRun.lessonNumber}-${previousExerciseToRun.lessonName} ${previousExerciseToRun.subfolder}`
+      : undefined,
+    lessonType: isExplainer ? "explainer" : "exercise",
+  });
 
   if (choice === "run-again") {
     return yield* runLesson({
@@ -355,51 +292,6 @@ const logReadmeFile = Effect.fn("logReadmeFile")(
   }
 );
 
-const normalizeExerciseNumber = (str: string): Array<string> => {
-  const variations = new Set<string>();
-
-  // Add original
-  variations.add(str);
-
-  // Check if it contains a dot (format like "02.03")
-  const dotIndex = str.indexOf(".");
-  if (dotIndex !== -1) {
-    const beforeDot = str.slice(0, dotIndex);
-    const afterDot = str.slice(dotIndex + 1);
-
-    // Original with dot: "02.03"
-    variations.add(str);
-
-    // Without dot: "0203"
-    variations.add(beforeDot + afterDot);
-
-    // Remove leading zeros from both parts
-    const beforeDotNoZeros = beforeDot.replace(/^0+/, "") || "0";
-    const afterDotNoZeros = afterDot.replace(/^0+/, "") || "0";
-
-    // Without leading zeros: "2.3"
-    variations.add(`${beforeDotNoZeros}.${afterDotNoZeros}`);
-
-    // Without dot and leading zeros: "23"
-    variations.add(beforeDotNoZeros + afterDotNoZeros);
-
-    // Partial leading zeros: "2.03", "02.3"
-    variations.add(`${beforeDotNoZeros}.${afterDot}`);
-    variations.add(`${beforeDot}.${afterDotNoZeros}`);
-
-    // Without dot, partial leading zeros: "203", "023"
-    variations.add(beforeDotNoZeros + afterDot);
-    variations.add(beforeDot + afterDotNoZeros);
-  } else {
-    // No dot - just remove leading zeros
-    const noZeros = str.replace(/^0+/, "") || "0";
-    variations.add(noZeros);
-    variations.add(str);
-  }
-
-  return Array.from(variations);
-};
-
 const chooseLessonAndRunIt = (opts: {
   root: string;
   envFilePath: string;
@@ -407,45 +299,16 @@ const chooseLessonAndRunIt = (opts: {
 }) =>
   Effect.gen(function* () {
     const lessonService = yield* LessonParserService;
+    const promptService = yield* PromptService;
     const lessons = yield* lessonService.getLessonsFromRepo(
       opts.root
     );
 
     yield* Console.clear;
 
-    const { lesson: lessonNumber } = yield* runPrompt<{
-      lesson: number;
-    }>(() =>
-      prompt([
-        {
-          type: "autocomplete",
-          name: "lesson",
-          message:
-            "Which exercise do you want to run? (type to search)",
-          choices: lessons.map((lesson) => ({
-            title: lesson.path.split("-")[0]!,
-            value: lesson.num,
-            description: lesson.name,
-          })),
-          suggest: async (input, choices) => {
-            return choices.filter((choice) => {
-              const searchText = `${choice.title}-${choice.description}`;
-              // Check exact match first
-              if (searchText.includes(input)) {
-                return true;
-              }
-              // Check fuzzy matches using variations
-              const searchTextVariations =
-                normalizeExerciseNumber(searchText);
-              return searchTextVariations.some(
-                (variation) =>
-                  variation.includes(input) ||
-                  input.includes(variation)
-              );
-            });
-          },
-        },
-      ])
+    const lessonNumber = yield* promptService.selectExercise(
+      lessons,
+      "Which exercise do you want to run? (type to search)"
     );
 
     if (typeof lessonNumber === "undefined") {
@@ -533,6 +396,7 @@ export const exercise = CLICommand.make(
 
 const selectSubfolderIndex = Effect.fn("selectSubfolder")(
   function* (opts: { lesson: Lesson }) {
+    const promptService = yield* PromptService;
     const subfolders = yield* opts.lesson.subfolders();
 
     if (subfolders.length === 0) {
@@ -542,25 +406,12 @@ const selectSubfolderIndex = Effect.fn("selectSubfolder")(
       });
     }
 
-    const result = yield* runPrompt<{
-      subfolderIndex: number;
-    }>(() =>
-      prompt([
-        {
-          type: "select",
-          name: "subfolderIndex",
-          message: "Select a subfolder",
-          choices: subfolders.map((file, index) => ({
-            title: file,
-            value: index,
-          })),
-        },
-      ])
-    );
+    const subfolderIndex =
+      yield* promptService.selectSubfolder(subfolders);
 
     return {
-      subfolderIndex: result.subfolderIndex,
-      subfolder: subfolders[result.subfolderIndex]!,
+      subfolderIndex,
+      subfolder: subfolders[subfolderIndex]!,
     };
   }
 );

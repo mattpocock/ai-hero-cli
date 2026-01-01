@@ -27,7 +27,11 @@ Migrated walk-through.ts to use PromptService:
 - confirmResetWithUncommittedChanges
 - selectWalkThroughAction
 
+Migrated exercise.ts to use PromptService:
+- selectExerciseAction (in runLesson)
+- selectExercise (in chooseLessonAndRunIt)
+- selectSubfolder (in selectSubfolderIndex)
+
 Remaining files to migrate:
-- src/exercise.ts
 - src/cherry-pick.ts
 - src/commit-utils.ts
