@@ -193,3 +193,20 @@ Changes:
   - Confirms state selection prompt is skipped when --solution flag provided
 
 PRD item marked as tested=true.
+
+---
+
+## Session 2026-01-01 (cont. 14)
+
+Added test for PRD: "User resets to problem using --problem flag" (reset user-flow).
+
+Changes:
+- Added test in reset.test.ts that verifies --problem flag behavior:
+  - Mocks all required GitService/PromptService methods
+  - Passes problem=true flag to runReset
+  - Tracks whether selectProblemOrSolution was called (should NOT be)
+  - Mocks getParentCommit to return parent123
+  - Verifies resetHard called with parent commit SHA (parent123)
+  - Confirms state selection prompt is skipped when --problem flag provided
+
+PRD item marked as tested=true.
