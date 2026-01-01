@@ -2,6 +2,7 @@ import { NodeContext } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { fromPartial } from "@total-typescript/shoehorn";
 import { Effect, Layer, Option } from "effect";
+import { CommitNotFoundError } from "../src/commit-utils.js";
 import {
   GitService,
   GitServiceConfig,
@@ -119,6 +120,55 @@ Add upstream remote:
             expect(result.message).toContain(
               "git remote add upstream"
             );
+          }
+        })
+    );
+  });
+
+  describe("PRD: User requests non-existent lesson", () => {
+    it.effect(
+      "should fail with CommitNotFoundError for non-existent lesson",
+      () =>
+        Effect.gen(function* () {
+          const mockGitService = fromPartial<GitService>({
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(
+              function* () {}
+            ),
+            ensureUpstreamBranchConnected: Effect.fn(
+              "ensureUpstreamBranchConnected"
+            )(function* (_opts: { targetBranch: string }) {}),
+            getLogOneline: Effect.fn("getLogOneline")(function* (
+              _branch: string
+            ) {
+              // Only has lesson 01.02.03
+              return `def5678 01.02.03 Add new feature`;
+            }),
+          });
+
+          const mockPromptService = fromPartial<PromptService>({});
+
+          const testLayer = Layer.mergeAll(
+            Layer.succeed(GitService, mockGitService),
+            Layer.succeed(PromptService, mockPromptService),
+            Layer.succeed(GitServiceConfig, {
+              cwd: "/test/repo",
+            }),
+            NodeContext.layer
+          );
+
+          // Request lesson 99.99.99 which doesn't exist
+          const result = yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.some("99.99.99"),
+            problem: false,
+            solution: false,
+            demo: false,
+          }).pipe(Effect.provide(testLayer), Effect.flip);
+
+          expect(result).toBeInstanceOf(CommitNotFoundError);
+          if (result instanceof CommitNotFoundError) {
+            expect(result.lessonId).toBe("99.99.99");
+            expect(result.branch).toBe("live-run-through");
           }
         })
     );

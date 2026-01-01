@@ -357,7 +357,7 @@
     "command": "reset",
     "category": "error",
     "description": "User requests non-existent lesson",
-    "tested": false,
+    "tested": true,
     "steps": [
       "User runs `ai-hero reset 99.99.99`",
       "System fetches upstream branch",

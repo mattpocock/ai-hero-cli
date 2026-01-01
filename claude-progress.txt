@@ -79,3 +79,16 @@ Changes:
 - Added NoUpstreamFoundError import to reset.test.ts
 
 PRD item marked as tested=true.
+
+---
+
+## Session 2026-01-01 (cont. 6)
+
+Added test for PRD: "User requests non-existent lesson" (reset error case).
+
+Changes:
+- Added test in reset.test.ts that mocks getLogOneline to return commits without the requested lesson ID
+- Verified runReset propagates CommitNotFoundError with lessonId and branch
+- Added CommitNotFoundError import to reset.test.ts
+
+PRD item marked as tested=true.
