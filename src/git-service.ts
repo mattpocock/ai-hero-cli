@@ -541,6 +541,38 @@ Add upstream remote:
           );
         }),
 
+        /**
+         * Creates and switches to a new branch at a specific commit (git checkout -b <name> <sha>).
+         * Unlike checkoutNewBranch which creates at HEAD, this creates the branch
+         * at an arbitrary commit position.
+         *
+         * @param branchName - The name of the new branch to create
+         * @param sha - The commit SHA where the branch should be created
+         * @returns Effect that succeeds when branch is created and checked out
+         * @throws FailedToCreateBranchError if branch creation fails (e.g., branch already exists)
+         */
+        checkoutNewBranchAt: Effect.fn("checkoutNewBranchAt")(function* (
+          branchName: string,
+          sha: string
+        ) {
+          const exitCode = yield* runCommandWithExitCode(
+            "git",
+            "checkout",
+            "-b",
+            branchName,
+            sha
+          );
+
+          if (exitCode !== 0) {
+            return yield* Effect.fail(
+              new FailedToCreateBranchError({
+                branchName,
+                message: `Failed to create branch ${branchName} at ${sha} (exit code: ${exitCode})`,
+              })
+            );
+          }
+        }),
+
         ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(
           function* () {
             const cwd = config.cwd;

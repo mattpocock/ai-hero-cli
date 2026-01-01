@@ -214,20 +214,7 @@ export const reset = CLICommand.make(
           `Creating branch ${branchName} from ${commitToUse} (${stateDescription})...`
         );
 
-        const createBranchExitCode =
-          yield* git.runCommandWithExitCode(
-            "git",
-            "checkout",
-            "-b",
-            branchName,
-            commitToUse
-          );
-
-        if (createBranchExitCode !== 0) {
-          yield* Console.error("Failed to create branch");
-          process.exitCode = 1;
-          return;
-        }
+        yield* git.checkoutNewBranchAt(branchName, commitToUse);
 
         yield* Console.log(
           `✓ Created and checked out branch: ${branchName}`
@@ -272,18 +259,7 @@ export const reset = CLICommand.make(
         `Resetting to ${commitToUse} (${stateDescription})...`
       );
 
-      const resetExitCode = yield* git.runCommandWithExitCode(
-        "git",
-        "reset",
-        "--hard",
-        commitToUse
-      );
-
-      if (resetExitCode !== 0) {
-        yield* Console.error("Failed to reset");
-        process.exitCode = 1;
-        return;
-      }
+      yield* git.resetHard(commitToUse);
 
       // Demo mode: undo commit and unstage changes
       if (demo) {
@@ -291,31 +267,8 @@ export const reset = CLICommand.make(
           "Undoing commit and unstaging changes..."
         );
 
-        const undoExitCode = yield* git.runCommandWithExitCode(
-          "git",
-          "reset",
-          "HEAD^"
-        );
-
-        if (undoExitCode !== 0) {
-          yield* Console.error("Failed to undo commit");
-          process.exitCode = 1;
-          return;
-        }
-
-        const unstageExitCode =
-          yield* git.runCommandWithExitCode(
-            "git",
-            "restore",
-            "--staged",
-            "."
-          );
-
-        if (unstageExitCode !== 0) {
-          yield* Console.error("Failed to unstage changes");
-          process.exitCode = 1;
-          return;
-        }
+        yield* git.resetHead();
+        yield* git.restoreStaged();
 
         yield* Console.log(
           `✓ Demo mode: Reset to lesson ${selectedLessonId} with unstaged changes`
@@ -366,6 +319,18 @@ export const reset = CLICommand.make(
           return Effect.succeed(void 0);
         },
         InvalidBranchOperationError: (error) => {
+          return Effect.gen(function* () {
+            yield* Console.error(`Error: ${error.message}`);
+            process.exitCode = 1;
+          });
+        },
+        FailedToCreateBranchError: (error) => {
+          return Effect.gen(function* () {
+            yield* Console.error(`Error: ${error.message}`);
+            process.exitCode = 1;
+          });
+        },
+        FailedToResetError: (error) => {
           return Effect.gen(function* () {
             yield* Console.error(`Error: ${error.message}`);
             process.exitCode = 1;

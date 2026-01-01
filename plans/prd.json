@@ -64,7 +64,7 @@
       "Update reset.ts to use GitService instead of Command",
       "Run pnpm typecheck to verify no errors"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "cherry-pick",
