@@ -59,6 +59,7 @@
     "service": "PromptService",
     "method": "selectProblemOrSolution",
     "category": "behavior",
+    "status": "DONE",
     "description": "Prompts user to select problem or solution state for reset",
     "steps": [
       "Displays select prompt with 2 options",

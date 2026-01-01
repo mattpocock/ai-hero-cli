@@ -112,11 +112,40 @@ export class PromptService extends Effect.Service<PromptService>()(
         return action;
       });
 
+      /**
+       * Prompts user to select problem or solution state for reset.
+       *
+       * @returns 'problem' | 'solution'
+       * @throws PromptCancelledError if user presses Ctrl+C
+       */
+      const selectProblemOrSolution = Effect.fn("selectProblemOrSolution")(
+        function* () {
+          const { action } = yield* runPrompt<{
+            action: "problem" | "solution";
+          }>(() =>
+            prompt([
+              {
+                type: "select",
+                name: "action",
+                message: "What would you like to do?",
+                choices: [
+                  { title: "Start the exercise", value: "problem" },
+                  { title: "View final code", value: "solution" },
+                ],
+              },
+            ])
+          );
+
+          return action;
+        }
+      );
+
       return {
         confirmReadyToCommit,
         confirmSaveToTargetBranch,
         confirmForcePush,
         selectCherryPickConflictAction,
+        selectProblemOrSolution,
       };
     }),
     dependencies: [],
