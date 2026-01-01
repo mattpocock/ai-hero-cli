@@ -2,6 +2,55 @@ import { Effect } from "effect";
 import { prompt } from "prompts";
 import { PromptCancelledError, runPrompt } from "./prompt-utils.js";
 
+/**
+ * Normalizes exercise numbers for fuzzy matching.
+ * Generates variations like "02.03" -> ["02.03", "0203", "2.3", "23", etc.]
+ */
+const normalizeExerciseNumber = (str: string): Array<string> => {
+  const variations = new Set<string>();
+
+  // Add original
+  variations.add(str);
+
+  // Check if it contains a dot (format like "02.03")
+  const dotIndex = str.indexOf(".");
+  if (dotIndex !== -1) {
+    const beforeDot = str.slice(0, dotIndex);
+    const afterDot = str.slice(dotIndex + 1);
+
+    // Original with dot: "02.03"
+    variations.add(str);
+
+    // Without dot: "0203"
+    variations.add(beforeDot + afterDot);
+
+    // Remove leading zeros from both parts
+    const beforeDotNoZeros = beforeDot.replace(/^0+/, "") || "0";
+    const afterDotNoZeros = afterDot.replace(/^0+/, "") || "0";
+
+    // Without leading zeros: "2.3"
+    variations.add(`${beforeDotNoZeros}.${afterDotNoZeros}`);
+
+    // Without dot and leading zeros: "23"
+    variations.add(beforeDotNoZeros + afterDotNoZeros);
+
+    // Partial leading zeros: "2.03", "02.3"
+    variations.add(`${beforeDotNoZeros}.${afterDot}`);
+    variations.add(`${beforeDot}.${afterDotNoZeros}`);
+
+    // Without dot, partial leading zeros: "203", "023"
+    variations.add(beforeDotNoZeros + afterDot);
+    variations.add(beforeDot + afterDotNoZeros);
+  } else {
+    // No dot - just remove leading zeros
+    const noZeros = str.replace(/^0+/, "") || "0";
+    variations.add(noZeros);
+    variations.add(str);
+  }
+
+  return Array.from(variations);
+};
+
 export class PromptService extends Effect.Service<PromptService>()(
   "PromptService",
   {
@@ -275,6 +324,54 @@ export class PromptService extends Effect.Service<PromptService>()(
         return lesson;
       });
 
+      /**
+       * Autocomplete prompt for selecting an exercise.
+       *
+       * @param lessons - Array of lessons with num, name, and path
+       * @param promptMessage - Custom prompt message to display
+       * @returns The selected lesson number (index)
+       * @throws PromptCancelledError if user presses Ctrl+C
+       */
+      const selectExercise = Effect.fn("selectExercise")(function* (
+        lessons: Array<{ num: number; name: string; path: string }>,
+        promptMessage: string
+      ) {
+        const { lesson } = yield* runPrompt<{ lesson: number }>(() =>
+          prompt([
+            {
+              type: "autocomplete",
+              name: "lesson",
+              message: promptMessage,
+              choices: lessons.map((l) => ({
+                title: l.path.split("-")[0]!,
+                value: l.num,
+                description: l.name,
+              })),
+              suggest: async (
+                input: string,
+                choices: Array<{ title: string; value: number; description: string }>
+              ) => {
+                return choices.filter((choice) => {
+                  const searchText = `${choice.title}-${choice.description}`;
+                  // Check exact match first
+                  if (searchText.includes(input)) {
+                    return true;
+                  }
+                  // Check fuzzy matches using variations
+                  const searchTextVariations = normalizeExerciseNumber(searchText);
+                  return searchTextVariations.some(
+                    (variation) =>
+                      variation.includes(input) || input.includes(variation)
+                  );
+                });
+              },
+            },
+          ])
+        );
+
+        return lesson;
+      });
+
       return {
         confirmReadyToCommit,
         confirmSaveToTargetBranch,
@@ -285,6 +382,7 @@ export class PromptService extends Effect.Service<PromptService>()(
         confirmResetWithUncommittedChanges,
         inputBranchName,
         selectLessonCommit,
+        selectExercise,
       };
     }),
     dependencies: [],

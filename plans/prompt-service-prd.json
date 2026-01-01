@@ -131,6 +131,7 @@
     "service": "PromptService",
     "method": "selectExercise",
     "category": "behavior",
+    "status": "DONE",
     "description": "Autocomplete prompt for selecting an exercise",
     "steps": [
       "Method receives array of lessons with num, name, and path",
