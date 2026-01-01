@@ -325,6 +325,32 @@ export class PromptService extends Effect.Service<PromptService>()(
       });
 
       /**
+       * Warns about uncommitted changes in walk-through.
+       * Default is false (no) for safety.
+       *
+       * @throws PromptCancelledError if user declines or cancels
+       */
+      const confirmProceedWithUncommittedChanges = Effect.fn(
+        "confirmProceedWithUncommittedChanges"
+      )(function* () {
+        const { confirm } = yield* runPrompt<{ confirm: boolean }>(() =>
+          prompt([
+            {
+              type: "confirm",
+              name: "confirm",
+              message:
+                "You have uncommitted changes. Continuing will lose them. Proceed?",
+              initial: false,
+            },
+          ])
+        );
+
+        if (!confirm) {
+          return yield* new PromptCancelledError();
+        }
+      });
+
+      /**
        * Autocomplete prompt for selecting an exercise.
        *
        * @param lessons - Array of lessons with num, name, and path
@@ -383,6 +409,7 @@ export class PromptService extends Effect.Service<PromptService>()(
         inputBranchName,
         selectLessonCommit,
         selectExercise,
+        confirmProceedWithUncommittedChanges,
       };
     }),
     dependencies: [],

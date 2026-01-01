@@ -147,6 +147,7 @@
     "service": "PromptService",
     "method": "confirmProceedWithUncommittedChanges",
     "category": "behavior",
+    "status": "DONE",
     "description": "Warns about uncommitted changes in walk-through",
     "steps": [
       "Displays: 'You have uncommitted changes. Continuing will lose them. Proceed?'",

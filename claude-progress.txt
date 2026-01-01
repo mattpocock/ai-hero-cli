@@ -5,3 +5,4 @@ PromptService: implemented confirmResetWithUncommittedChanges
 PromptService: implemented inputBranchName
 PromptService: implemented selectLessonCommit
 PromptService: implemented selectExercise
+PromptService: implemented confirmProceedWithUncommittedChanges
