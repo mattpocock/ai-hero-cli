@@ -1,5 +1,5 @@
 import { Command as CLICommand, Options } from "@effect/cli";
-import { FileSystem } from "@effect/platform";
+import { Command, FileSystem } from "@effect/platform";
 import { Console, Data, Effect } from "effect";
 import { existsSync } from "node:fs";
 import * as path from "node:path";
@@ -116,7 +116,9 @@ export const getDiffs = CLICommand.make(
       // Phase 2: Retrieve commit history
       yield* Console.log("\nRetrieving commit history...");
 
-      const commitHistory = yield* git.getLogOnelineReverse(branch);
+      const commitHistory = yield* git.getLogOnelineReverse(
+        branch
+      );
 
       // Parse commits: format is "SHA message"
       type ParsedCommit = {

@@ -12,6 +12,11 @@ import type { PromptCancelledError } from "../prompt-utils.js";
 import { runPrompt } from "../prompt-utils.js";
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "../constants.js";
 import { GitService } from "../git-service.js";
+import type { CommandExecutor } from "@effect/platform";
+import type {
+  BadArgument,
+  SystemError,
+} from "@effect/platform/Error";
 
 export class NotAGitRepoError extends Data.TaggedError(
   "NotAGitRepoError"
@@ -109,10 +114,11 @@ export const editCommit = CLICommand.make(
       );
 
       // Count following commits on target branch
-      const followingCommitCount = yield* gitService.revListCount(
-        targetSha,
-        `origin/${branch}`
-      );
+      const followingCommitCount =
+        yield* gitService.revListCount(
+          targetSha,
+          `origin/${branch}`
+        );
 
       if (followingCommitCount === 0) {
         yield* Console.log(
@@ -131,12 +137,14 @@ export const editCommit = CLICommand.make(
         `Resetting to ${targetSha} (${selectedLessonId})...`
       );
 
-      const resetResult = yield* gitService.resetHard(targetSha).pipe(
-        Effect.catchTag("FailedToResetError", () =>
-          Effect.succeed({ failed: true as const })
-        ),
-        Effect.map(() => ({ failed: false as const }))
-      );
+      const resetResult = yield* gitService
+        .resetHard(targetSha)
+        .pipe(
+          Effect.catchTag("FailedToResetError", () =>
+            Effect.succeed({ failed: true as const })
+          ),
+          Effect.map(() => ({ failed: false as const }))
+        );
 
       if (resetResult.failed) {
         yield* Console.error("Failed to reset");
@@ -187,12 +195,14 @@ export const editCommit = CLICommand.make(
       // Add all files and commit
       yield* gitService.stageAll();
 
-      const commitResult = yield* gitService.commit(originalMessage).pipe(
-        Effect.catchTag("FailedToCommitError", () =>
-          Effect.succeed({ failed: true as const })
-        ),
-        Effect.map(() => ({ failed: false as const }))
-      );
+      const commitResult = yield* gitService
+        .commit(originalMessage)
+        .pipe(
+          Effect.catchTag("FailedToCommitError", () =>
+            Effect.succeed({ failed: true as const })
+          ),
+          Effect.map(() => ({ failed: false as const }))
+        );
 
       if (commitResult.failed) {
         return yield* Effect.fail(
@@ -270,12 +280,14 @@ export const editCommit = CLICommand.make(
         `Switching to ${branch} and applying changes...`
       );
 
-      const checkoutResult = yield* gitService.checkout(branch).pipe(
-        Effect.catchTag("FailedToCheckoutError", () =>
-          Effect.succeed({ failed: true as const })
-        ),
-        Effect.map(() => ({ failed: false as const }))
-      );
+      const checkoutResult = yield* gitService
+        .checkout(branch)
+        .pipe(
+          Effect.catchTag("FailedToCheckoutError", () =>
+            Effect.succeed({ failed: true as const })
+          ),
+          Effect.map(() => ({ failed: false as const }))
+        );
 
       if (checkoutResult.failed) {
         yield* Console.error(
@@ -285,12 +297,14 @@ export const editCommit = CLICommand.make(
         return;
       }
 
-      const resetToCurrentResult = yield* gitService.resetHard(currentBranch).pipe(
-        Effect.catchTag("FailedToResetError", () =>
-          Effect.succeed({ failed: true as const })
-        ),
-        Effect.map(() => ({ failed: false as const }))
-      );
+      const resetToCurrentResult = yield* gitService
+        .resetHard(currentBranch)
+        .pipe(
+          Effect.catchTag("FailedToResetError", () =>
+            Effect.succeed({ failed: true as const })
+          ),
+          Effect.map(() => ({ failed: false as const }))
+        );
 
       if (resetToCurrentResult.failed) {
         yield* Console.error(
@@ -351,9 +365,14 @@ export const editCommit = CLICommand.make(
       yield* Console.log(
         `Switching back to ${currentBranch}...`
       );
-      yield* gitService.checkout(currentBranch).pipe(
-        Effect.catchTag("FailedToCheckoutError", () => Effect.void)
-      );
+      yield* gitService
+        .checkout(currentBranch)
+        .pipe(
+          Effect.catchTag(
+            "FailedToCheckoutError",
+            () => Effect.void
+          )
+        );
 
       yield* Console.log(`✓ Switched back to ${currentBranch}`);
     }).pipe(
@@ -403,7 +422,11 @@ export const editCommit = CLICommand.make(
 // Recursive conflict resolution loop
 function resolveConflictLoop(
   gitService: GitService
-): Effect.Effect<void, PromptCancelledError> {
+): Effect.Effect<
+  void,
+  PromptCancelledError | BadArgument | SystemError,
+  CommandExecutor.CommandExecutor
+> {
   return Effect.gen(function* () {
     // Show git status
     const status = yield* gitService.getStatusShort();

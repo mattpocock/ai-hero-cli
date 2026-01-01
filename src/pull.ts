@@ -1,11 +1,6 @@
 import { Command as CLICommand } from "@effect/cli";
 import { Console, Data, Effect } from "effect";
-import {
-  FailedToFetchError,
-  GitService,
-  GitServiceConfig,
-  MergeConflictError,
-} from "./git-service.js";
+import { GitService, GitServiceConfig } from "./git-service.js";
 import { cwdOption } from "./options.js";
 
 export class InvalidBranchOperationError extends Data.TaggedError(
@@ -113,4 +108,8 @@ export const pull = CLICommand.make(
         });
       })
     )
-).pipe(CLICommand.withDescription("Pull latest changes from upstream main"));
+).pipe(
+  CLICommand.withDescription(
+    "Pull latest changes from upstream main"
+  )
+);

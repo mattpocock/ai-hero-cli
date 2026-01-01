@@ -1,6 +1,6 @@
 {
   "extends": "./tsconfig.base.json",
-  "include": ["src", "test/lesson-parser-service.test.ts"],
+  "include": ["src"],
   "compilerOptions": {
     "types": ["node"],
     "tsBuildInfoFile": ".tsbuildinfo/src.tsbuildinfo",

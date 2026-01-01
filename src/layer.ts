@@ -4,7 +4,7 @@ import { GitService } from "./git-service.js";
 import { LessonParserService } from "./lesson-parser-service.js";
 
 export const layerLive = Layer.mergeAll(
+  NodeContext.layer,
   GitService.Default,
-  LessonParserService.Default,
-  NodeContext.layer
+  LessonParserService.Default
 );
