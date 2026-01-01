@@ -1,0 +1,217 @@
+[
+  {
+    "id": "edit-commit-part1",
+    "category": "refactor",
+    "description": "Extract fetch, status, and ref commands from edit-commit.ts to git-service",
+    "steps": [
+      "Add fetchOrigin() method with FailedToFetchOriginError and JSDoc explaining git fetch origin behavior",
+      "Add revParse(ref) method with InvalidRefError and JSDoc explaining ref resolution",
+      "Add revListCount(from, to) method with JSDoc explaining commit counting between refs",
+      "Add getStatusShort() method with JSDoc explaining short status format output",
+      "Update edit-commit.ts to use these GitService methods instead of Command",
+      "Run pnpm typecheck to verify no errors"
+    ],
+    "passes": false
+  },
+  {
+    "id": "edit-commit-part2",
+    "category": "refactor",
+    "description": "Extract reset, staging, and commit commands from edit-commit.ts to git-service",
+    "steps": [
+      "Add resetHard(sha) method with FailedToResetError and JSDoc explaining hard reset behavior and data loss risks",
+      "Add resetHead() method with JSDoc explaining soft reset of last commit (git reset HEAD^)",
+      "Add restoreStaged() method with JSDoc explaining unstaging all files (git restore --staged .)",
+      "Add stageAll() method with JSDoc explaining staging all changes (git add .)",
+      "Add commit(message) method with FailedToCommitError and JSDoc explaining commit creation",
+      "Update edit-commit.ts to use these GitService methods instead of Command",
+      "Run pnpm typecheck to verify no errors"
+    ],
+    "passes": false
+  },
+  {
+    "id": "edit-commit-part3",
+    "category": "refactor",
+    "description": "Extract cherry-pick, checkout, and push commands from edit-commit.ts to git-service",
+    "steps": [
+      "Add cherryPick(sha) method with CherryPickConflictError and JSDoc explaining cherry-pick behavior and conflict scenarios",
+      "Add cherryPickContinue() method with JSDoc explaining how to continue after conflict resolution",
+      "Add cherryPickAbort() method with JSDoc explaining how to abort and restore pre-cherry-pick state",
+      "Add checkout(branch) method with FailedToCheckoutError and JSDoc explaining branch switching",
+      "Add pushForceWithLease(remote, branch) method with FailedToPushError and JSDoc explaining force-with-lease safety vs force",
+      "Update edit-commit.ts to use these GitService methods instead of Command",
+      "Run pnpm typecheck to verify no errors"
+    ],
+    "passes": false
+  },
+  {
+    "id": "walk-through",
+    "category": "refactor",
+    "description": "Extract git commands from walk-through.ts to git-service",
+    "steps": [
+      "Add checkoutNewBranch(branchName) method with FailedToCreateBranchError and JSDoc explaining branch creation (git checkout -b)",
+      "Add getLogOnelineReverse(range) method with JSDoc explaining reversed commit log format and range syntax",
+      "Update walk-through.ts to use GitService instead of Command",
+      "Run pnpm typecheck to verify no errors"
+    ],
+    "passes": false
+  },
+  {
+    "id": "reset",
+    "category": "refactor",
+    "description": "Extract git commands from reset.ts to git-service",
+    "steps": [
+      "Add checkoutNewBranchAt(branchName, sha) method with JSDoc explaining branch creation at specific commit (git checkout -b <name> <sha>)",
+      "Update reset.ts to use GitService instead of Command",
+      "Run pnpm typecheck to verify no errors"
+    ],
+    "passes": false
+  },
+  {
+    "id": "cherry-pick",
+    "category": "refactor",
+    "description": "Extract git commands from cherry-pick.ts to git-service",
+    "steps": [
+      "Update cherry-pick.ts to use GitService.checkoutNewBranch",
+      "Update cherry-pick.ts to use GitService.cherryPick",
+      "Run pnpm typecheck to verify no errors"
+    ],
+    "dependencies": ["edit-commit-part3", "walk-through"],
+    "passes": false
+  },
+  {
+    "id": "pull",
+    "category": "refactor",
+    "description": "Extract git commands from pull.ts to git-service",
+    "steps": [
+      "Add fetch(remote, branch) method with JSDoc explaining remote fetch behavior and ref updates",
+      "Add merge(ref) method with MergeConflictError and JSDoc explaining merge behavior and conflict scenarios",
+      "Update pull.ts to use GitService instead of Command",
+      "Run pnpm typecheck to verify no errors"
+    ],
+    "passes": false
+  },
+  {
+    "id": "rebase-to-main",
+    "category": "refactor",
+    "description": "Extract git commands from rebase-to-main.ts to git-service",
+    "steps": [
+      "Add rebase(onto) method with RebaseConflictError and JSDoc explaining rebase behavior, conflict handling, and history rewriting implications",
+      "Update rebase-to-main.ts to use GitService instead of Command",
+      "Run pnpm typecheck to verify no errors"
+    ],
+    "dependencies": ["edit-commit-part3"],
+    "passes": false
+  },
+  {
+    "id": "commit-utils",
+    "category": "refactor",
+    "description": "Extract git commands from commit-utils.ts to git-service",
+    "steps": [
+      "Add getLogOneline(branch) method with JSDoc explaining oneline log format and branch parameter",
+      "Add getParentCommit(sha) method with NoParentCommitError and JSDoc explaining parent ref syntax (sha^)",
+      "Update commit-utils.ts to use GitService instead of Command",
+      "Run pnpm typecheck to verify no errors"
+    ],
+    "passes": false
+  },
+  {
+    "id": "get-diffs",
+    "category": "refactor",
+    "description": "Extract git commands from get-diffs.ts to git-service",
+    "steps": [
+      "Update get-diffs.ts to use GitService.fetchOrigin",
+      "Update get-diffs.ts to use GitService.getLogOnelineReverse",
+      "Run pnpm typecheck to verify no errors"
+    ],
+    "dependencies": ["edit-commit-part1", "walk-through"],
+    "passes": false
+  },
+  {
+    "id": "diffs-to-repo",
+    "category": "refactor",
+    "description": "Extract git commands from diffs-to-repo.ts to git-service",
+    "steps": [
+      "Update diffs-to-repo.ts to use GitService.fetchOrigin",
+      "Update diffs-to-repo.ts to use GitService.getLogOnelineReverse",
+      "Run pnpm typecheck to verify no errors"
+    ],
+    "dependencies": ["edit-commit-part1", "walk-through"],
+    "passes": false
+  },
+  {
+    "id": "test-fetch-status-ref",
+    "category": "test",
+    "description": "Add unit tests for fetch, status, and ref git-service methods",
+    "steps": [
+      "Create src/git-service.test.ts if not exists",
+      "Add tests for fetchOrigin() with mocked Command",
+      "Add tests for revParse() including InvalidRefError case",
+      "Add tests for revListCount() with various ranges",
+      "Add tests for getStatusShort() output parsing",
+      "Run pnpm test to verify tests pass"
+    ],
+    "dependencies": ["edit-commit-part1", "get-diffs", "diffs-to-repo"],
+    "passes": false
+  },
+  {
+    "id": "test-reset-staging-commit",
+    "category": "test",
+    "description": "Add unit tests for reset, staging, and commit git-service methods",
+    "steps": [
+      "Add tests for resetHard() including FailedToResetError case",
+      "Add tests for resetHead()",
+      "Add tests for restoreStaged()",
+      "Add tests for stageAll()",
+      "Add tests for commit() including FailedToCommitError case",
+      "Run pnpm test to verify tests pass"
+    ],
+    "dependencies": ["edit-commit-part2", "walk-through", "reset"],
+    "passes": false
+  },
+  {
+    "id": "test-cherry-pick-checkout-push",
+    "category": "test",
+    "description": "Add unit tests for cherry-pick, checkout, and push git-service methods",
+    "steps": [
+      "Add tests for cherryPick() including CherryPickConflictError case",
+      "Add tests for cherryPickContinue()",
+      "Add tests for cherryPickAbort()",
+      "Add tests for checkout() including FailedToCheckoutError case",
+      "Add tests for checkoutNewBranch() including FailedToCreateBranchError case",
+      "Add tests for checkoutNewBranchAt()",
+      "Add tests for pushForceWithLease() including FailedToPushError case",
+      "Run pnpm test to verify tests pass"
+    ],
+    "dependencies": ["edit-commit-part3", "cherry-pick", "rebase-to-main"],
+    "passes": false
+  },
+  {
+    "id": "test-log-merge-rebase",
+    "category": "test",
+    "description": "Add unit tests for log, merge, and rebase git-service methods",
+    "steps": [
+      "Add tests for getLogOneline() output parsing",
+      "Add tests for getLogOnelineReverse() output parsing",
+      "Add tests for getParentCommit() including NoParentCommitError case",
+      "Add tests for fetch(remote, branch)",
+      "Add tests for merge() including MergeConflictError case",
+      "Add tests for rebase() including RebaseConflictError case",
+      "Run pnpm test to verify tests pass"
+    ],
+    "dependencies": ["commit-utils", "pull", "rebase-to-main"],
+    "passes": false
+  },
+  {
+    "id": "remove-generic-helpers",
+    "category": "refactor",
+    "description": "Remove exposed runCommandWithExitCode and runCommandWithString from git-service public API",
+    "steps": [
+      "Make runCommandWithExitCode private (internal only)",
+      "Make runCommandWithString private (internal only)",
+      "Update any external usages to use named methods",
+      "Run pnpm typecheck to verify no errors"
+    ],
+    "dependencies": ["edit-commit-part1", "edit-commit-part2", "edit-commit-part3", "walk-through", "reset", "cherry-pick", "pull", "rebase-to-main", "commit-utils", "get-diffs", "diffs-to-repo"],
+    "passes": false
+  }
+]
