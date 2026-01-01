@@ -1,5 +1,22 @@
 # Claude Progress Log
 
+## 2026-01-01: remove-generic-helpers
+
+Completed refactor to remove exposed runCommandWithExitCode and runCommandWithString from git-service public API.
+
+### Changes made:
+
+**src/git-service.ts:**
+- Removed `runCommandWithExitCode` from public API export (line 826)
+- Removed `runCommandWithString` from public API export (line 827)
+- Both functions remain as internal helpers used by named methods
+
+### Verification:
+- pnpm typecheck: passed
+- pnpm test: passed (4 tests)
+
+---
+
 ## 2026-01-01: diffs-to-repo
 
 Completed refactor to extract git commands from diffs-to-repo.ts to git-service.

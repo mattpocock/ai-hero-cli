@@ -823,8 +823,6 @@ Add upstream remote:
             return currentBranch;
           }
         ),
-        runCommandWithExitCode,
-        runCommandWithString,
         detectUpstreamRemote,
       };
     }),
