@@ -177,3 +177,19 @@ Changes:
   - Verifies resetHard called with parent commit SHA (parent123), not solution commit
 
 PRD item marked as tested=true.
+
+---
+
+## Session 2026-01-01 (cont. 13)
+
+Added test for PRD: "User resets to solution using --solution flag" (reset user-flow).
+
+Changes:
+- Added test in reset.test.ts that verifies --solution flag behavior:
+  - Mocks all required GitService/PromptService methods
+  - Passes solution=true flag to runReset
+  - Tracks whether selectProblemOrSolution was called (should NOT be)
+  - Verifies resetHard called with solution commit SHA (abc1234)
+  - Confirms state selection prompt is skipped when --solution flag provided
+
+PRD item marked as tested=true.

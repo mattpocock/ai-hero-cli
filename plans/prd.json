@@ -211,7 +211,7 @@
     "command": "reset",
     "category": "user-flow",
     "description": "User resets to solution using --solution flag",
-    "tested": false,
+    "tested": true,
     "steps": [
       "User runs `ai-hero reset 01.02.03 --solution`",
       "System skips state selection prompt",
