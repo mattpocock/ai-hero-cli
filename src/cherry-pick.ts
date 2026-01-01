@@ -11,13 +11,6 @@ import { cwdOption } from "./options.js";
 import { runPrompt } from "./prompt-utils.js";
 import prompt from "prompts";
 
-export class NotAGitRepoError extends Data.TaggedError(
-  "NotAGitRepoError"
-)<{
-  path: string;
-  message: string;
-}> {}
-
 export class InvalidBranchOperationError extends Data.TaggedError(
   "InvalidBranchOperationError"
 )<{
@@ -90,19 +83,7 @@ export const cherryPick = CLICommand.make(
           ]);
         });
 
-        const createBranchExitCode =
-          yield* git.runCommandWithExitCode(
-            "git",
-            "checkout",
-            "-b",
-            branchName
-          );
-
-        if (createBranchExitCode !== 0) {
-          return yield* new InvalidBranchOperationError({
-            message: `Failed to create branch`,
-          });
-        }
+        yield* git.checkoutNewBranch(branchName);
 
         yield* Console.log(
           `✓ Created and switched to ${branchName}`
@@ -113,18 +94,7 @@ export const cherryPick = CLICommand.make(
         `Cherry-picking ${targetCommit.sha} onto current branch...\n`
       );
 
-      // Execute git cherry-pick with inherited stdio
-      const cherryPickExitCode =
-        yield* git.runCommandWithExitCode(
-          "git",
-          "cherry-pick",
-          targetCommit.sha
-        );
-
-      if (cherryPickExitCode !== 0) {
-        process.exitCode = 1;
-        return;
-      }
+      yield* git.cherryPick(targetCommit.sha);
 
       yield* Console.log(
         `\n✓ Successfully cherry-picked lesson ${selectedLessonId}`
@@ -158,6 +128,18 @@ export const cherryPick = CLICommand.make(
           });
         },
         InvalidBranchOperationError: (error) => {
+          return Effect.gen(function* () {
+            yield* Console.error(`Error: ${error.message}`);
+            process.exitCode = 1;
+          });
+        },
+        FailedToCreateBranchError: (error) => {
+          return Effect.gen(function* () {
+            yield* Console.error(`Error: ${error.message}`);
+            process.exitCode = 1;
+          });
+        },
+        CherryPickConflictError: (error) => {
           return Effect.gen(function* () {
             yield* Console.error(`Error: ${error.message}`);
             process.exitCode = 1;

@@ -1,5 +1,23 @@
 # Claude Progress Log
 
+## 2026-01-01: cherry-pick
+
+Completed refactor to extract git commands from cherry-pick.ts to git-service.
+
+### Changes made:
+
+**src/cherry-pick.ts:**
+- Replaced `git.runCommandWithExitCode("git", "checkout", "-b", branchName)` with `git.checkoutNewBranch()`
+- Replaced `git.runCommandWithExitCode("git", "cherry-pick", sha)` with `git.cherryPick()`
+- Removed duplicate local `NotAGitRepoError` class (already in git-service)
+- Added error handlers for `FailedToCreateBranchError` and `CherryPickConflictError`
+
+### Verification:
+- pnpm typecheck: passed
+- pnpm test: passed (4 tests)
+
+---
+
 ## 2026-01-01: reset
 
 Completed refactor to extract git commands from reset.ts to git-service.
