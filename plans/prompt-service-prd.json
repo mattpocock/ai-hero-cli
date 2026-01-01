@@ -245,17 +245,16 @@
     "service": "PromptService",
     "method": "*",
     "category": "migration-tracking",
-    "status": "IN_PROGRESS",
+    "status": "DONE",
     "description": "Track files migrated from runPrompt to PromptService",
     "migratedFiles": [
       "src/internal/edit-commit.ts",
       "src/reset.ts",
       "src/internal/walk-through.ts",
       "src/exercise.ts",
-      "src/cherry-pick.ts"
-    ],
-    "remainingFiles": [
+      "src/cherry-pick.ts",
       "src/commit-utils.ts"
-    ]
+    ],
+    "remainingFiles": []
   }
 ]

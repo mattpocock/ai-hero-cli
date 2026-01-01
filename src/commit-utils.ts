@@ -1,7 +1,6 @@
 import { Console, Data, Effect, Option } from "effect";
-import prompt from "prompts";
 import { GitService, NoParentCommitError } from "./git-service.js";
-import { runPrompt } from "./prompt-utils.js";
+import { PromptService } from "./prompt-service.js";
 
 export { NoParentCommitError };
 
@@ -72,6 +71,7 @@ export const selectLessonCommit = ({
 }) =>
   Effect.gen(function* () {
     const gitService = yield* GitService;
+    const promptService = yield* PromptService;
 
     // Search commit history for lesson ID
     let commits: Array<ParsedCommit>;
@@ -131,32 +131,13 @@ export const selectLessonCommit = ({
       });
 
       // Prompt user to select a commit
-      const { lesson } = yield* runPrompt<{
-        lesson: string;
-      }>(() =>
-        prompt([
-          {
-            type: "autocomplete",
-            name: "lesson",
-            message: promptMessage,
-            choices: sortedCommits.map((commit) => ({
-              title: commit.lessonId!,
-              value: commit.lessonId!,
-              description: commit.message,
-            })),
-            suggest: async (input, choices) => {
-              return choices.filter((choice) => {
-                const searchText = `${choice.title} ${choice.description}`;
-                return searchText
-                  .toLowerCase()
-                  .includes(input.toLowerCase());
-              });
-            },
-          },
-        ])
+      selectedLessonId = yield* promptService.selectLessonCommit(
+        sortedCommits.map((commit) => ({
+          lessonId: commit.lessonId!,
+          message: commit.message,
+        })),
+        promptMessage
       );
-
-      selectedLessonId = lesson;
     }
 
     const matchingCommits = commits.filter(

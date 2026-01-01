@@ -35,5 +35,7 @@ Migrated exercise.ts to use PromptService:
 Migrated cherry-pick.ts to use PromptService:
 - inputBranchName (for working branch when on main)
 
-Remaining files to migrate:
-- src/commit-utils.ts
+Migrated commit-utils.ts to use PromptService:
+- selectLessonCommit (inline prompt replaced with promptService.selectLessonCommit)
+
+ALL FILES MIGRATED - PromptService migration complete!
