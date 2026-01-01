@@ -137,6 +137,27 @@ export class FailedToPushError extends Data.TaggedError("FailedToPushError")<{
   message: string;
 }> {}
 
+/**
+ * Error thrown when git fetch fails.
+ * Common causes: network issues, authentication problems,
+ * or the remote/branch doesn't exist.
+ */
+export class FailedToFetchError extends Data.TaggedError("FailedToFetchError")<{
+  remote: string;
+  branch: string;
+  message: string;
+}> {}
+
+/**
+ * Error thrown when git merge encounters conflicts.
+ * Conflicts occur when changes in the merged ref overlap with
+ * changes in the current branch that cannot be automatically resolved.
+ */
+export class MergeConflictError extends Data.TaggedError("MergeConflictError")<{
+  ref: string;
+  message: string;
+}> {}
+
 export class GitService extends Effect.Service<GitService>()(
   "GitService",
   {
@@ -568,6 +589,57 @@ Add upstream remote:
               new FailedToCreateBranchError({
                 branchName,
                 message: `Failed to create branch ${branchName} at ${sha} (exit code: ${exitCode})`,
+              })
+            );
+          }
+        }),
+
+        /**
+         * Fetches a specific branch from a remote.
+         * Updates the remote-tracking branch (e.g., origin/main) without
+         * modifying local branches or the working directory.
+         *
+         * @param remote - The remote name (e.g., "origin", "upstream")
+         * @param branch - The branch to fetch (e.g., "main")
+         * @returns Effect that succeeds when fetch completes
+         * @throws FailedToFetchError if fetch fails (network, auth, or remote/branch not found)
+         */
+        fetch: Effect.fn("fetch")(function* (remote: string, branch: string) {
+          const exitCode = yield* runCommandWithExitCode(
+            "git",
+            "fetch",
+            remote,
+            branch
+          );
+
+          if (exitCode !== 0) {
+            return yield* Effect.fail(
+              new FailedToFetchError({
+                remote,
+                branch,
+                message: `Failed to fetch ${branch} from ${remote} (exit code: ${exitCode})`,
+              })
+            );
+          }
+        }),
+
+        /**
+         * Merges a ref into the current branch.
+         * This creates a merge commit if necessary, or performs a fast-forward
+         * merge if the current branch is directly behind the target ref.
+         *
+         * @param ref - The ref to merge (e.g., "origin/main", a branch name, or SHA)
+         * @returns Effect that succeeds when merge completes
+         * @throws MergeConflictError if conflicts occur during merge
+         */
+        merge: Effect.fn("merge")(function* (ref: string) {
+          const exitCode = yield* runCommandWithExitCode("git", "merge", ref);
+
+          if (exitCode !== 0) {
+            return yield* Effect.fail(
+              new MergeConflictError({
+                ref,
+                message: `Merge conflicts detected when merging ${ref}`,
               })
             );
           }

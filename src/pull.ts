@@ -1,6 +1,11 @@
 import { Command as CLICommand } from "@effect/cli";
 import { Console, Data, Effect } from "effect";
-import { GitService, GitServiceConfig } from "./git-service.js";
+import {
+  FailedToFetchError,
+  GitService,
+  GitServiceConfig,
+  MergeConflictError,
+} from "./git-service.js";
 import { cwdOption } from "./options.js";
 
 export class InvalidBranchOperationError extends Data.TaggedError(
@@ -49,36 +54,13 @@ export const pull = CLICommand.make(
 
       // Fetch main from upstream
       yield* Console.log(`Fetching main from ${remoteName}...`);
-      const fetchExitCode = yield* git.runCommandWithExitCode(
-        "git",
-        "fetch",
-        remoteName,
-        "main"
-      );
-
-      if (fetchExitCode !== 0) {
-        yield* Console.error("Failed to fetch from upstream");
-        process.exitCode = 1;
-        return;
-      }
+      yield* git.fetch(remoteName, "main");
 
       // Merge upstream/main into current branch
       yield* Console.log(
         `Merging ${remoteName}/main into ${currentBranch}...`
       );
-      const mergeExitCode = yield* git.runCommandWithExitCode(
-        "git",
-        "merge",
-        `${remoteName}/main`
-      );
-
-      if (mergeExitCode !== 0) {
-        yield* Console.log(
-          "\nMerge conflicts detected. Resolve conflicts and commit."
-        );
-        process.exitCode = 1;
-        return;
-      }
+      yield* git.merge(`${remoteName}/main`);
 
       yield* Console.log(
         `\n✓ Successfully merged ${remoteName}/main into ${currentBranch}`
@@ -106,6 +88,20 @@ export const pull = CLICommand.make(
         InvalidBranchOperationError: (error) => {
           return Effect.gen(function* () {
             yield* Console.error(`Error: ${error.message}`);
+            process.exitCode = 1;
+          });
+        },
+        FailedToFetchError: (error) => {
+          return Effect.gen(function* () {
+            yield* Console.error(`Error: ${error.message}`);
+            process.exitCode = 1;
+          });
+        },
+        MergeConflictError: () => {
+          return Effect.gen(function* () {
+            yield* Console.log(
+              "\nMerge conflicts detected. Resolve conflicts and commit."
+            );
             process.exitCode = 1;
           });
         },
