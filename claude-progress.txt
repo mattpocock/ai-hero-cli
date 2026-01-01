@@ -132,3 +132,16 @@ Changes:
 - Verified InvalidBranchOperationError with message "Cannot use both --problem and --solution flags"
 
 PRD item marked as tested=true.
+
+---
+
+## Session 2026-01-01 (cont. 10)
+
+Added test for PRD: "User uses --demo with state flags" (reset error case).
+
+Changes:
+- Added 2 tests in reset.test.ts: --demo with --problem, --demo with --solution
+- Both verify runReset fails with InvalidBranchOperationError
+- Error message: "Cannot use --demo with --problem or --solution flags"
+
+PRD item marked as tested=true.

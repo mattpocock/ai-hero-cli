@@ -232,6 +232,120 @@ Add upstream remote:
     );
   });
 
+  describe("PRD: User uses --demo with state flags", () => {
+    it.effect(
+      "should fail with InvalidBranchOperationError when --demo is used with --problem",
+      () =>
+        Effect.gen(function* () {
+          const mockGitService = fromPartial<GitService>({
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(
+              function* () {}
+            ),
+            ensureUpstreamBranchConnected: Effect.fn(
+              "ensureUpstreamBranchConnected"
+            )(function* (_opts: { targetBranch: string }) {}),
+            getLogOneline: Effect.fn("getLogOneline")(function* (
+              _branch: string
+            ) {
+              return `abc1234 01.02.03 Add new feature`;
+            }),
+          });
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectLessonCommit: Effect.fn("selectLessonCommit")(
+              function* (
+                _commits: Array<{ lessonId: string; message: string }>,
+                _promptMessage: string
+              ) {
+                return "01.02.03";
+              }
+            ),
+          });
+
+          const testLayer = Layer.mergeAll(
+            Layer.succeed(GitService, mockGitService),
+            Layer.succeed(PromptService, mockPromptService),
+            Layer.succeed(GitServiceConfig, {
+              cwd: "/test/repo",
+            }),
+            NodeContext.layer
+          );
+
+          // Use --demo with --problem flag
+          const result = yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.some("01.02.03"),
+            problem: true,
+            solution: false,
+            demo: true,
+          }).pipe(Effect.provide(testLayer), Effect.flip);
+
+          expect(result).toBeInstanceOf(InvalidBranchOperationError);
+          if (result instanceof InvalidBranchOperationError) {
+            expect(result.message).toBe(
+              "Cannot use --demo with --problem or --solution flags"
+            );
+          }
+        })
+    );
+
+    it.effect(
+      "should fail with InvalidBranchOperationError when --demo is used with --solution",
+      () =>
+        Effect.gen(function* () {
+          const mockGitService = fromPartial<GitService>({
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(
+              function* () {}
+            ),
+            ensureUpstreamBranchConnected: Effect.fn(
+              "ensureUpstreamBranchConnected"
+            )(function* (_opts: { targetBranch: string }) {}),
+            getLogOneline: Effect.fn("getLogOneline")(function* (
+              _branch: string
+            ) {
+              return `abc1234 01.02.03 Add new feature`;
+            }),
+          });
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectLessonCommit: Effect.fn("selectLessonCommit")(
+              function* (
+                _commits: Array<{ lessonId: string; message: string }>,
+                _promptMessage: string
+              ) {
+                return "01.02.03";
+              }
+            ),
+          });
+
+          const testLayer = Layer.mergeAll(
+            Layer.succeed(GitService, mockGitService),
+            Layer.succeed(PromptService, mockPromptService),
+            Layer.succeed(GitServiceConfig, {
+              cwd: "/test/repo",
+            }),
+            NodeContext.layer
+          );
+
+          // Use --demo with --solution flag
+          const result = yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.some("01.02.03"),
+            problem: false,
+            solution: true,
+            demo: true,
+          }).pipe(Effect.provide(testLayer), Effect.flip);
+
+          expect(result).toBeInstanceOf(InvalidBranchOperationError);
+          if (result instanceof InvalidBranchOperationError) {
+            expect(result.message).toBe(
+              "Cannot use --demo with --problem or --solution flags"
+            );
+          }
+        })
+    );
+  });
+
   describe("PRD: User attempts reset when on target branch", () => {
     it.effect(
       "should fail with InvalidBranchOperationError when on target branch and selecting reset-current",

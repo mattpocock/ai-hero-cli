@@ -394,7 +394,7 @@
     "command": "reset",
     "category": "error",
     "description": "User uses --demo with state flags",
-    "tested": false,
+    "tested": true,
     "steps": [
       "User runs `ai-hero reset --demo --problem`",
       "System displays: 'Error: Cannot use --demo with --problem or --solution flags'",
