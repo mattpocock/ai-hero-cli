@@ -151,7 +151,7 @@
       "Run pnpm test to verify tests pass"
     ],
     "dependencies": ["edit-commit-part1", "get-diffs", "diffs-to-repo"],
-    "passes": false
+    "passes": true
   },
   {
     "id": "test-reset-staging-commit",

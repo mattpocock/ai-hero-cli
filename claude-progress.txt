@@ -1,5 +1,25 @@
 # Claude Progress Log
 
+## 2026-01-01: test-fetch-status-ref
+
+Added unit tests for fetch, status, and ref git-service methods.
+
+### Changes made:
+
+**test/git-service.test.ts (new file):**
+- Created test file for GitService
+- Added tests for fetchOrigin() - verifies method works and error structure
+- Added tests for revParse() - resolves HEAD and branch names to SHA
+- Added tests for revListCount() - counts commits between refs
+- Added tests for getStatusShort() - returns status output as string
+- Tests use @effect/vitest with proper layer composition
+
+### Verification:
+- pnpm typecheck: passed
+- pnpm test: passed (13 tests)
+
+---
+
 ## 2026-01-01: remove-generic-helpers
 
 Completed refactor to remove exposed runCommandWithExitCode and runCommandWithString from git-service public API.
