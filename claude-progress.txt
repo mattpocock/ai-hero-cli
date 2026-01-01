@@ -8,3 +8,4 @@ PromptService: implemented selectExercise
 PromptService: implemented confirmProceedWithUncommittedChanges
 PromptService: implemented selectWalkThroughAction
 PromptService: implemented selectSubfolder
+PromptService: implemented selectExerciseAction

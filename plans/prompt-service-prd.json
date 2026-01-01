@@ -175,6 +175,7 @@
     "service": "PromptService",
     "method": "selectExerciseAction",
     "category": "behavior",
+    "status": "DONE",
     "description": "Prompts for next action after running exercise",
     "steps": [
       "Method receives result status, hasNext, hasPrevious, labels, lessonType",

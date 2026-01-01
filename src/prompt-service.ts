@@ -457,6 +457,122 @@ export class PromptService extends Effect.Service<PromptService>()(
         return subfolderIndex;
       });
 
+      /**
+       * Prompts for next action after running exercise.
+       *
+       * @param opts - Options for the prompt
+       * @param opts.result - The result of the exercise: 'success', 'failed', or 'readme-only'
+       * @param opts.hasNext - Whether there is a next exercise
+       * @param opts.hasPrevious - Whether there is a previous exercise
+       * @param opts.nextLabel - Label for the next exercise (if hasNext)
+       * @param opts.previousLabel - Label for the previous exercise (if hasPrevious)
+       * @param opts.lessonType - Type of lesson: 'exercise' or 'explainer'
+       * @returns Selected action
+       * @throws PromptCancelledError if user presses Ctrl+C
+       */
+      const selectExerciseAction = Effect.fn("selectExerciseAction")(
+        function* (opts: {
+          result: "success" | "failed" | "readme-only";
+          hasNext: boolean;
+          hasPrevious: boolean;
+          nextLabel?: string;
+          previousLabel?: string;
+          lessonType: "exercise" | "explainer";
+        }) {
+          const lessonNoun =
+            opts.lessonType === "explainer"
+              ? {
+                  successMessage: `Explainer executed! Once you've read the readme and understand the code, you can go to the next exercise.`,
+                  failureMessage: `Looks like the explainer errored! Want to try again?`,
+                  lowercase: "explainer",
+                  readmeMessage: `Once you've read the readme, you can go to the next exercise.`,
+                }
+              : {
+                  successMessage: "Exercise complete! What's next?",
+                  failureMessage: `Looks like the exercise errored! Want to try again?`,
+                  lowercase: "exercise",
+                  readmeMessage:
+                    "Once you've read the readme, you can go to the next exercise.",
+                };
+
+          const message =
+            opts.result === "success"
+              ? lessonNoun.successMessage
+              : opts.result === "readme-only"
+                ? lessonNoun.readmeMessage
+                : lessonNoun.failureMessage;
+
+          type Choice = {
+            title: string;
+            value:
+              | "run-again"
+              | "next-exercise"
+              | "previous-exercise"
+              | "choose-exercise"
+              | "finish";
+          };
+
+          const choices: Array<Choice> = [];
+
+          // Run again (not shown for readme-only)
+          if (opts.result !== "readme-only") {
+            choices.push({
+              title:
+                opts.result === "failed"
+                  ? `🔄 Run the ${lessonNoun.lowercase} again`
+                  : `🔄 Try the ${lessonNoun.lowercase} again`,
+              value: "run-again",
+            });
+          }
+
+          // Next exercise
+          if (opts.hasNext && opts.nextLabel) {
+            choices.push({
+              title: `➡️  Run the next exercise: ${opts.nextLabel}`,
+              value: "next-exercise",
+            });
+          }
+
+          // Previous exercise
+          if (opts.hasPrevious && opts.previousLabel) {
+            choices.push({
+              title: `⬅️  Run the previous exercise: ${opts.previousLabel}`,
+              value: "previous-exercise",
+            });
+          }
+
+          // Always show these
+          choices.push({
+            title: "📋 Choose a new exercise",
+            value: "choose-exercise",
+          });
+          choices.push({
+            title: "✅ Finish",
+            value: "finish",
+          });
+
+          const { action } = yield* runPrompt<{
+            action:
+              | "run-again"
+              | "next-exercise"
+              | "previous-exercise"
+              | "choose-exercise"
+              | "finish";
+          }>(() =>
+            prompt([
+              {
+                type: "select",
+                name: "action",
+                message,
+                choices,
+              },
+            ])
+          );
+
+          return action;
+        }
+      );
+
       return {
         confirmReadyToCommit,
         confirmSaveToTargetBranch,
@@ -471,6 +587,7 @@ export class PromptService extends Effect.Service<PromptService>()(
         confirmProceedWithUncommittedChanges,
         selectWalkThroughAction,
         selectSubfolder,
+        selectExerciseAction,
       };
     }),
     dependencies: [],
