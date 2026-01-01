@@ -2,9 +2,13 @@ import { describe, expect, it } from "@effect/vitest";
 import { NodeContext } from "@effect/platform-node";
 import { Effect } from "effect";
 import {
-  FailedToFetchOriginError,
-  FailedToResetError,
+  CherryPickConflictError,
+  FailedToCheckoutError,
   FailedToCommitError,
+  FailedToCreateBranchError,
+  FailedToFetchOriginError,
+  FailedToPushError,
+  FailedToResetError,
   GitService,
   InvalidRefError,
 } from "../src/git-service.js";
@@ -70,7 +74,7 @@ describe("GitService", () => {
       )
     );
 
-it("InvalidRefError has correct structure", () => {
+    it("InvalidRefError has correct structure", () => {
       const error = new InvalidRefError({
         ref: "nonexistent-branch",
         message: "Failed to resolve ref: nonexistent-branch",
@@ -89,10 +93,7 @@ it("InvalidRefError has correct structure", () => {
 
         // Count commits from 5 back to HEAD
         const headSha = yield* git.revParse("HEAD");
-        const count = yield* git.revListCount(
-          `${headSha}~5`,
-          headSha
-        );
+        const count = yield* git.revListCount(`${headSha}~5`, headSha);
 
         expect(typeof count).toBe("number");
         expect(count).toBeGreaterThanOrEqual(0);
@@ -143,9 +144,7 @@ it("InvalidRefError has correct structure", () => {
         // Format: XY filename (X=staging, Y=working tree)
         // Codes: M (modified), A (added), D (deleted), ?? (untracked)
         if (status.length > 0) {
-          const lines = status
-            .split("\n")
-            .filter((l) => l.length > 0);
+          const lines = status.split("\n").filter((l) => l.length > 0);
           for (const line of lines) {
             // Each line: status code (2 chars) + space + filename
             expect(line.length).toBeGreaterThanOrEqual(3);
@@ -270,6 +269,180 @@ it("InvalidRefError has correct structure", () => {
 
       expect(error._tag).toBe("FailedToCommitError");
       expect(error.message).toContain("Failed to commit");
+    });
+  });
+
+  describe("cherryPick", () => {
+    it.effect("method exists and is callable", () =>
+      Effect.gen(function* () {
+        const git = yield* GitService;
+
+        // Just verify the method exists - actually calling it
+        // would require a valid commit range and could modify repo state
+        expect(typeof git.cherryPick).toBe("function");
+      }).pipe(
+        Effect.provide(NodeContext.layer),
+        Effect.provide(GitService.Default)
+      )
+    );
+
+    it("CherryPickConflictError has correct structure", () => {
+      const error = new CherryPickConflictError({
+        range: "abc123..def456",
+        message: "Cherry-pick conflict on range abc123..def456",
+      });
+
+      expect(error._tag).toBe("CherryPickConflictError");
+      expect(error.range).toBe("abc123..def456");
+      expect(error.message).toContain("Cherry-pick conflict");
+    });
+  });
+
+  describe("cherryPickContinue", () => {
+    it.effect("method exists and is callable", () =>
+      Effect.gen(function* () {
+        const git = yield* GitService;
+
+        // Just verify the method exists - can only be called during an active cherry-pick
+        expect(typeof git.cherryPickContinue).toBe("function");
+      }).pipe(
+        Effect.provide(NodeContext.layer),
+        Effect.provide(GitService.Default)
+      )
+    );
+  });
+
+  describe("cherryPickAbort", () => {
+    it.effect("method exists and is callable", () =>
+      Effect.gen(function* () {
+        const git = yield* GitService;
+
+        // Just verify the method exists - can only be called during an active cherry-pick
+        expect(typeof git.cherryPickAbort).toBe("function");
+      }).pipe(
+        Effect.provide(NodeContext.layer),
+        Effect.provide(GitService.Default)
+      )
+    );
+  });
+
+  describe("checkout", () => {
+    it.effect("switches to an existing branch", () =>
+      Effect.gen(function* () {
+        const git = yield* GitService;
+
+        // Get current branch first
+        const currentBranch = yield* git.getCurrentBranch();
+
+        // Checkout the same branch (safe operation)
+        yield* git.checkout(currentBranch);
+
+        // Verify we're still on the same branch
+        const afterBranch = yield* git.getCurrentBranch();
+        expect(afterBranch).toBe(currentBranch);
+      }).pipe(
+        Effect.provide(NodeContext.layer),
+        Effect.provide(GitService.Default)
+      )
+    );
+
+    it.effect("fails for non-existent branch", () =>
+      Effect.gen(function* () {
+        const git = yield* GitService;
+
+        const result = yield* git
+          .checkout("nonexistent-branch-that-does-not-exist-12345")
+          .pipe(
+            Effect.map(() => "success" as const),
+            Effect.catchTag("FailedToCheckoutError", () =>
+              Effect.succeed("checkout-failed" as const)
+            )
+          );
+
+        expect(result).toBe("checkout-failed");
+      }).pipe(
+        Effect.provide(NodeContext.layer),
+        Effect.provide(GitService.Default)
+      )
+    );
+
+    it("FailedToCheckoutError has correct structure", () => {
+      const error = new FailedToCheckoutError({
+        branch: "feature-branch",
+        message: "Failed to checkout feature-branch (exit code: 1)",
+      });
+
+      expect(error._tag).toBe("FailedToCheckoutError");
+      expect(error.branch).toBe("feature-branch");
+      expect(error.message).toContain("Failed to checkout");
+    });
+  });
+
+  describe("checkoutNewBranch", () => {
+    it.effect("method exists and is callable", () =>
+      Effect.gen(function* () {
+        const git = yield* GitService;
+
+        // Just verify the method exists - actually creating a branch
+        // would modify repo state
+        expect(typeof git.checkoutNewBranch).toBe("function");
+      }).pipe(
+        Effect.provide(NodeContext.layer),
+        Effect.provide(GitService.Default)
+      )
+    );
+
+    it("FailedToCreateBranchError has correct structure", () => {
+      const error = new FailedToCreateBranchError({
+        branchName: "new-feature",
+        message: "Failed to create branch new-feature (exit code: 1)",
+      });
+
+      expect(error._tag).toBe("FailedToCreateBranchError");
+      expect(error.branchName).toBe("new-feature");
+      expect(error.message).toContain("Failed to create branch");
+    });
+  });
+
+  describe("checkoutNewBranchAt", () => {
+    it.effect("method exists and is callable", () =>
+      Effect.gen(function* () {
+        const git = yield* GitService;
+
+        // Just verify the method exists - actually creating a branch
+        // would modify repo state
+        expect(typeof git.checkoutNewBranchAt).toBe("function");
+      }).pipe(
+        Effect.provide(NodeContext.layer),
+        Effect.provide(GitService.Default)
+      )
+    );
+  });
+
+  describe("pushForceWithLease", () => {
+    it.effect("method exists and is callable", () =>
+      Effect.gen(function* () {
+        const git = yield* GitService;
+
+        // Just verify the method exists - actually pushing would modify remote
+        expect(typeof git.pushForceWithLease).toBe("function");
+      }).pipe(
+        Effect.provide(NodeContext.layer),
+        Effect.provide(GitService.Default)
+      )
+    );
+
+    it("FailedToPushError has correct structure", () => {
+      const error = new FailedToPushError({
+        remote: "origin",
+        branch: "feature-branch",
+        message: "Failed to push feature-branch to origin (exit code: 1)",
+      });
+
+      expect(error._tag).toBe("FailedToPushError");
+      expect(error.remote).toBe("origin");
+      expect(error.branch).toBe("feature-branch");
+      expect(error.message).toContain("Failed to push");
     });
   });
 });

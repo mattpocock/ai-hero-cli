@@ -183,7 +183,7 @@
       "Run pnpm test to verify tests pass"
     ],
     "dependencies": ["edit-commit-part3", "cherry-pick", "rebase-to-main"],
-    "passes": false
+    "passes": true
   },
   {
     "id": "test-log-merge-rebase",

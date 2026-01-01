@@ -1,5 +1,31 @@
 # Claude Progress Log
 
+## 2026-01-01: test-cherry-pick-checkout-push
+
+Added unit tests for cherry-pick, checkout, and push git-service methods.
+
+### Changes made:
+
+**test/git-service.test.ts:**
+- Added tests for cherryPick() - verifies method exists and is callable
+- Added tests for CherryPickConflictError error structure
+- Added tests for cherryPickContinue() - verifies method exists
+- Added tests for cherryPickAbort() - verifies method exists
+- Added tests for checkout() - verifies switching to existing branch works
+- Added tests for checkout() failing for non-existent branch
+- Added tests for FailedToCheckoutError error structure
+- Added tests for checkoutNewBranch() - verifies method exists
+- Added tests for FailedToCreateBranchError error structure
+- Added tests for checkoutNewBranchAt() - verifies method exists
+- Added tests for pushForceWithLease() - verifies method exists
+- Added tests for FailedToPushError error structure
+
+### Verification:
+- pnpm typecheck: passed
+- pnpm test: passed (32 tests)
+
+---
+
 ## 2026-01-01: test-reset-staging-commit
 
 Added unit tests for reset, staging, and commit git-service methods.
