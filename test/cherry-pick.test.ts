@@ -11,6 +11,7 @@ import {
   selectLessonCommit,
 } from "../src/commit-utils.js";
 import {
+  CherryPickConflictError,
   GitService,
   GitServiceConfig,
   NoUpstreamFoundError,
@@ -536,6 +537,74 @@ Add upstream remote:
             expect(result.message).toContain(
               'Cannot cherry-pick when on target branch "live-run-through"'
             );
+          }
+        })
+    );
+  });
+
+  describe("PRD: Cherry-pick results in merge conflict", () => {
+    it.effect(
+      "should fail with CherryPickConflictError when git encounters merge conflict",
+      () =>
+        Effect.gen(function* () {
+          const mockGitService = fromPartial<GitService>({
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(
+              function* () {}
+            ),
+            ensureUpstreamBranchConnected: Effect.fn(
+              "ensureUpstreamBranchConnected"
+            )(function* (_opts: { targetBranch: string }) {}),
+            getLogOneline: Effect.fn("getLogOneline")(function* (
+              branch: string
+            ) {
+              if (branch === "HEAD") {
+                return "abc1234 Initial commit";
+              }
+              return `def5678 01.02.03 Add new feature`;
+            }),
+            getCurrentBranch: Effect.fn("getCurrentBranch")(
+              function* () {
+                return "matt/feature-work";
+              }
+            ),
+            cherryPick: Effect.fn("cherryPick")(function* (
+              sha: string
+            ) {
+              return yield* Effect.fail(
+                new CherryPickConflictError({
+                  range: sha,
+                  message: `Cherry-pick conflict on range ${sha}`,
+                })
+              );
+            }),
+          });
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectLessonCommit: Effect.fn("selectLessonCommit")(
+              function* () {
+                return "01.02.03";
+              }
+            ),
+          });
+
+          const testLayer = Layer.mergeAll(
+            Layer.succeed(GitService, mockGitService),
+            Layer.succeed(PromptService, mockPromptService),
+            Layer.succeed(GitServiceConfig, {
+              cwd: "/test/repo",
+            }),
+            NodeContext.layer
+          );
+
+          const result = yield* runCherryPick({
+            branch: "live-run-through",
+            lessonId: Option.none(),
+          }).pipe(Effect.provide(testLayer), Effect.flip);
+
+          expect(result).toBeInstanceOf(CherryPickConflictError);
+          if (result instanceof CherryPickConflictError) {
+            expect(result.range).toBe("def5678");
+            expect(result.message).toContain("Cherry-pick conflict");
           }
         })
     );

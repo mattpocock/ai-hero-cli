@@ -125,7 +125,7 @@
     "command": "cherry-pick",
     "category": "error",
     "description": "Cherry-pick results in merge conflict",
-    "tested": false,
+    "tested": true,
     "steps": [
       "User has conflicting changes on current branch",
       "User runs `ai-hero cherry-pick 01.02.03`",

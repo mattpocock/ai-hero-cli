@@ -92,3 +92,16 @@ Changes:
 - Added CommitNotFoundError import to reset.test.ts
 
 PRD item marked as tested=true.
+
+---
+
+## Session 2026-01-01 (cont. 7)
+
+Added test for PRD: "Cherry-pick results in merge conflict" (cherry-pick error case).
+
+Changes:
+- Added test in cherry-pick.test.ts that mocks cherryPick to fail with CherryPickConflictError
+- Verified runCherryPick propagates CherryPickConflictError with range and message
+- Added CherryPickConflictError import to cherry-pick.test.ts
+
+PRD item marked as tested=true.
