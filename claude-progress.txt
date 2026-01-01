@@ -53,3 +53,16 @@ Changes:
 - Verified runCherryPick propagates NoUpstreamFoundError with helpful message about adding upstream remote
 
 PRD item marked as tested=true.
+
+---
+
+## Session 2026-01-01 (cont. 4)
+
+Added test for PRD: "User attempts cherry-pick from same branch" (cherry-pick error case).
+
+Changes:
+- Added test in cherry-pick.test.ts that mocks getCurrentBranch to return target branch name
+- Verified runCherryPick fails with InvalidBranchOperationError when user is on target branch
+- Import InvalidBranchOperationError from cherry-pick.ts
+
+PRD item marked as tested=true.

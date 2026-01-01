@@ -2,7 +2,10 @@ import { NodeContext } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { fromPartial } from "@total-typescript/shoehorn";
 import { Effect, Layer, Option } from "effect";
-import { runCherryPick } from "../src/cherry-pick.js";
+import {
+  InvalidBranchOperationError,
+  runCherryPick,
+} from "../src/cherry-pick.js";
 import {
   CommitNotFoundError,
   selectLessonCommit,
@@ -470,6 +473,68 @@ Add upstream remote:
             );
             expect(result.message).toContain(
               "git remote add upstream"
+            );
+          }
+        })
+    );
+  });
+
+  describe("PRD: User attempts cherry-pick from same branch", () => {
+    it.effect(
+      "should fail with InvalidBranchOperationError when on target branch",
+      () =>
+        Effect.gen(function* () {
+          const mockGitService = fromPartial<GitService>({
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(
+              function* () {}
+            ),
+            ensureUpstreamBranchConnected: Effect.fn(
+              "ensureUpstreamBranchConnected"
+            )(function* (_opts: { targetBranch: string }) {}),
+            getLogOneline: Effect.fn("getLogOneline")(function* (
+              branch: string
+            ) {
+              if (branch === "HEAD") {
+                // Current branch has no lesson commits yet
+                return "abc1234 Initial commit";
+              }
+              // Target branch has lesson commits
+              return `def5678 01.02.03 Add new feature`;
+            }),
+            getCurrentBranch: Effect.fn("getCurrentBranch")(
+              function* () {
+                // User is on the same branch they're trying to cherry-pick from
+                return "live-run-through";
+              }
+            ),
+          });
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectLessonCommit: Effect.fn("selectLessonCommit")(
+              function* () {
+                return "01.02.03";
+              }
+            ),
+          });
+
+          const testLayer = Layer.mergeAll(
+            Layer.succeed(GitService, mockGitService),
+            Layer.succeed(PromptService, mockPromptService),
+            Layer.succeed(GitServiceConfig, {
+              cwd: "/test/repo",
+            }),
+            NodeContext.layer
+          );
+
+          const result = yield* runCherryPick({
+            branch: "live-run-through",
+            lessonId: Option.none(),
+          }).pipe(Effect.provide(testLayer), Effect.flip);
+
+          expect(result).toBeInstanceOf(InvalidBranchOperationError);
+          if (result instanceof InvalidBranchOperationError) {
+            expect(result.message).toContain(
+              'Cannot cherry-pick when on target branch "live-run-through"'
             );
           }
         })

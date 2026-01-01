@@ -113,7 +113,7 @@
     "command": "cherry-pick",
     "category": "error",
     "description": "User attempts cherry-pick from same branch",
-    "tested": false,
+    "tested": true,
     "steps": [
       "User is on 'live-run-through' branch",
       "User runs `ai-hero cherry-pick`",
