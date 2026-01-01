@@ -178,7 +178,7 @@
     "command": "reset",
     "category": "user-flow",
     "description": "User interactively resets to solution state",
-    "tested": false,
+    "tested": true,
     "steps": [
       "User runs `ai-hero reset`",
       "System fetches latest commits from upstream",

@@ -346,6 +346,91 @@ Add upstream remote:
     );
   });
 
+  describe("PRD: User interactively resets to solution state", () => {
+    it.effect(
+      "should reset to solution commit when user selects lesson and final code",
+      () =>
+        Effect.gen(function* () {
+          let resetHardCalledWith: string | undefined;
+
+          const mockGitService = fromPartial<GitService>({
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(
+              function* () {}
+            ),
+            ensureUpstreamBranchConnected: Effect.fn(
+              "ensureUpstreamBranchConnected"
+            )(function* (_opts: { targetBranch: string }) {}),
+            getLogOneline: Effect.fn("getLogOneline")(function* (
+              _branch: string
+            ) {
+              return `abc1234 01.02.03 Add new feature
+def5678 01.02.02 Setup base structure
+ghi9012 01.02.01 Initial setup`;
+            }),
+            getCurrentBranch: Effect.fn("getCurrentBranch")(
+              function* () {
+                return "matt/feature-branch";
+              }
+            ),
+            getUncommittedChanges: Effect.fn(
+              "getUncommittedChanges"
+            )(function* () {
+              return {
+                hasUncommittedChanges: false,
+                statusOutput: "",
+              };
+            }),
+            resetHard: Effect.fn("resetHard")(function* (
+              sha: string
+            ) {
+              resetHardCalledWith = sha;
+            }),
+          });
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectLessonCommit: Effect.fn("selectLessonCommit")(
+              function* (
+                _commits: Array<{ lessonId: string; message: string }>,
+                _promptMessage: string
+              ) {
+                return "01.02.03";
+              }
+            ),
+            selectProblemOrSolution: Effect.fn(
+              "selectProblemOrSolution"
+            )(function* () {
+              return "solution" as const;
+            }),
+            selectResetAction: Effect.fn("selectResetAction")(
+              function* (_branch: string) {
+                return "reset-current" as const;
+              }
+            ),
+          });
+
+          const testLayer = Layer.mergeAll(
+            Layer.succeed(GitService, mockGitService),
+            Layer.succeed(PromptService, mockPromptService),
+            Layer.succeed(GitServiceConfig, {
+              cwd: "/test/repo",
+            }),
+            NodeContext.layer
+          );
+
+          yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.none(),
+            problem: false,
+            solution: false,
+            demo: false,
+          }).pipe(Effect.provide(testLayer));
+
+          // Verify resetHard was called with the solution commit SHA
+          expect(resetHardCalledWith).toBe("abc1234");
+        })
+    );
+  });
+
   describe("PRD: User attempts reset when on target branch", () => {
     it.effect(
       "should fail with InvalidBranchOperationError when on target branch and selecting reset-current",

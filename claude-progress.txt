@@ -145,3 +145,19 @@ Changes:
 - Error message: "Cannot use --demo with --problem or --solution flags"
 
 PRD item marked as tested=true.
+
+---
+
+## Session 2026-01-01 (cont. 11)
+
+Added test for PRD: "User interactively resets to solution state" (reset user-flow).
+
+Changes:
+- Added test in reset.test.ts that verifies full happy path:
+  - Mocks selectLessonCommit to return lesson 01.02.03
+  - Mocks selectProblemOrSolution to return "solution"
+  - Mocks selectResetAction to return "reset-current"
+  - Mocks getCurrentBranch to return non-main/non-target branch
+  - Verifies resetHard called with correct commit SHA (abc1234)
+
+PRD item marked as tested=true.
