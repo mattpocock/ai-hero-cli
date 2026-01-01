@@ -3,7 +3,6 @@ import {
   Command as CLICommand,
   Options,
 } from "@effect/cli";
-import { Command } from "@effect/platform";
 import { Console, Data, Effect } from "effect";
 import { existsSync } from "node:fs";
 import * as path from "node:path";
@@ -11,11 +10,6 @@ import prompt from "prompts";
 import { selectLessonCommit } from "../commit-utils.js";
 import type { PromptCancelledError } from "../prompt-utils.js";
 import { runPrompt } from "../prompt-utils.js";
-import type {
-  BadArgument,
-  SystemError,
-} from "@effect/platform/Error";
-import type { CommandExecutor } from "@effect/platform/CommandExecutor";
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "../constants.js";
 import { GitService } from "../git-service.js";
 
@@ -28,12 +22,6 @@ export class NotAGitRepoError extends Data.TaggedError(
 
 export class NoFollowingCommitsError extends Data.TaggedError(
   "NoFollowingCommitsError"
-)<{
-  message: string;
-}> {}
-
-export class CherryPickConflictError extends Data.TaggedError(
-  "CherryPickConflictError"
 )<{
   message: string;
 }> {}
@@ -228,21 +216,16 @@ export const editCommit = CLICommand.make(
 
         // Use range cherry-pick: targetSha..origin/branch
         // This excludes targetSha and includes all commits on target branch
-        const cherryPickCommand = Command.make(
-          "git",
-          "cherry-pick",
-          `${targetSha}..${targetBranchHead}`
-        ).pipe(
-          Command.workingDirectory(cwd),
-          Command.stdout("inherit"),
-          Command.stderr("inherit")
-        );
+        const cherryPickResult = yield* gitService
+          .cherryPick(`${targetSha}..${targetBranchHead}`)
+          .pipe(
+            Effect.catchTag("CherryPickConflictError", () =>
+              Effect.succeed({ conflict: true as const })
+            ),
+            Effect.map(() => ({ conflict: false as const }))
+          );
 
-        const cherryPickExitCode = yield* Command.exitCode(
-          cherryPickCommand
-        ).pipe(Effect.catchAll(() => Effect.succeed(1)));
-
-        if (cherryPickExitCode !== 0) {
+        if (cherryPickResult.conflict) {
           // Conflict detected
           yield* Console.log(
             "\n⚠️  Cherry-pick conflict detected!"
@@ -252,7 +235,7 @@ export const editCommit = CLICommand.make(
           );
 
           // Enter conflict resolution loop
-          yield* resolveConflictLoop(cwd);
+          yield* resolveConflictLoop(gitService);
         } else {
           yield* Console.log("✓ Cherry-pick complete");
         }
@@ -288,21 +271,14 @@ export const editCommit = CLICommand.make(
         `Switching to ${branch} and applying changes...`
       );
 
-      const checkoutTargetCommand = Command.make(
-        "git",
-        "checkout",
-        branch
-      ).pipe(
-        Command.workingDirectory(cwd),
-        Command.stdout("inherit"),
-        Command.stderr("inherit")
+      const checkoutResult = yield* gitService.checkout(branch).pipe(
+        Effect.catchTag("FailedToCheckoutError", () =>
+          Effect.succeed({ failed: true as const })
+        ),
+        Effect.map(() => ({ failed: false as const }))
       );
 
-      const checkoutExitCode = yield* Command.exitCode(
-        checkoutTargetCommand
-      ).pipe(Effect.catchAll(() => Effect.succeed(1)));
-
-      if (checkoutExitCode !== 0) {
+      if (checkoutResult.failed) {
         yield* Console.error(
           `Failed to checkout ${branch}. Changes remain on ${currentBranch}.`
         );
@@ -353,23 +329,16 @@ export const editCommit = CLICommand.make(
       // Force push to origin
       yield* Console.log(`Force pushing ${branch} to origin...`);
 
-      const forcePushCommand = Command.make(
-        "git",
-        "push",
-        "origin",
-        branch,
-        "--force-with-lease"
-      ).pipe(
-        Command.workingDirectory(cwd),
-        Command.stdout("inherit"),
-        Command.stderr("inherit")
-      );
+      const forcePushResult = yield* gitService
+        .pushForceWithLease("origin", branch)
+        .pipe(
+          Effect.catchTag("FailedToPushError", () =>
+            Effect.succeed({ failed: true as const })
+          ),
+          Effect.map(() => ({ failed: false as const }))
+        );
 
-      const forcePushExitCode = yield* Command.exitCode(
-        forcePushCommand
-      ).pipe(Effect.catchAll(() => Effect.succeed(1)));
-
-      if (forcePushExitCode !== 0) {
+      if (forcePushResult.failed) {
         yield* Console.error("Failed to force push");
         process.exitCode = 1;
         return;
@@ -383,12 +352,9 @@ export const editCommit = CLICommand.make(
       yield* Console.log(
         `Switching back to ${currentBranch}...`
       );
-      const switchBackCommand = Command.make(
-        "git",
-        "checkout",
-        currentBranch
-      ).pipe(Command.workingDirectory(cwd));
-      yield* Command.exitCode(switchBackCommand);
+      yield* gitService.checkout(currentBranch).pipe(
+        Effect.catchTag("FailedToCheckoutError", () => Effect.void)
+      );
 
       yield* Console.log(`✓ Switched back to ${currentBranch}`);
     }).pipe(
@@ -437,15 +403,9 @@ export const editCommit = CLICommand.make(
 
 // Recursive conflict resolution loop
 function resolveConflictLoop(
-  cwd: string
-): Effect.Effect<
-  void,
-  BadArgument | PromptCancelledError | SystemError,
-  CommandExecutor | GitService
-> {
+  gitService: GitService
+): Effect.Effect<void, PromptCancelledError> {
   return Effect.gen(function* () {
-    const gitService = yield* GitService;
-
     // Show git status
     const status = yield* gitService.getStatusShort();
     if (status) {
@@ -491,18 +451,7 @@ function resolveConflictLoop(
         "Cherry-pick aborted. Branch left as-is."
       );
 
-      // Abort the cherry-pick
-      const abortCommand = Command.make(
-        "git",
-        "cherry-pick",
-        "--abort"
-      ).pipe(
-        Command.workingDirectory(cwd),
-        Command.stdout("inherit"),
-        Command.stderr("inherit")
-      );
-
-      yield* Command.exitCode(abortCommand);
+      yield* gitService.cherryPickAbort();
       return;
     }
 
@@ -512,28 +461,23 @@ function resolveConflictLoop(
     }
 
     // Continue cherry-pick
-    const continueCommand = Command.make(
-      "git",
-      "cherry-pick",
-      "--continue"
-    ).pipe(
-      Command.workingDirectory(cwd),
-      Command.stdout("inherit"),
-      Command.stderr("inherit")
-    );
+    const continueResult = yield* gitService
+      .cherryPickContinue()
+      .pipe(
+        Effect.catchTag("CherryPickConflictError", () =>
+          Effect.succeed({ conflict: true as const })
+        ),
+        Effect.map(() => ({ conflict: false as const }))
+      );
 
-    const continueExitCode = yield* Command.exitCode(
-      continueCommand
-    ).pipe(Effect.catchAll(() => Effect.succeed(1)));
-
-    if (continueExitCode !== 0) {
+    if (continueResult.conflict) {
       // Another conflict
       yield* Console.log(
         "\n⚠️  Another conflict detected during cherry-pick!"
       );
       yield* Console.log("Resolve conflicts, then continue.\n");
       // Recursive call
-      yield* resolveConflictLoop(cwd);
+      yield* resolveConflictLoop(gitService);
     } else {
       yield* Console.log("✓ Cherry-pick complete");
     }

@@ -1,5 +1,38 @@
 # Claude Progress Log
 
+## 2026-01-01: edit-commit-part3
+
+Completed refactor to extract cherry-pick, checkout, and push commands from edit-commit.ts to git-service.
+
+### Changes made:
+
+**src/git-service.ts:**
+- Added `CherryPickConflictError` class with JSDoc explaining conflict scenarios
+- Added `FailedToCheckoutError` class with JSDoc explaining checkout failure causes
+- Added `FailedToPushError` class with JSDoc explaining push failure causes
+- Added `cherryPick(range)` method - cherry-picks commit range, throws CherryPickConflictError on conflict
+- Added `cherryPickContinue()` method - continues cherry-pick after conflict resolution
+- Added `cherryPickAbort()` method - aborts in-progress cherry-pick, restores pre-cherry-pick state
+- Added `checkout(branch)` method - switches to existing branch, throws FailedToCheckoutError on failure
+- Added `pushForceWithLease(remote, branch)` method - force push with safety check, throws FailedToPushError
+
+**src/internal/edit-commit.ts:**
+- Removed `Command` import from `@effect/platform` (no longer needed)
+- Removed local `CherryPickConflictError` class (now in git-service)
+- Removed unused imports (`BadArgument`, `SystemError`, `CommandExecutor`)
+- Replaced `git cherry-pick range` command with `gitService.cherryPick()`
+- Replaced `git cherry-pick --continue` command with `gitService.cherryPickContinue()`
+- Replaced `git cherry-pick --abort` command with `gitService.cherryPickAbort()`
+- Replaced `git checkout branch` commands with `gitService.checkout()`
+- Replaced `git push --force-with-lease` command with `gitService.pushForceWithLease()`
+- Updated `resolveConflictLoop()` to accept GitService instance instead of cwd
+
+### Verification:
+- pnpm typecheck: passed
+- pnpm test: passed (4 tests)
+
+---
+
 ## 2026-01-01: edit-commit-part2
 
 Completed refactor to extract reset, staging, and commit commands from edit-commit.ts to git-service.

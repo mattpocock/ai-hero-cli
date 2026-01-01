@@ -102,6 +102,41 @@ export class FailedToCommitError extends Data.TaggedError(
   message: string;
 }> {}
 
+/**
+ * Error thrown when cherry-pick encounters a conflict.
+ * Conflicts occur when changes in the cherry-picked commit overlap with
+ * changes in the current branch that cannot be automatically merged.
+ */
+export class CherryPickConflictError extends Data.TaggedError(
+  "CherryPickConflictError"
+)<{
+  range: string;
+  message: string;
+}> {}
+
+/**
+ * Error thrown when git checkout fails.
+ * Common causes: uncommitted changes that would be overwritten,
+ * branch doesn't exist, or path conflicts.
+ */
+export class FailedToCheckoutError extends Data.TaggedError(
+  "FailedToCheckoutError"
+)<{
+  branch: string;
+  message: string;
+}> {}
+
+/**
+ * Error thrown when git push fails.
+ * Common causes: remote rejected push (force-with-lease safety),
+ * network issues, or authentication problems.
+ */
+export class FailedToPushError extends Data.TaggedError("FailedToPushError")<{
+  remote: string;
+  branch: string;
+  message: string;
+}> {}
+
 export class GitService extends Effect.Service<GitService>()(
   "GitService",
   {
@@ -333,6 +368,126 @@ Add upstream remote:
             return yield* Effect.fail(
               new FailedToCommitError({
                 message: `Failed to commit (exit code: ${exitCode})`,
+              })
+            );
+          }
+        }),
+
+        /**
+         * Cherry-picks a range of commits onto the current branch.
+         * The range is specified as "from..to" where commits after "from"
+         * up to and including "to" are applied.
+         *
+         * @param range - The commit range to cherry-pick (e.g., "abc123..def456")
+         * @returns Effect that succeeds when cherry-pick completes
+         * @throws CherryPickConflictError if conflicts occur during cherry-pick
+         */
+        cherryPick: Effect.fn("cherryPick")(function* (range: string) {
+          const exitCode = yield* runCommandWithExitCode(
+            "git",
+            "cherry-pick",
+            range
+          );
+
+          if (exitCode !== 0) {
+            return yield* Effect.fail(
+              new CherryPickConflictError({
+                range,
+                message: `Cherry-pick conflict on range ${range}`,
+              })
+            );
+          }
+        }),
+
+        /**
+         * Continues a cherry-pick after conflicts have been resolved.
+         * Call this after manually resolving conflicts and staging the changes.
+         *
+         * @returns Effect that succeeds when cherry-pick continues, or fails if more conflicts
+         * @throws CherryPickConflictError if additional conflicts occur
+         */
+        cherryPickContinue: Effect.fn("cherryPickContinue")(function* () {
+          const exitCode = yield* runCommandWithExitCode(
+            "git",
+            "cherry-pick",
+            "--continue"
+          );
+
+          if (exitCode !== 0) {
+            return yield* Effect.fail(
+              new CherryPickConflictError({
+                range: "continue",
+                message: "Cherry-pick continue encountered conflicts",
+              })
+            );
+          }
+        }),
+
+        /**
+         * Aborts an in-progress cherry-pick operation.
+         * This restores the branch to its state before the cherry-pick started.
+         *
+         * @returns Effect that succeeds when abort completes
+         */
+        cherryPickAbort: Effect.fn("cherryPickAbort")(function* () {
+          yield* runCommandWithExitCode("git", "cherry-pick", "--abort");
+        }),
+
+        /**
+         * Switches to an existing branch.
+         * The working directory must be clean or have changes that don't
+         * conflict with the target branch.
+         *
+         * @param branch - The branch name to switch to
+         * @returns Effect that succeeds when checkout completes
+         * @throws FailedToCheckoutError if checkout fails (branch not found, conflicts)
+         */
+        checkout: Effect.fn("checkout")(function* (branch: string) {
+          const exitCode = yield* runCommandWithExitCode(
+            "git",
+            "checkout",
+            branch
+          );
+
+          if (exitCode !== 0) {
+            return yield* Effect.fail(
+              new FailedToCheckoutError({
+                branch,
+                message: `Failed to checkout ${branch} (exit code: ${exitCode})`,
+              })
+            );
+          }
+        }),
+
+        /**
+         * Force pushes a branch to a remote using --force-with-lease.
+         * This is safer than --force because it will fail if the remote has
+         * commits that aren't in your local branch, preventing accidental
+         * overwrites of others' work.
+         *
+         * @param remote - The remote name (e.g., "origin")
+         * @param branch - The branch to push
+         * @returns Effect that succeeds when push completes
+         * @throws FailedToPushError if push fails (rejected, network, auth issues)
+         */
+        pushForceWithLease: Effect.fn("pushForceWithLease")(function* (
+          remote: string,
+          branch: string
+        ) {
+          const exitCode = yield* runCommandWithExitCode(
+            "git",
+            "push",
+            remote,
+            branch,
+            "--force-with-lease"
+          );
+
+          if (exitCode !== 0) {
+            return yield* Effect.fail(
+              new FailedToPushError({
+                remote,
+                branch,
+                message: `Failed to push ${branch} to ${remote} (exit code: ${exitCode})`,
               })
             );
           }
