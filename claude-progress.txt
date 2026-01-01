@@ -1,5 +1,22 @@
 # Claude Progress Log
 
+## 2026-01-01: diffs-to-repo
+
+Completed refactor to extract git commands from diffs-to-repo.ts to git-service.
+
+### Changes made:
+
+**src/internal/diffs-to-repo.ts:**
+- Replaced `Command.make("git", "fetch", "origin")` with `git.fetchOrigin()`
+- Replaced `Command.make("git", "log", "--oneline", "--reverse", range)` with `git.getLogOnelineReverse(range)`
+- Added error handling for `FailedToFetchOriginError` to convert to `InvalidProjectRepoError`
+
+### Verification:
+- pnpm typecheck: passed
+- pnpm test: passed (4 tests)
+
+---
+
 ## 2026-01-01: get-diffs
 
 Completed refactor to extract git commands from get-diffs.ts to git-service.
