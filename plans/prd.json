@@ -197,7 +197,7 @@
     "command": "reset",
     "category": "user-flow",
     "description": "User resets to problem state (before solution)",
-    "tested": false,
+    "tested": true,
     "steps": [
       "User runs `ai-hero reset`",
       "User selects a lesson",

@@ -161,3 +161,19 @@ Changes:
   - Verifies resetHard called with correct commit SHA (abc1234)
 
 PRD item marked as tested=true.
+
+---
+
+## Session 2026-01-01 (cont. 12)
+
+Added test for PRD: "User resets to problem state (before solution)" (reset user-flow).
+
+Changes:
+- Added test in reset.test.ts that verifies problem state path:
+  - Mocks selectLessonCommit to return lesson 01.02.03
+  - Mocks selectProblemOrSolution to return "problem"
+  - Mocks getParentCommit to return parent commit SHA
+  - Mocks selectResetAction to return "reset-current"
+  - Verifies resetHard called with parent commit SHA (parent123), not solution commit
+
+PRD item marked as tested=true.
