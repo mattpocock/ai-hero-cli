@@ -7,3 +7,4 @@ PromptService: implemented selectLessonCommit
 PromptService: implemented selectExercise
 PromptService: implemented confirmProceedWithUncommittedChanges
 PromptService: implemented selectWalkThroughAction
+PromptService: implemented selectSubfolder

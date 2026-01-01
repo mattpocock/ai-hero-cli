@@ -32,6 +32,7 @@ describe("PromptService", () => {
         expect(typeof service.selectExercise).toBe("function");
         expect(typeof service.confirmProceedWithUncommittedChanges).toBe("function");
         expect(typeof service.selectWalkThroughAction).toBe("function");
+        expect(typeof service.selectSubfolder).toBe("function");
       }).pipe(Effect.provide(PromptService.Default))
     );
   });

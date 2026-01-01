@@ -191,6 +191,7 @@
     "service": "PromptService",
     "method": "selectSubfolder",
     "category": "behavior",
+    "status": "DONE",
     "description": "Prompts user to select a subfolder for exercise",
     "steps": [
       "Method receives array of subfolder names",

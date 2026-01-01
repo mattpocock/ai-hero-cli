@@ -428,6 +428,35 @@ export class PromptService extends Effect.Service<PromptService>()(
         }
       );
 
+      /**
+       * Prompts user to select a subfolder for exercise.
+       *
+       * @param subfolders - Array of subfolder names
+       * @returns The selected index (0-based)
+       * @throws PromptCancelledError if user presses Ctrl+C
+       */
+      const selectSubfolder = Effect.fn("selectSubfolder")(function* (
+        subfolders: Array<string>
+      ) {
+        const { subfolderIndex } = yield* runPrompt<{
+          subfolderIndex: number;
+        }>(() =>
+          prompt([
+            {
+              type: "autocomplete",
+              name: "subfolderIndex",
+              message: "Select a subfolder",
+              choices: subfolders.map((subfolder, index) => ({
+                title: subfolder,
+                value: index,
+              })),
+            },
+          ])
+        );
+
+        return subfolderIndex;
+      });
+
       return {
         confirmReadyToCommit,
         confirmSaveToTargetBranch,
@@ -441,6 +470,7 @@ export class PromptService extends Effect.Service<PromptService>()(
         selectExercise,
         confirmProceedWithUncommittedChanges,
         selectWalkThroughAction,
+        selectSubfolder,
       };
     }),
     dependencies: [],
