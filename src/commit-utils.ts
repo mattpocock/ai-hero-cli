@@ -1,19 +1,15 @@
-import { Command } from "@effect/platform";
 import { Console, Data, Effect, Option } from "effect";
 import prompt from "prompts";
+import { GitService, NoParentCommitError } from "./git-service.js";
 import { runPrompt } from "./prompt-utils.js";
+
+export { NoParentCommitError };
 
 export class CommitNotFoundError extends Data.TaggedError(
   "CommitNotFoundError"
 )<{
   lessonId: string;
   branch: string;
-}> {}
-
-export class NoParentCommitError extends Data.TaggedError(
-  "NoParentCommitError"
-)<{
-  commitSha: string;
 }> {}
 
 type ParsedCommit = {
@@ -65,36 +61,25 @@ const parseCommits = (
 
 export const selectLessonCommit = ({
   branch,
-  cwd,
   excludeCurrentBranch,
   lessonId,
   promptMessage,
 }: {
-  cwd: string;
   branch: string;
   lessonId: Option.Option<string>;
   promptMessage: string;
   excludeCurrentBranch: boolean;
 }) =>
   Effect.gen(function* () {
+    const gitService = yield* GitService;
+
     // Search commit history for lesson ID
     let commits: Array<ParsedCommit>;
 
     if (excludeCurrentBranch) {
       // Get commits from current branch to extract lesson IDs
-      const currentBranchCommand = Command.make(
-        "git",
-        "log",
-        "HEAD",
-        "--oneline"
-      ).pipe(Command.workingDirectory(cwd));
-
-      const currentBranchHistory = yield* Command.string(
-        currentBranchCommand
-      );
-      const currentBranchCommits = parseCommits(
-        currentBranchHistory
-      );
+      const currentBranchHistory = yield* gitService.getLogOneline("HEAD");
+      const currentBranchCommits = parseCommits(currentBranchHistory);
 
       // Extract lesson IDs from current branch (only commits with lesson IDs)
       const currentLessonIds = new Set(
@@ -104,16 +89,7 @@ export const selectLessonCommit = ({
       );
 
       // Get commits from target branch
-      const targetBranchCommand = Command.make(
-        "git",
-        "log",
-        branch,
-        "--oneline"
-      ).pipe(Command.workingDirectory(cwd));
-
-      const targetBranchHistory = yield* Command.string(
-        targetBranchCommand
-      );
+      const targetBranchHistory = yield* gitService.getLogOneline(branch);
       const allTargetCommits = parseCommits(targetBranchHistory);
 
       // Filter out commits with lesson IDs that exist on current branch
@@ -121,14 +97,7 @@ export const selectLessonCommit = ({
         (c) => !c.lessonId || !currentLessonIds.has(c.lessonId)
       );
     } else {
-      const gitLogCommand = Command.make(
-        "git",
-        "log",
-        branch,
-        "--oneline"
-      ).pipe(Command.workingDirectory(cwd));
-
-      const commitHistory = yield* Command.string(gitLogCommand);
+      const commitHistory = yield* gitService.getLogOneline(branch);
 
       commits = parseCommits(commitHistory);
     }
@@ -219,27 +188,8 @@ export const selectLessonCommit = ({
  * Get the parent commit of a given commit SHA.
  * Throws NoParentCommitError if the commit has no parent.
  */
-export const getParentCommit = ({
-  commitSha,
-  cwd,
-}: {
-  commitSha: string;
-  cwd: string;
-}) =>
+export const getParentCommit = ({ commitSha }: { commitSha: string }) =>
   Effect.gen(function* () {
-    const gitRevParseCommand = Command.make(
-      "git",
-      "rev-parse",
-      `${commitSha}^`
-    ).pipe(Command.workingDirectory(cwd));
-
-    const parentSha = yield* Command.string(
-      gitRevParseCommand
-    ).pipe(
-      Effect.mapError(
-        () => new NoParentCommitError({ commitSha })
-      )
-    );
-
-    return parentSha.trim();
+    const gitService = yield* GitService;
+    return yield* gitService.getParentCommit(commitSha);
   });

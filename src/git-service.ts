@@ -169,6 +169,15 @@ export class RebaseConflictError extends Data.TaggedError("RebaseConflictError")
   message: string;
 }> {}
 
+/**
+ * Error thrown when a commit has no parent.
+ * This occurs when trying to get the parent of the initial commit
+ * in a repository, as it has no parent by definition.
+ */
+export class NoParentCommitError extends Data.TaggedError("NoParentCommitError")<{
+  commitSha: string;
+}> {}
+
 export class GitService extends Effect.Service<GitService>()(
   "GitService",
   {
@@ -571,6 +580,45 @@ Add upstream remote:
             "--reverse",
             range
           );
+        }),
+
+        /**
+         * Gets commit log in oneline format for a branch.
+         * Uses `git log <branch> --oneline`.
+         * Each line contains: <short-sha> <commit-message>
+         *
+         * @param branch - The branch to get log for (e.g., "main", "HEAD", "origin/main")
+         * @returns The commit log output as a string
+         */
+        getLogOneline: Effect.fn("getLogOneline")(function* (branch: string) {
+          return yield* runCommandWithString(
+            "git",
+            "log",
+            branch,
+            "--oneline"
+          );
+        }),
+
+        /**
+         * Gets the parent commit SHA of a given commit.
+         * Uses `git rev-parse <sha>^` to resolve the parent ref.
+         *
+         * @param sha - The commit SHA to get the parent of
+         * @returns The full SHA of the parent commit
+         * @throws NoParentCommitError if the commit has no parent (e.g., initial commit)
+         */
+        getParentCommit: Effect.fn("getParentCommit")(function* (sha: string) {
+          const parentSha = yield* runCommandWithString(
+            "git",
+            "rev-parse",
+            `${sha}^`
+          ).pipe(
+            Effect.catchAll(() =>
+              Effect.fail(new NoParentCommitError({ commitSha: sha }))
+            )
+          );
+
+          return parentSha;
         }),
 
         /**

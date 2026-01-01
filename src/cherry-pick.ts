@@ -34,7 +34,6 @@ export const cherryPick = CLICommand.make(
   ({ branch, cwd, lessonId }) =>
     Effect.gen(function* () {
       const git = yield* GitService;
-      const config = yield* GitServiceConfig;
 
       // Validate git repository
       yield* git.ensureIsGitRepo();
@@ -47,7 +46,6 @@ export const cherryPick = CLICommand.make(
         commit: targetCommit,
         lessonId: selectedLessonId,
       } = yield* selectLessonCommit({
-        cwd: config.cwd,
         branch,
         lessonId,
         promptMessage:

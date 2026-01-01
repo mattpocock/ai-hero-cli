@@ -64,7 +64,6 @@ export const reset = CLICommand.make(
   }) =>
     Effect.gen(function* () {
       const git = yield* GitService;
-      const config = yield* GitServiceConfig;
 
       // Validate git repository
       yield* git.ensureIsGitRepo();
@@ -77,7 +76,6 @@ export const reset = CLICommand.make(
         commit: targetCommit,
         lessonId: selectedLessonId,
       } = yield* selectLessonCommit({
-        cwd: config.cwd,
         branch,
         lessonId,
         promptMessage:
@@ -139,14 +137,12 @@ export const reset = CLICommand.make(
         if (state === "problem") {
           commitToUse = yield* getParentCommit({
             commitSha: targetCommit.sha,
-            cwd: config.cwd,
           });
           stateDescription = "problem state";
         }
       } else if (problem) {
         commitToUse = yield* getParentCommit({
           commitSha: targetCommit.sha,
-          cwd: config.cwd,
         });
         stateDescription = "problem state";
       }

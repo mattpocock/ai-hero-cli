@@ -92,7 +92,6 @@ export const editCommit = CLICommand.make(
         commit: targetCommit,
         lessonId: selectedLessonId,
       } = yield* selectLessonCommit({
-        cwd,
         branch,
         lessonId,
         promptMessage:
