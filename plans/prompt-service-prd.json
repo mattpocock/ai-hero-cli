@@ -88,6 +88,7 @@
     "service": "PromptService",
     "method": "confirmResetWithUncommittedChanges",
     "category": "behavior",
+    "status": "DONE",
     "description": "Warns about uncommitted changes before reset",
     "steps": [
       "Displays: 'This will lose all uncommitted work. Continue?'",

@@ -172,6 +172,31 @@ export class PromptService extends Effect.Service<PromptService>()(
         return action;
       });
 
+      /**
+       * Warns about uncommitted changes before reset.
+       * Default is false (no) for safety.
+       *
+       * @throws PromptCancelledError if user declines or cancels
+       */
+      const confirmResetWithUncommittedChanges = Effect.fn(
+        "confirmResetWithUncommittedChanges"
+      )(function* () {
+        const { confirm } = yield* runPrompt<{ confirm: boolean }>(() =>
+          prompt([
+            {
+              type: "confirm",
+              name: "confirm",
+              message: "This will lose all uncommitted work. Continue?",
+              initial: false,
+            },
+          ])
+        );
+
+        if (!confirm) {
+          return yield* new PromptCancelledError();
+        }
+      });
+
       return {
         confirmReadyToCommit,
         confirmSaveToTargetBranch,
@@ -179,6 +204,7 @@ export class PromptService extends Effect.Service<PromptService>()(
         selectCherryPickConflictAction,
         selectProblemOrSolution,
         selectResetAction,
+        confirmResetWithUncommittedChanges,
       };
     }),
     dependencies: [],
