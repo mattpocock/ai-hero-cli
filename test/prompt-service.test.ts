@@ -28,6 +28,7 @@ describe("PromptService", () => {
         expect(typeof service.selectResetAction).toBe("function");
         expect(typeof service.confirmResetWithUncommittedChanges).toBe("function");
         expect(typeof service.inputBranchName).toBe("function");
+        expect(typeof service.selectLessonCommit).toBe("function");
       }).pipe(Effect.provide(PromptService.Default))
     );
   });

@@ -115,6 +115,7 @@
     "service": "PromptService",
     "method": "selectLessonCommit",
     "category": "behavior",
+    "status": "DONE",
     "description": "Autocomplete prompt for selecting a lesson commit",
     "steps": [
       "Method receives array of commits with lessonId and message",

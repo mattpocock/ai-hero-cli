@@ -225,6 +225,56 @@ export class PromptService extends Effect.Service<PromptService>()(
         return branchName;
       });
 
+      /**
+       * Autocomplete prompt for selecting a lesson commit.
+       *
+       * @param commits - Array of commits with lessonId and message
+       * @param promptMessage - Custom prompt message to display
+       * @returns The selected lesson ID string
+       * @throws PromptCancelledError if user presses Ctrl+C
+       */
+      const selectLessonCommit = Effect.fn("selectLessonCommit")(function* (
+        commits: Array<{ lessonId: string; message: string }>,
+        promptMessage: string
+      ) {
+        const { lesson } = yield* runPrompt<{ lesson: string }>(() =>
+          prompt([
+            {
+              type: "autocomplete",
+              name: "lesson",
+              message: promptMessage,
+              choices: commits.map((commit) => ({
+                title: commit.lessonId,
+                value: commit.lessonId,
+                description: commit.message,
+              })),
+              suggest: async (
+                input: string,
+                choices: Array<{ title: string; value: string; description: string }>
+              ) => {
+                const lowerInput = input.toLowerCase();
+                return choices.filter((choice) => {
+                  const searchText = `${choice.title} ${choice.description}`;
+                  // Check if input matches
+                  if (searchText.toLowerCase().includes(lowerInput)) {
+                    return true;
+                  }
+                  // Regex-based fuzzy matching for lesson IDs (e.g., 01.02.03)
+                  // Allow matching without leading zeros or dots
+                  const lessonIdPattern = choice.title
+                    .replace(/\./g, "\\.?")
+                    .replace(/0(\d)/g, "0?$1");
+                  const regex = new RegExp(lessonIdPattern, "i");
+                  return regex.test(input);
+                });
+              },
+            },
+          ])
+        );
+
+        return lesson;
+      });
+
       return {
         confirmReadyToCommit,
         confirmSaveToTargetBranch,
@@ -234,6 +284,7 @@ export class PromptService extends Effect.Service<PromptService>()(
         selectResetAction,
         confirmResetWithUncommittedChanges,
         inputBranchName,
+        selectLessonCommit,
       };
     }),
     dependencies: [],
