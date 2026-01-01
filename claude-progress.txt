@@ -28,3 +28,16 @@ Changes:
 - Verified runCherryPick propagates NotAGitRepoError with correct path/message
 
 PRD item marked as tested=true.
+
+---
+
+## Session 2026-01-01 (cont. 2)
+
+Added test for PRD: "User runs reset outside git repo" (reset error case).
+
+Changes:
+- Extracted `runReset` function from reset.ts for testability (same pattern as cherry-pick)
+- Removed duplicate NotAGitRepoError from reset.ts (uses git-service.ts version)
+- Created test/reset.test.ts with test for NotAGitRepoError case
+
+PRD item marked as tested=true.

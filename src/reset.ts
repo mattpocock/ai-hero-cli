@@ -3,7 +3,7 @@ import {
   Command as CLICommand,
   Options,
 } from "@effect/cli";
-import { Console, Data, Effect } from "effect";
+import { Console, Data, Effect, Option } from "effect";
 import {
   getParentCommit,
   selectLessonCommit,
@@ -13,18 +13,171 @@ import { GitService, GitServiceConfig } from "./git-service.js";
 import { cwdOption } from "./options.js";
 import { PromptService } from "./prompt-service.js";
 
-export class NotAGitRepoError extends Data.TaggedError(
-  "NotAGitRepoError"
-)<{
-  path: string;
-  message: string;
-}> {}
-
 export class InvalidBranchOperationError extends Data.TaggedError(
   "InvalidBranchOperationError"
 )<{
   message: string;
 }> {}
+
+/**
+ * Core reset logic, extracted for testability.
+ * Takes options as Effect Option types.
+ */
+export const runReset = ({
+  branch,
+  lessonId,
+  problem,
+  solution,
+  demo,
+}: {
+  branch: string;
+  lessonId: Option.Option<string>;
+  problem: boolean;
+  solution: boolean;
+  demo: boolean;
+}) =>
+  Effect.gen(function* () {
+    const git = yield* GitService;
+    const promptService = yield* PromptService;
+
+    // Validate git repository
+    yield* git.ensureIsGitRepo();
+
+    yield* git.ensureUpstreamBranchConnected({
+      targetBranch: branch,
+    });
+
+    const {
+      commit: targetCommit,
+      lessonId: selectedLessonId,
+    } = yield* selectLessonCommit({
+      branch,
+      lessonId,
+      promptMessage:
+        "Which lesson do you want to reset to? (type to search)",
+      excludeCurrentBranch: false,
+    });
+
+    // Determine which commit to use based on problem/solution state
+    let commitToUse = targetCommit.sha;
+    let stateDescription = "final code";
+
+    // Check for conflicting flags
+    if (problem && solution) {
+      return yield* Effect.fail(
+        new InvalidBranchOperationError({
+          message:
+            "Cannot use both --problem and --solution flags",
+        })
+      );
+    }
+
+    if (demo && (problem || solution)) {
+      return yield* Effect.fail(
+        new InvalidBranchOperationError({
+          message:
+            "Cannot use --demo with --problem or --solution flags",
+        })
+      );
+    }
+
+    // If neither flag is provided, prompt user (unless demo mode)
+    if (!problem && !solution && !demo) {
+      const state = yield* promptService.selectProblemOrSolution();
+
+      if (state === "problem") {
+        commitToUse = yield* getParentCommit({
+          commitSha: targetCommit.sha,
+        });
+        stateDescription = "problem state";
+      }
+    } else if (problem) {
+      commitToUse = yield* getParentCommit({
+        commitSha: targetCommit.sha,
+      });
+      stateDescription = "problem state";
+    }
+    // If solution flag is set, commitToUse stays as targetCommit.sha
+
+    const currentBranch = yield* git.getCurrentBranch();
+
+    // Prompt for action (skip in demo mode)
+    let action: "reset-current" | "create-branch";
+    if (currentBranch === "main") {
+      yield* Console.log(
+        "You cannot reset the main branch. Creating a new branch..."
+      );
+      action = "create-branch";
+    } else if (demo) {
+      action = "reset-current";
+    } else {
+      action = yield* promptService.selectResetAction(currentBranch);
+    }
+
+    if (action === "reset-current") {
+      // Check if current branch is the target branch
+      if (currentBranch === branch) {
+        return yield* new InvalidBranchOperationError({
+          message: `Cannot reset current branch when on target branch "${branch}"`,
+        });
+      }
+    }
+
+    if (action === "create-branch") {
+      const branchName = yield* promptService.inputBranchName("new");
+
+      yield* Console.log(
+        `Creating branch ${branchName} from ${commitToUse} (${stateDescription})...`
+      );
+
+      yield* git.checkoutNewBranchAt(branchName, commitToUse);
+
+      yield* Console.log(
+        `✓ Created and checked out branch: ${branchName}`
+      );
+      return;
+    }
+
+    // Reset current branch - check for unstaged changes (skip in demo mode)
+    if (!demo) {
+      const { hasUncommittedChanges, statusOutput } =
+        yield* git.getUncommittedChanges();
+
+      if (hasUncommittedChanges) {
+        yield* Console.log(
+          "\nWarning: You have uncommitted changes:"
+        );
+        yield* Console.log(statusOutput);
+
+        yield* promptService.confirmResetWithUncommittedChanges();
+      }
+    }
+
+    // Reset to target commit
+    yield* Console.log(
+      `Resetting to ${commitToUse} (${stateDescription})...`
+    );
+
+    yield* git.resetHard(commitToUse);
+
+    // Demo mode: undo commit and unstage changes
+    if (demo) {
+      yield* Console.log(
+        "Undoing commit and unstaging changes..."
+      );
+
+      yield* git.resetHead();
+      yield* git.restoreStaged();
+
+      yield* Console.log(
+        `✓ Demo mode: Reset to lesson ${selectedLessonId} with unstaged changes`
+      );
+    } else {
+      yield* Console.log(
+        `✓ Reset to lesson ${selectedLessonId} (${stateDescription})`
+      );
+    }
+  });
 
 export const reset = CLICommand.make(
   "reset",
@@ -61,148 +214,7 @@ export const reset = CLICommand.make(
     problem,
     solution,
   }) =>
-    Effect.gen(function* () {
-      const git = yield* GitService;
-      const promptService = yield* PromptService;
-
-      // Validate git repository
-      yield* git.ensureIsGitRepo();
-
-      yield* git.ensureUpstreamBranchConnected({
-        targetBranch: branch,
-      });
-
-      const {
-        commit: targetCommit,
-        lessonId: selectedLessonId,
-      } = yield* selectLessonCommit({
-        branch,
-        lessonId,
-        promptMessage:
-          "Which lesson do you want to reset to? (type to search)",
-        excludeCurrentBranch: false,
-      });
-
-      // Determine which commit to use based on problem/solution state
-      let commitToUse = targetCommit.sha;
-      let stateDescription = "final code";
-
-      // Check for conflicting flags
-      if (problem && solution) {
-        return yield* Effect.fail(
-          new InvalidBranchOperationError({
-            message:
-              "Cannot use both --problem and --solution flags",
-          })
-        );
-      }
-
-      if (demo && (problem || solution)) {
-        return yield* Effect.fail(
-          new InvalidBranchOperationError({
-            message:
-              "Cannot use --demo with --problem or --solution flags",
-          })
-        );
-      }
-
-      // If neither flag is provided, prompt user (unless demo mode)
-      if (!problem && !solution && !demo) {
-        const state = yield* promptService.selectProblemOrSolution();
-
-        if (state === "problem") {
-          commitToUse = yield* getParentCommit({
-            commitSha: targetCommit.sha,
-          });
-          stateDescription = "problem state";
-        }
-      } else if (problem) {
-        commitToUse = yield* getParentCommit({
-          commitSha: targetCommit.sha,
-        });
-        stateDescription = "problem state";
-      }
-      // If solution flag is set, commitToUse stays as targetCommit.sha
-
-      const currentBranch = yield* git.getCurrentBranch();
-
-      // Prompt for action (skip in demo mode)
-      let action: "reset-current" | "create-branch";
-      if (currentBranch === "main") {
-        yield* Console.log(
-          "You cannot reset the main branch. Creating a new branch..."
-        );
-        action = "create-branch";
-      } else if (demo) {
-        action = "reset-current";
-      } else {
-        action = yield* promptService.selectResetAction(currentBranch);
-      }
-
-      if (action === "reset-current") {
-        // Check if current branch is the target branch
-        if (currentBranch === branch) {
-          return yield* new InvalidBranchOperationError({
-            message: `Cannot reset current branch when on target branch "${branch}"`,
-          });
-        }
-      }
-
-      if (action === "create-branch") {
-        const branchName = yield* promptService.inputBranchName("new");
-
-        yield* Console.log(
-          `Creating branch ${branchName} from ${commitToUse} (${stateDescription})...`
-        );
-
-        yield* git.checkoutNewBranchAt(branchName, commitToUse);
-
-        yield* Console.log(
-          `✓ Created and checked out branch: ${branchName}`
-        );
-        return;
-      }
-
-      // Reset current branch - check for unstaged changes (skip in demo mode)
-      if (!demo) {
-        const { hasUncommittedChanges, statusOutput } =
-          yield* git.getUncommittedChanges();
-
-        if (hasUncommittedChanges) {
-          yield* Console.log(
-            "\nWarning: You have uncommitted changes:"
-          );
-          yield* Console.log(statusOutput);
-
-          yield* promptService.confirmResetWithUncommittedChanges();
-        }
-      }
-
-      // Reset to target commit
-      yield* Console.log(
-        `Resetting to ${commitToUse} (${stateDescription})...`
-      );
-
-      yield* git.resetHard(commitToUse);
-
-      // Demo mode: undo commit and unstage changes
-      if (demo) {
-        yield* Console.log(
-          "Undoing commit and unstaging changes..."
-        );
-
-        yield* git.resetHead();
-        yield* git.restoreStaged();
-
-        yield* Console.log(
-          `✓ Demo mode: Reset to lesson ${selectedLessonId} with unstaged changes`
-        );
-      } else {
-        yield* Console.log(
-          `✓ Reset to lesson ${selectedLessonId} (${stateDescription})`
-        );
-      }
-    }).pipe(
+    runReset({ branch, lessonId, problem, solution, demo }).pipe(
       Effect.provideService(
         GitServiceConfig,
         GitServiceConfig.of({

@@ -332,7 +332,7 @@
     "command": "reset",
     "category": "error",
     "description": "User runs reset outside git repo",
-    "tested": false,
+    "tested": true,
     "steps": [
       "User is in directory without .git folder",
       "User runs `ai-hero reset`",
