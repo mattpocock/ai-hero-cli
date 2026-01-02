@@ -663,6 +663,158 @@ Add upstream remote:
     );
   });
 
+  describe("PRD: User cherry-picks from custom source branch", () => {
+    it.effect(
+      "should fetch and use custom branch when --branch option is provided",
+      () =>
+        Effect.gen(function* () {
+          let ensureUpstreamBranchArg = "";
+          let cherryPickCalled = false;
+          let cherryPickSha = "";
+
+          const mockGitService = fromPartial<GitService>({
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(
+              function* () {}
+            ),
+            ensureUpstreamBranchConnected: Effect.fn(
+              "ensureUpstreamBranchConnected"
+            )(function* (opts: { targetBranch: string }) {
+              ensureUpstreamBranchArg = opts.targetBranch;
+            }),
+            getLogOneline: Effect.fn("getLogOneline")(function* (
+              branch: string
+            ) {
+              if (branch === "HEAD") {
+                return "abc1234 Initial commit";
+              }
+              // Custom branch has different lessons
+              if (
+                branch.includes("custom-lessons") ||
+                branch === "custom-lessons"
+              ) {
+                return `xyz9999 02.01.01 Custom lesson from custom branch`;
+              }
+              // Default branch would have different content
+              return `def5678 01.02.03 Add new feature`;
+            }),
+            getCurrentBranch: Effect.fn("getCurrentBranch")(
+              function* () {
+                return "matt/feature-work";
+              }
+            ),
+            cherryPick: Effect.fn("cherryPick")(function* (
+              sha: string
+            ) {
+              cherryPickCalled = true;
+              cherryPickSha = sha;
+            }),
+          });
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectLessonCommit: Effect.fn("selectLessonCommit")(
+              function* () {
+                return "02.01.01";
+              }
+            ),
+          });
+
+          const testLayer = Layer.mergeAll(
+            Layer.succeed(GitService, mockGitService),
+            Layer.succeed(PromptService, mockPromptService),
+            Layer.succeed(GitServiceConfig, {
+              cwd: "/test/dir",
+            }),
+            NodeContext.layer
+          );
+
+          // Act: cherry-pick from custom branch
+          yield* runCherryPick({
+            branch: "custom-lessons",
+            lessonId: Option.none(),
+          }).pipe(Effect.provide(testLayer));
+
+          // Assert: ensureUpstreamBranchConnected was called with custom branch
+          expect(ensureUpstreamBranchArg).toBe("custom-lessons");
+
+          // Assert: cherry-pick happened with commit from custom branch
+          expect(cherryPickCalled).toBe(true);
+          expect(cherryPickSha).toBe("xyz9999");
+        })
+    );
+
+    it.effect(
+      "should cherry-pick specific lesson from custom branch when ID provided",
+      () =>
+        Effect.gen(function* () {
+          let ensureUpstreamBranchArg = "";
+          let cherryPickSha = "";
+
+          const mockGitService = fromPartial<GitService>({
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(
+              function* () {}
+            ),
+            ensureUpstreamBranchConnected: Effect.fn(
+              "ensureUpstreamBranchConnected"
+            )(function* (opts: { targetBranch: string }) {
+              ensureUpstreamBranchArg = opts.targetBranch;
+            }),
+            getLogOneline: Effect.fn("getLogOneline")(function* (
+              branch: string
+            ) {
+              if (branch === "HEAD") {
+                return "abc1234 Initial commit";
+              }
+              // Custom branch with specific lessons
+              return `aaa1111 03.01.02 Second custom lesson
+bbb2222 03.01.01 First custom lesson`;
+            }),
+            getCurrentBranch: Effect.fn("getCurrentBranch")(
+              function* () {
+                return "matt/custom-work";
+              }
+            ),
+            cherryPick: Effect.fn("cherryPick")(function* (
+              sha: string
+            ) {
+              cherryPickSha = sha;
+            }),
+          });
+
+          const mockPromptService = fromPartial<PromptService>({
+            // Should NOT be called when lessonId is provided
+            selectLessonCommit: Effect.fn("selectLessonCommit")(
+              function* () {
+                throw new Error(
+                  "selectLessonCommit should not be called"
+                );
+              }
+            ),
+          });
+
+          const testLayer = Layer.mergeAll(
+            Layer.succeed(GitService, mockGitService),
+            Layer.succeed(PromptService, mockPromptService),
+            Layer.succeed(GitServiceConfig, {
+              cwd: "/test/dir",
+            }),
+            NodeContext.layer
+          );
+
+          // Act: cherry-pick specific lesson from custom branch
+          yield* runCherryPick({
+            branch: "custom-lessons",
+            lessonId: Option.some("03.01.02"),
+          }).pipe(Effect.provide(testLayer));
+
+          // Assert: custom branch was used
+          expect(ensureUpstreamBranchArg).toBe("custom-lessons");
+
+          // Assert: correct commit from custom branch was cherry-picked
+          expect(cherryPickSha).toBe("aaa1111");
+        })
+    );
+  });
+
   describe("PRD: Branch creation fails during main protection flow", () => {
     it.effect(
       "should fail with FailedToCreateBranchError when branch already exists",

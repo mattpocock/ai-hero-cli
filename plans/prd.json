@@ -62,7 +62,7 @@
     "command": "cherry-pick",
     "category": "user-flow",
     "description": "User cherry-picks from custom source branch",
-    "tested": false,
+    "tested": true,
     "steps": [
       "User runs `ai-hero cherry-pick --branch custom-lessons`",
       "System fetches 'custom-lessons' branch from upstream",

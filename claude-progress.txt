@@ -374,3 +374,20 @@ Changes:
 - Added NoParentCommitError to imports in reset.test.ts
 
 PRD item marked as tested=true.
+
+---
+
+## Session 2026-01-02 (cont. 10)
+
+Added test for PRD: "User cherry-picks from custom source branch" (cherry-pick user-flow).
+
+Changes:
+- Added 2 tests in cherry-pick.test.ts:
+  1. "should fetch and use custom branch when --branch option is provided"
+     - Verifies ensureUpstreamBranchConnected called with custom branch name
+     - Verifies cherry-pick uses commit from custom branch
+  2. "should cherry-pick specific lesson from custom branch when ID provided"
+     - Verifies custom branch used with direct lesson ID
+     - Verifies selectLessonCommit prompt is skipped
+
+PRD item marked as tested=true.
