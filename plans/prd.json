@@ -268,7 +268,7 @@
     "command": "reset",
     "category": "user-flow",
     "description": "User is warned about uncommitted changes",
-    "tested": false,
+    "tested": true,
     "steps": [
       "User has uncommitted changes in working directory",
       "User runs `ai-hero reset 01.02.03`",

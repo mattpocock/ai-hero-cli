@@ -9,7 +9,10 @@ import {
   NoUpstreamFoundError,
   NotAGitRepoError,
 } from "../src/git-service.js";
-import { PromptService } from "../src/prompt-service.js";
+import {
+  PromptCancelledError,
+  PromptService,
+} from "../src/prompt-service.js";
 import { InvalidBranchOperationError, runReset } from "../src/reset.js";
 
 /**
@@ -1031,6 +1034,251 @@ def5678 01.02.02 Setup base structure`;
             branchName: "matt/problem-work",
             sha: "parent123",
           });
+        })
+    );
+  });
+
+  describe("PRD: User is warned about uncommitted changes", () => {
+    it.effect(
+      "should warn about uncommitted changes and proceed when user confirms",
+      () =>
+        Effect.gen(function* () {
+          let resetHardCalledWith: string | undefined;
+          let confirmResetWithUncommittedChangesCalled = false;
+
+          const mockGitService = fromPartial<GitService>({
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(function* () {}),
+            ensureUpstreamBranchConnected: Effect.fn(
+              "ensureUpstreamBranchConnected"
+            )(function* (_opts: { targetBranch: string }) {}),
+            getLogOneline: Effect.fn("getLogOneline")(function* (
+              _branch: string
+            ) {
+              return `abc1234 01.02.03 Add new feature`;
+            }),
+            getCurrentBranch: Effect.fn("getCurrentBranch")(function* () {
+              return "matt/feature-branch";
+            }),
+            getUncommittedChanges: Effect.fn("getUncommittedChanges")(
+              function* () {
+                return {
+                  hasUncommittedChanges: true,
+                  statusOutput: " M src/index.ts\n?? new-file.ts",
+                };
+              }
+            ),
+            resetHard: Effect.fn("resetHard")(function* (sha: string) {
+              resetHardCalledWith = sha;
+            }),
+          });
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectLessonCommit: Effect.fn("selectLessonCommit")(function* (
+              _commits: Array<{ lessonId: string; message: string }>,
+              _promptMessage: string
+            ) {
+              return "01.02.03";
+            }),
+            selectProblemOrSolution: Effect.fn("selectProblemOrSolution")(
+              function* () {
+                return "solution" as const;
+              }
+            ),
+            selectResetAction: Effect.fn("selectResetAction")(function* (
+              _branch: string
+            ) {
+              return "reset-current" as const;
+            }),
+            confirmResetWithUncommittedChanges: Effect.fn(
+              "confirmResetWithUncommittedChanges"
+            )(function* () {
+              confirmResetWithUncommittedChangesCalled = true;
+              // User confirms YES to proceed
+            }),
+          });
+
+          const testLayer = Layer.mergeAll(
+            Layer.succeed(GitService, mockGitService),
+            Layer.succeed(PromptService, mockPromptService),
+            Layer.succeed(GitServiceConfig, {
+              cwd: "/test/repo",
+            }),
+            NodeContext.layer
+          );
+
+          yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.some("01.02.03"),
+            problem: false,
+            solution: false,
+            demo: false,
+          }).pipe(Effect.provide(testLayer));
+
+          // Verify confirmation prompt was called
+          expect(confirmResetWithUncommittedChangesCalled).toBe(true);
+          // Verify reset still proceeded after confirmation
+          expect(resetHardCalledWith).toBe("abc1234");
+        })
+    );
+
+    it.effect(
+      "should cancel reset when user declines confirmation",
+      () =>
+        Effect.gen(function* () {
+          let resetHardCalled = false;
+
+          const mockGitService = fromPartial<GitService>({
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(function* () {}),
+            ensureUpstreamBranchConnected: Effect.fn(
+              "ensureUpstreamBranchConnected"
+            )(function* (_opts: { targetBranch: string }) {}),
+            getLogOneline: Effect.fn("getLogOneline")(function* (
+              _branch: string
+            ) {
+              return `abc1234 01.02.03 Add new feature`;
+            }),
+            getCurrentBranch: Effect.fn("getCurrentBranch")(function* () {
+              return "matt/feature-branch";
+            }),
+            getUncommittedChanges: Effect.fn("getUncommittedChanges")(
+              function* () {
+                return {
+                  hasUncommittedChanges: true,
+                  statusOutput: " M src/index.ts",
+                };
+              }
+            ),
+            resetHard: Effect.fn("resetHard")(function* (_sha: string) {
+              resetHardCalled = true;
+            }),
+          });
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectLessonCommit: Effect.fn("selectLessonCommit")(function* (
+              _commits: Array<{ lessonId: string; message: string }>,
+              _promptMessage: string
+            ) {
+              return "01.02.03";
+            }),
+            selectProblemOrSolution: Effect.fn("selectProblemOrSolution")(
+              function* () {
+                return "solution" as const;
+              }
+            ),
+            selectResetAction: Effect.fn("selectResetAction")(function* (
+              _branch: string
+            ) {
+              return "reset-current" as const;
+            }),
+            confirmResetWithUncommittedChanges: Effect.fn(
+              "confirmResetWithUncommittedChanges"
+            )(function* () {
+              // User declines - throw PromptCancelledError
+              return yield* Effect.fail(new PromptCancelledError());
+            }),
+          });
+
+          const testLayer = Layer.mergeAll(
+            Layer.succeed(GitService, mockGitService),
+            Layer.succeed(PromptService, mockPromptService),
+            Layer.succeed(GitServiceConfig, {
+              cwd: "/test/repo",
+            }),
+            NodeContext.layer
+          );
+
+          const result = yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.some("01.02.03"),
+            problem: false,
+            solution: false,
+            demo: false,
+          }).pipe(Effect.provide(testLayer), Effect.flip);
+
+          // Verify reset was cancelled
+          expect(result).toBeInstanceOf(PromptCancelledError);
+          expect(resetHardCalled).toBe(false);
+        })
+    );
+
+    it.effect(
+      "should not prompt for confirmation when no uncommitted changes",
+      () =>
+        Effect.gen(function* () {
+          let confirmResetWithUncommittedChangesCalled = false;
+          let resetHardCalledWith: string | undefined;
+
+          const mockGitService = fromPartial<GitService>({
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(function* () {}),
+            ensureUpstreamBranchConnected: Effect.fn(
+              "ensureUpstreamBranchConnected"
+            )(function* (_opts: { targetBranch: string }) {}),
+            getLogOneline: Effect.fn("getLogOneline")(function* (
+              _branch: string
+            ) {
+              return `abc1234 01.02.03 Add new feature`;
+            }),
+            getCurrentBranch: Effect.fn("getCurrentBranch")(function* () {
+              return "matt/feature-branch";
+            }),
+            getUncommittedChanges: Effect.fn("getUncommittedChanges")(
+              function* () {
+                return {
+                  hasUncommittedChanges: false,
+                  statusOutput: "",
+                };
+              }
+            ),
+            resetHard: Effect.fn("resetHard")(function* (sha: string) {
+              resetHardCalledWith = sha;
+            }),
+          });
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectLessonCommit: Effect.fn("selectLessonCommit")(function* (
+              _commits: Array<{ lessonId: string; message: string }>,
+              _promptMessage: string
+            ) {
+              return "01.02.03";
+            }),
+            selectProblemOrSolution: Effect.fn("selectProblemOrSolution")(
+              function* () {
+                return "solution" as const;
+              }
+            ),
+            selectResetAction: Effect.fn("selectResetAction")(function* (
+              _branch: string
+            ) {
+              return "reset-current" as const;
+            }),
+            confirmResetWithUncommittedChanges: Effect.fn(
+              "confirmResetWithUncommittedChanges"
+            )(function* () {
+              confirmResetWithUncommittedChangesCalled = true;
+            }),
+          });
+
+          const testLayer = Layer.mergeAll(
+            Layer.succeed(GitService, mockGitService),
+            Layer.succeed(PromptService, mockPromptService),
+            Layer.succeed(GitServiceConfig, {
+              cwd: "/test/repo",
+            }),
+            NodeContext.layer
+          );
+
+          yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.some("01.02.03"),
+            problem: false,
+            solution: false,
+            demo: false,
+          }).pipe(Effect.provide(testLayer));
+
+          // Verify confirmation prompt was NOT called
+          expect(confirmResetWithUncommittedChangesCalled).toBe(false);
+          // Verify reset proceeded
+          expect(resetHardCalledWith).toBe("abc1234");
         })
     );
   });

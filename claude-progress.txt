@@ -246,3 +246,27 @@ Changes:
      - Verifies checkoutNewBranchAt called with parent commit SHA (problem state)
 
 PRD item marked as tested=true.
+
+---
+
+## Session 2026-01-02 (cont. 2)
+
+Added test for PRD: "User is warned about uncommitted changes" (reset user-flow).
+
+Changes:
+- Added 3 tests in reset.test.ts:
+  1. "should warn about uncommitted changes and proceed when user confirms"
+     - Mocks getUncommittedChanges to return { hasUncommittedChanges: true, statusOutput: "..." }
+     - Verifies confirmResetWithUncommittedChanges is called
+     - Verifies resetHard proceeds after confirmation
+  2. "should cancel reset when user declines confirmation"
+     - confirmResetWithUncommittedChanges fails with PromptCancelledError
+     - Verifies resetHard is NOT called
+     - Verifies PromptCancelledError is propagated
+  3. "should not prompt for confirmation when no uncommitted changes"
+     - hasUncommittedChanges = false
+     - Verifies confirmResetWithUncommittedChanges is NOT called
+     - Verifies resetHard proceeds directly
+- Added PromptCancelledError import to reset.test.ts
+
+PRD item marked as tested=true.
