@@ -228,3 +228,21 @@ Changes:
      - Verifies checkoutNewBranchAt called with parent commit SHA (problem state)
 
 PRD item marked as tested=true.
+
+---
+
+## Session 2026-01-02 (cont.)
+
+Added test for PRD: "User is forced to create branch when on main" (reset user-flow).
+
+Changes:
+- Added 2 tests in reset.test.ts:
+  1. "should skip action selection and force create-branch when on main"
+     - Mocks getCurrentBranch to return "main"
+     - Tracks whether selectResetAction was called (should NOT be)
+     - Verifies checkoutNewBranchAt called with correct branch name and solution commit SHA
+  2. "should create branch at parent commit when on main and problem state selected"
+     - Same setup but selectProblemOrSolution returns "problem"
+     - Verifies checkoutNewBranchAt called with parent commit SHA (problem state)
+
+PRD item marked as tested=true.

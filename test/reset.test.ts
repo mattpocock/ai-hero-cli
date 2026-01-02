@@ -870,6 +870,171 @@ def5678 01.02.02 Setup base structure`;
     );
   });
 
+  describe("PRD: User is forced to create branch when on main", () => {
+    it.effect(
+      "should skip action selection and force create-branch when on main",
+      () =>
+        Effect.gen(function* () {
+          let checkoutNewBranchAtCalledWith:
+            | { branchName: string; sha: string }
+            | undefined;
+          let selectResetActionCalled = false;
+
+          const mockGitService = fromPartial<GitService>({
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(function* () {}),
+            ensureUpstreamBranchConnected: Effect.fn(
+              "ensureUpstreamBranchConnected"
+            )(function* (_opts: { targetBranch: string }) {}),
+            getLogOneline: Effect.fn("getLogOneline")(function* (
+              _branch: string
+            ) {
+              return `abc1234 01.02.03 Add new feature
+def5678 01.02.02 Setup base structure`;
+            }),
+            getCurrentBranch: Effect.fn("getCurrentBranch")(function* () {
+              // User is on main branch
+              return "main";
+            }),
+            checkoutNewBranchAt: Effect.fn("checkoutNewBranchAt")(function* (
+              branchName: string,
+              sha: string
+            ) {
+              checkoutNewBranchAtCalledWith = { branchName, sha };
+            }),
+          });
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectLessonCommit: Effect.fn("selectLessonCommit")(function* (
+              _commits: Array<{ lessonId: string; message: string }>,
+              _promptMessage: string
+            ) {
+              return "01.02.03";
+            }),
+            selectProblemOrSolution: Effect.fn("selectProblemOrSolution")(
+              function* () {
+                return "solution" as const;
+              }
+            ),
+            selectResetAction: Effect.fn("selectResetAction")(function* (
+              _branch: string
+            ) {
+              selectResetActionCalled = true;
+              return "reset-current" as const; // Should NOT be called
+            }),
+            inputBranchName: Effect.fn("inputBranchName")(function* (
+              _context: "working" | "new"
+            ) {
+              return "matt/lesson-work";
+            }),
+          });
+
+          const testLayer = Layer.mergeAll(
+            Layer.succeed(GitService, mockGitService),
+            Layer.succeed(PromptService, mockPromptService),
+            Layer.succeed(GitServiceConfig, {
+              cwd: "/test/repo",
+            }),
+            NodeContext.layer
+          );
+
+          yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.some("01.02.03"),
+            problem: false,
+            solution: false,
+            demo: false,
+          }).pipe(Effect.provide(testLayer));
+
+          // Verify selectResetAction was NOT called (skipped)
+          expect(selectResetActionCalled).toBe(false);
+          // Verify checkoutNewBranchAt was called with correct args
+          expect(checkoutNewBranchAtCalledWith).toEqual({
+            branchName: "matt/lesson-work",
+            sha: "abc1234",
+          });
+        })
+    );
+
+    it.effect(
+      "should create branch at parent commit when on main and problem state selected",
+      () =>
+        Effect.gen(function* () {
+          let checkoutNewBranchAtCalledWith:
+            | { branchName: string; sha: string }
+            | undefined;
+
+          const mockGitService = fromPartial<GitService>({
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(function* () {}),
+            ensureUpstreamBranchConnected: Effect.fn(
+              "ensureUpstreamBranchConnected"
+            )(function* (_opts: { targetBranch: string }) {}),
+            getLogOneline: Effect.fn("getLogOneline")(function* (
+              _branch: string
+            ) {
+              return `abc1234 01.02.03 Add new feature
+def5678 01.02.02 Setup base structure`;
+            }),
+            getCurrentBranch: Effect.fn("getCurrentBranch")(function* () {
+              return "main";
+            }),
+            getParentCommit: Effect.fn("getParentCommit")(function* (
+              _sha: string
+            ) {
+              return "parent123";
+            }),
+            checkoutNewBranchAt: Effect.fn("checkoutNewBranchAt")(function* (
+              branchName: string,
+              sha: string
+            ) {
+              checkoutNewBranchAtCalledWith = { branchName, sha };
+            }),
+          });
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectLessonCommit: Effect.fn("selectLessonCommit")(function* (
+              _commits: Array<{ lessonId: string; message: string }>,
+              _promptMessage: string
+            ) {
+              return "01.02.03";
+            }),
+            selectProblemOrSolution: Effect.fn("selectProblemOrSolution")(
+              function* () {
+                return "problem" as const;
+              }
+            ),
+            inputBranchName: Effect.fn("inputBranchName")(function* (
+              _context: "working" | "new"
+            ) {
+              return "matt/problem-work";
+            }),
+          });
+
+          const testLayer = Layer.mergeAll(
+            Layer.succeed(GitService, mockGitService),
+            Layer.succeed(PromptService, mockPromptService),
+            Layer.succeed(GitServiceConfig, {
+              cwd: "/test/repo",
+            }),
+            NodeContext.layer
+          );
+
+          yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.some("01.02.03"),
+            problem: false,
+            solution: false,
+            demo: false,
+          }).pipe(Effect.provide(testLayer));
+
+          // Verify checkoutNewBranchAt was called with parent commit (problem state)
+          expect(checkoutNewBranchAtCalledWith).toEqual({
+            branchName: "matt/problem-work",
+            sha: "parent123",
+          });
+        })
+    );
+  });
+
   describe("PRD: User attempts reset when on target branch", () => {
     it.effect(
       "should fail with InvalidBranchOperationError when on target branch and selecting reset-current",

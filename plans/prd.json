@@ -253,7 +253,7 @@
     "command": "reset",
     "category": "user-flow",
     "description": "User is forced to create branch when on main",
-    "tested": false,
+    "tested": true,
     "steps": [
       "User is on 'main' branch",
       "User runs `ai-hero reset 01.02.03`",
