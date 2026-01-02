@@ -4,6 +4,7 @@ import { fromPartial } from "@total-typescript/shoehorn";
 import { Effect, Layer, Option } from "effect";
 import { CommitNotFoundError } from "../src/commit-utils.js";
 import {
+  FailedToCreateBranchError,
   GitService,
   GitServiceConfig,
   NoUpstreamFoundError,
@@ -1639,6 +1640,88 @@ def5678 01.02.03 Add new feature`;
             expect(result.message).toContain(
               'Cannot reset current branch when on target branch "live-run-through"'
             );
+          }
+        })
+    );
+  });
+
+  describe("PRD: User tries to create branch that exists", () => {
+    it.effect(
+      "should fail with FailedToCreateBranchError when user enters name of existing branch",
+      () =>
+        Effect.gen(function* () {
+          const mockGitService = fromPartial<GitService>({
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(function* () {}),
+            ensureUpstreamBranchConnected: Effect.fn(
+              "ensureUpstreamBranchConnected"
+            )(function* (_opts: { targetBranch: string }) {}),
+            getLogOneline: Effect.fn("getLogOneline")(function* (
+              _branch: string
+            ) {
+              return `abc1234 01.02.03 Add new feature`;
+            }),
+            getCurrentBranch: Effect.fn("getCurrentBranch")(function* () {
+              return "matt/feature-branch";
+            }),
+            checkoutNewBranchAt: Effect.fn("checkoutNewBranchAt")(function* (
+              branchName: string,
+              _sha: string
+            ) {
+              // Branch already exists - fail
+              return yield* Effect.fail(
+                new FailedToCreateBranchError({
+                  branchName,
+                  message: `Failed to create branch ${branchName} (exit code: 128)`,
+                })
+              );
+            }),
+          });
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectLessonCommit: Effect.fn("selectLessonCommit")(function* (
+              _commits: Array<{ lessonId: string; message: string }>,
+              _promptMessage: string
+            ) {
+              return "01.02.03";
+            }),
+            selectProblemOrSolution: Effect.fn("selectProblemOrSolution")(
+              function* () {
+                return "solution" as const;
+              }
+            ),
+            selectResetAction: Effect.fn("selectResetAction")(function* (
+              _branch: string
+            ) {
+              return "create-branch" as const;
+            }),
+            inputBranchName: Effect.fn("inputBranchName")(function* (
+              _context: "working" | "new"
+            ) {
+              return "existing-branch";
+            }),
+          });
+
+          const testLayer = Layer.mergeAll(
+            Layer.succeed(GitService, mockGitService),
+            Layer.succeed(PromptService, mockPromptService),
+            Layer.succeed(GitServiceConfig, {
+              cwd: "/test/repo",
+            }),
+            NodeContext.layer
+          );
+
+          const result = yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.some("01.02.03"),
+            problem: false,
+            solution: false,
+            demo: false,
+          }).pipe(Effect.provide(testLayer), Effect.flip);
+
+          expect(result).toBeInstanceOf(FailedToCreateBranchError);
+          if (result instanceof FailedToCreateBranchError) {
+            expect(result.branchName).toBe("existing-branch");
+            expect(result.message).toContain("Failed to create branch");
           }
         })
     );

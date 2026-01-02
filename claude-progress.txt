@@ -346,3 +346,17 @@ Changes:
 - Supports both dots (1.1.1) and dashes (1-1-1) as separators
 
 PRD item marked as tested=true.
+
+---
+
+## Session 2026-01-02 (cont. 8)
+
+Added test for PRD: "User tries to create branch that exists" (reset error).
+
+Changes:
+- Added test in reset.test.ts that mocks checkoutNewBranchAt to fail with FailedToCreateBranchError
+- Test scenario: user selects create-branch, enters name of branch that already exists
+- Verified runReset propagates FailedToCreateBranchError with branchName and message
+- Added FailedToCreateBranchError to imports in reset.test.ts
+
+PRD item marked as tested=true.

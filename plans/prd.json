@@ -418,7 +418,7 @@
     "command": "reset",
     "category": "error",
     "description": "User tries to create branch that exists",
-    "tested": false,
+    "tested": true,
     "steps": [
       "User runs `ai-hero reset 01.02.03`",
       "User selects 'Create new branch'",
