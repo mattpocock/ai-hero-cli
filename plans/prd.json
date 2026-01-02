@@ -49,7 +49,7 @@
     "command": "cherry-pick",
     "category": "user-flow",
     "description": "User cancels lesson selection",
-    "tested": false,
+    "tested": true,
     "steps": [
       "User runs `ai-hero cherry-pick`",
       "User sees lesson selection prompt",

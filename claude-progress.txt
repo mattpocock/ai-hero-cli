@@ -290,3 +290,16 @@ Changes:
 - Also marked PRD item "User cancels reset due to uncommitted changes" as tested=true (test already existed from previous session)
 
 PRD items marked as tested=true.
+
+---
+
+## Session 2026-01-02 (cont. 4)
+
+Added test for PRD: "User cancels lesson selection" (cherry-pick user-flow).
+
+Changes:
+- Added test in cherry-pick.test.ts that mocks selectLessonCommit to fail with PromptCancelledError
+- Verified runCherryPick propagates PromptCancelledError when user presses Ctrl+C
+- Added PromptCancelledError import to cherry-pick.test.ts
+
+PRD item marked as tested=true.

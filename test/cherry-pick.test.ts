@@ -6,6 +6,7 @@ import {
   InvalidBranchOperationError,
   runCherryPick,
 } from "../src/cherry-pick.js";
+import { PromptCancelledError } from "../src/prompt-service.js";
 import {
   CommitNotFoundError,
   selectLessonCommit,
@@ -606,6 +607,57 @@ Add upstream remote:
             expect(result.range).toBe("def5678");
             expect(result.message).toContain("Cherry-pick conflict");
           }
+        })
+    );
+  });
+
+  describe("PRD: User cancels lesson selection", () => {
+    it.effect(
+      "should propagate PromptCancelledError when user presses Ctrl+C during lesson selection",
+      () =>
+        Effect.gen(function* () {
+          const mockGitService = fromPartial<GitService>({
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(
+              function* () {}
+            ),
+            ensureUpstreamBranchConnected: Effect.fn(
+              "ensureUpstreamBranchConnected"
+            )(function* (_opts: { targetBranch: string }) {}),
+            getLogOneline: Effect.fn("getLogOneline")(function* (
+              branch: string
+            ) {
+              if (branch === "HEAD") {
+                return "abc1234 Initial commit";
+              }
+              return `def5678 01.02.03 Add new feature`;
+            }),
+          });
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectLessonCommit: Effect.fn("selectLessonCommit")(
+              function* () {
+                // User presses Ctrl+C during prompt
+                return yield* Effect.fail(new PromptCancelledError());
+              }
+            ),
+          });
+
+          const testLayer = Layer.mergeAll(
+            Layer.succeed(GitService, mockGitService),
+            Layer.succeed(PromptService, mockPromptService),
+            Layer.succeed(GitServiceConfig, {
+              cwd: "/test/repo",
+            }),
+            NodeContext.layer
+          );
+
+          const result = yield* runCherryPick({
+            branch: "live-run-through",
+            lessonId: Option.none(),
+          }).pipe(Effect.provide(testLayer), Effect.flip);
+
+          // Verify PromptCancelledError is propagated
+          expect(result).toBeInstanceOf(PromptCancelledError);
         })
     );
   });
