@@ -15,10 +15,7 @@ import {
   PromptCancelledError,
   PromptService,
 } from "../src/prompt-service.js";
-import {
-  InvalidBranchOperationError,
-  runReset,
-} from "../src/reset.js";
+import { InvalidBranchOperationError, runReset } from "../src/reset.js";
 
 /**
  * Tests for the reset command business logic.
@@ -47,9 +44,7 @@ describe("reset", () => {
             ),
           });
 
-          const mockPromptService = fromPartial<PromptService>(
-            {}
-          );
+          const mockPromptService = fromPartial<PromptService>({});
 
           const testLayer = Layer.mergeAll(
             Layer.succeed(GitService, mockGitService),
@@ -103,9 +98,7 @@ Add upstream remote:
             }),
           });
 
-          const mockPromptService = fromPartial<PromptService>(
-            {}
-          );
+          const mockPromptService = fromPartial<PromptService>({});
 
           const testLayer = Layer.mergeAll(
             Layer.succeed(GitService, mockGitService),
@@ -157,9 +150,7 @@ Add upstream remote:
             }),
           });
 
-          const mockPromptService = fromPartial<PromptService>(
-            {}
-          );
+          const mockPromptService = fromPartial<PromptService>({});
 
           const testLayer = Layer.mergeAll(
             Layer.succeed(GitService, mockGitService),
@@ -210,10 +201,7 @@ Add upstream remote:
           const mockPromptService = fromPartial<PromptService>({
             selectLessonCommit: Effect.fn("selectLessonCommit")(
               function* (
-                _commits: Array<{
-                  lessonId: string;
-                  message: string;
-                }>,
+                _commits: Array<{ lessonId: string; message: string }>,
                 _promptMessage: string
               ) {
                 return "01.02.03";
@@ -239,9 +227,7 @@ Add upstream remote:
             demo: false,
           }).pipe(Effect.provide(testLayer), Effect.flip);
 
-          expect(result).toBeInstanceOf(
-            InvalidBranchOperationError
-          );
+          expect(result).toBeInstanceOf(InvalidBranchOperationError);
           if (result instanceof InvalidBranchOperationError) {
             expect(result.message).toBe(
               "Cannot use both --problem and --solution flags"
@@ -273,10 +259,7 @@ Add upstream remote:
           const mockPromptService = fromPartial<PromptService>({
             selectLessonCommit: Effect.fn("selectLessonCommit")(
               function* (
-                _commits: Array<{
-                  lessonId: string;
-                  message: string;
-                }>,
+                _commits: Array<{ lessonId: string; message: string }>,
                 _promptMessage: string
               ) {
                 return "01.02.03";
@@ -302,9 +285,7 @@ Add upstream remote:
             demo: true,
           }).pipe(Effect.provide(testLayer), Effect.flip);
 
-          expect(result).toBeInstanceOf(
-            InvalidBranchOperationError
-          );
+          expect(result).toBeInstanceOf(InvalidBranchOperationError);
           if (result instanceof InvalidBranchOperationError) {
             expect(result.message).toBe(
               "Cannot use --demo with --problem or --solution flags"
@@ -334,10 +315,7 @@ Add upstream remote:
           const mockPromptService = fromPartial<PromptService>({
             selectLessonCommit: Effect.fn("selectLessonCommit")(
               function* (
-                _commits: Array<{
-                  lessonId: string;
-                  message: string;
-                }>,
+                _commits: Array<{ lessonId: string; message: string }>,
                 _promptMessage: string
               ) {
                 return "01.02.03";
@@ -363,9 +341,7 @@ Add upstream remote:
             demo: true,
           }).pipe(Effect.provide(testLayer), Effect.flip);
 
-          expect(result).toBeInstanceOf(
-            InvalidBranchOperationError
-          );
+          expect(result).toBeInstanceOf(InvalidBranchOperationError);
           if (result instanceof InvalidBranchOperationError) {
             expect(result.message).toBe(
               "Cannot use --demo with --problem or --solution flags"
@@ -419,10 +395,7 @@ ghi9012 01.02.01 Initial setup`;
           const mockPromptService = fromPartial<PromptService>({
             selectLessonCommit: Effect.fn("selectLessonCommit")(
               function* (
-                _commits: Array<{
-                  lessonId: string;
-                  message: string;
-                }>,
+                _commits: Array<{ lessonId: string; message: string }>,
                 _promptMessage: string
               ) {
                 return "01.02.03";
@@ -497,12 +470,12 @@ ghi9012 01.02.01 Initial setup`;
                 statusOutput: "",
               };
             }),
-            getParentCommit: Effect.fn("getParentCommit")(
-              function* (_sha: string) {
-                // Parent of abc1234 (solution) is parent123 (problem state)
-                return "parent123";
-              }
-            ),
+            getParentCommit: Effect.fn("getParentCommit")(function* (
+              _sha: string
+            ) {
+              // Parent of abc1234 (solution) is parent123 (problem state)
+              return "parent123";
+            }),
             resetHard: Effect.fn("resetHard")(function* (
               sha: string
             ) {
@@ -513,10 +486,7 @@ ghi9012 01.02.01 Initial setup`;
           const mockPromptService = fromPartial<PromptService>({
             selectLessonCommit: Effect.fn("selectLessonCommit")(
               function* (
-                _commits: Array<{
-                  lessonId: string;
-                  message: string;
-                }>,
+                _commits: Array<{ lessonId: string; message: string }>,
                 _promptMessage: string
               ) {
                 return "01.02.03";
@@ -602,10 +572,7 @@ def5678 01.02.02 Setup base structure`;
           const mockPromptService = fromPartial<PromptService>({
             selectLessonCommit: Effect.fn("selectLessonCommit")(
               function* (
-                _commits: Array<{
-                  lessonId: string;
-                  message: string;
-                }>,
+                _commits: Array<{ lessonId: string; message: string }>,
                 _promptMessage: string
               ) {
                 return "01.02.03";
@@ -683,12 +650,12 @@ def5678 01.02.02 Setup base structure`;
                 statusOutput: "",
               };
             }),
-            getParentCommit: Effect.fn("getParentCommit")(
-              function* (_sha: string) {
-                // Parent of abc1234 (solution) is parent123 (problem state)
-                return "parent123";
-              }
-            ),
+            getParentCommit: Effect.fn("getParentCommit")(function* (
+              _sha: string
+            ) {
+              // Parent of abc1234 (solution) is parent123 (problem state)
+              return "parent123";
+            }),
             resetHard: Effect.fn("resetHard")(function* (
               sha: string
             ) {
@@ -699,10 +666,7 @@ def5678 01.02.02 Setup base structure`;
           const mockPromptService = fromPartial<PromptService>({
             selectLessonCommit: Effect.fn("selectLessonCommit")(
               function* (
-                _commits: Array<{
-                  lessonId: string;
-                  message: string;
-                }>,
+                _commits: Array<{ lessonId: string; message: string }>,
                 _promptMessage: string
               ) {
                 return "01.02.03";
@@ -756,9 +720,7 @@ def5678 01.02.02 Setup base structure`;
             | undefined;
 
           const mockGitService = fromPartial<GitService>({
-            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(
-              function* () {}
-            ),
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(function* () {}),
             ensureUpstreamBranchConnected: Effect.fn(
               "ensureUpstreamBranchConnected"
             )(function* (_opts: { targetBranch: string }) {}),
@@ -768,48 +730,39 @@ def5678 01.02.02 Setup base structure`;
               return `abc1234 01.02.03 Add new feature
 def5678 01.02.02 Setup base structure`;
             }),
-            getCurrentBranch: Effect.fn("getCurrentBranch")(
-              function* () {
-                return "matt/feature-branch";
-              }
-            ),
-            checkoutNewBranchAt: Effect.fn(
-              "checkoutNewBranchAt"
-            )(function* (branchName: string, sha: string) {
-              checkoutNewBranchAtCalledWith = {
-                branchName,
-                sha,
-              };
+            getCurrentBranch: Effect.fn("getCurrentBranch")(function* () {
+              return "matt/feature-branch";
+            }),
+            checkoutNewBranchAt: Effect.fn("checkoutNewBranchAt")(function* (
+              branchName: string,
+              sha: string
+            ) {
+              checkoutNewBranchAtCalledWith = { branchName, sha };
             }),
           });
 
           const mockPromptService = fromPartial<PromptService>({
-            selectLessonCommit: Effect.fn("selectLessonCommit")(
-              function* (
-                _commits: Array<{
-                  lessonId: string;
-                  message: string;
-                }>,
-                _promptMessage: string
-              ) {
-                return "01.02.03";
-              }
-            ),
-            selectProblemOrSolution: Effect.fn(
-              "selectProblemOrSolution"
-            )(function* () {
-              return "solution" as const;
+            selectLessonCommit: Effect.fn("selectLessonCommit")(function* (
+              _commits: Array<{ lessonId: string; message: string }>,
+              _promptMessage: string
+            ) {
+              return "01.02.03";
             }),
-            selectResetAction: Effect.fn("selectResetAction")(
-              function* (_branch: string) {
-                return "create-branch" as const;
+            selectProblemOrSolution: Effect.fn("selectProblemOrSolution")(
+              function* () {
+                return "solution" as const;
               }
             ),
-            inputBranchName: Effect.fn("inputBranchName")(
-              function* (_context: "working" | "new") {
-                return "matt/lesson-work";
-              }
-            ),
+            selectResetAction: Effect.fn("selectResetAction")(function* (
+              _branch: string
+            ) {
+              return "create-branch" as const;
+            }),
+            inputBranchName: Effect.fn("inputBranchName")(function* (
+              _context: "working" | "new"
+            ) {
+              return "matt/lesson-work";
+            }),
           });
 
           const testLayer = Layer.mergeAll(
@@ -846,9 +799,7 @@ def5678 01.02.02 Setup base structure`;
             | undefined;
 
           const mockGitService = fromPartial<GitService>({
-            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(
-              function* () {}
-            ),
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(function* () {}),
             ensureUpstreamBranchConnected: Effect.fn(
               "ensureUpstreamBranchConnected"
             )(function* (_opts: { targetBranch: string }) {}),
@@ -858,53 +809,44 @@ def5678 01.02.02 Setup base structure`;
               return `abc1234 01.02.03 Add new feature
 def5678 01.02.02 Setup base structure`;
             }),
-            getCurrentBranch: Effect.fn("getCurrentBranch")(
-              function* () {
-                return "matt/feature-branch";
-              }
-            ),
-            getParentCommit: Effect.fn("getParentCommit")(
-              function* (_sha: string) {
-                return "parent123";
-              }
-            ),
-            checkoutNewBranchAt: Effect.fn(
-              "checkoutNewBranchAt"
-            )(function* (branchName: string, sha: string) {
-              checkoutNewBranchAtCalledWith = {
-                branchName,
-                sha,
-              };
+            getCurrentBranch: Effect.fn("getCurrentBranch")(function* () {
+              return "matt/feature-branch";
+            }),
+            getParentCommit: Effect.fn("getParentCommit")(function* (
+              _sha: string
+            ) {
+              return "parent123";
+            }),
+            checkoutNewBranchAt: Effect.fn("checkoutNewBranchAt")(function* (
+              branchName: string,
+              sha: string
+            ) {
+              checkoutNewBranchAtCalledWith = { branchName, sha };
             }),
           });
 
           const mockPromptService = fromPartial<PromptService>({
-            selectLessonCommit: Effect.fn("selectLessonCommit")(
-              function* (
-                _commits: Array<{
-                  lessonId: string;
-                  message: string;
-                }>,
-                _promptMessage: string
-              ) {
-                return "01.02.03";
-              }
-            ),
-            selectProblemOrSolution: Effect.fn(
-              "selectProblemOrSolution"
-            )(function* () {
-              return "problem" as const;
+            selectLessonCommit: Effect.fn("selectLessonCommit")(function* (
+              _commits: Array<{ lessonId: string; message: string }>,
+              _promptMessage: string
+            ) {
+              return "01.02.03";
             }),
-            selectResetAction: Effect.fn("selectResetAction")(
-              function* (_branch: string) {
-                return "create-branch" as const;
+            selectProblemOrSolution: Effect.fn("selectProblemOrSolution")(
+              function* () {
+                return "problem" as const;
               }
             ),
-            inputBranchName: Effect.fn("inputBranchName")(
-              function* (_context: "working" | "new") {
-                return "matt/lesson-work";
-              }
-            ),
+            selectResetAction: Effect.fn("selectResetAction")(function* (
+              _branch: string
+            ) {
+              return "create-branch" as const;
+            }),
+            inputBranchName: Effect.fn("inputBranchName")(function* (
+              _context: "working" | "new"
+            ) {
+              return "matt/lesson-work";
+            }),
           });
 
           const testLayer = Layer.mergeAll(
@@ -944,9 +886,7 @@ def5678 01.02.02 Setup base structure`;
           let selectResetActionCalled = false;
 
           const mockGitService = fromPartial<GitService>({
-            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(
-              function* () {}
-            ),
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(function* () {}),
             ensureUpstreamBranchConnected: Effect.fn(
               "ensureUpstreamBranchConnected"
             )(function* (_opts: { targetBranch: string }) {}),
@@ -956,50 +896,41 @@ def5678 01.02.02 Setup base structure`;
               return `abc1234 01.02.03 Add new feature
 def5678 01.02.02 Setup base structure`;
             }),
-            getCurrentBranch: Effect.fn("getCurrentBranch")(
-              function* () {
-                // User is on main branch
-                return "main";
-              }
-            ),
-            checkoutNewBranchAt: Effect.fn(
-              "checkoutNewBranchAt"
-            )(function* (branchName: string, sha: string) {
-              checkoutNewBranchAtCalledWith = {
-                branchName,
-                sha,
-              };
+            getCurrentBranch: Effect.fn("getCurrentBranch")(function* () {
+              // User is on main branch
+              return "main";
+            }),
+            checkoutNewBranchAt: Effect.fn("checkoutNewBranchAt")(function* (
+              branchName: string,
+              sha: string
+            ) {
+              checkoutNewBranchAtCalledWith = { branchName, sha };
             }),
           });
 
           const mockPromptService = fromPartial<PromptService>({
-            selectLessonCommit: Effect.fn("selectLessonCommit")(
-              function* (
-                _commits: Array<{
-                  lessonId: string;
-                  message: string;
-                }>,
-                _promptMessage: string
-              ) {
-                return "01.02.03";
-              }
-            ),
-            selectProblemOrSolution: Effect.fn(
-              "selectProblemOrSolution"
-            )(function* () {
-              return "solution" as const;
+            selectLessonCommit: Effect.fn("selectLessonCommit")(function* (
+              _commits: Array<{ lessonId: string; message: string }>,
+              _promptMessage: string
+            ) {
+              return "01.02.03";
             }),
-            selectResetAction: Effect.fn("selectResetAction")(
-              function* (_branch: string) {
-                selectResetActionCalled = true;
-                return "reset-current" as const; // Should NOT be called
+            selectProblemOrSolution: Effect.fn("selectProblemOrSolution")(
+              function* () {
+                return "solution" as const;
               }
             ),
-            inputBranchName: Effect.fn("inputBranchName")(
-              function* (_context: "working" | "new") {
-                return "matt/lesson-work";
-              }
-            ),
+            selectResetAction: Effect.fn("selectResetAction")(function* (
+              _branch: string
+            ) {
+              selectResetActionCalled = true;
+              return "reset-current" as const; // Should NOT be called
+            }),
+            inputBranchName: Effect.fn("inputBranchName")(function* (
+              _context: "working" | "new"
+            ) {
+              return "matt/lesson-work";
+            }),
           });
 
           const testLayer = Layer.mergeAll(
@@ -1038,9 +969,7 @@ def5678 01.02.02 Setup base structure`;
             | undefined;
 
           const mockGitService = fromPartial<GitService>({
-            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(
-              function* () {}
-            ),
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(function* () {}),
             ensureUpstreamBranchConnected: Effect.fn(
               "ensureUpstreamBranchConnected"
             )(function* (_opts: { targetBranch: string }) {}),
@@ -1050,48 +979,39 @@ def5678 01.02.02 Setup base structure`;
               return `abc1234 01.02.03 Add new feature
 def5678 01.02.02 Setup base structure`;
             }),
-            getCurrentBranch: Effect.fn("getCurrentBranch")(
-              function* () {
-                return "main";
-              }
-            ),
-            getParentCommit: Effect.fn("getParentCommit")(
-              function* (_sha: string) {
-                return "parent123";
-              }
-            ),
-            checkoutNewBranchAt: Effect.fn(
-              "checkoutNewBranchAt"
-            )(function* (branchName: string, sha: string) {
-              checkoutNewBranchAtCalledWith = {
-                branchName,
-                sha,
-              };
+            getCurrentBranch: Effect.fn("getCurrentBranch")(function* () {
+              return "main";
+            }),
+            getParentCommit: Effect.fn("getParentCommit")(function* (
+              _sha: string
+            ) {
+              return "parent123";
+            }),
+            checkoutNewBranchAt: Effect.fn("checkoutNewBranchAt")(function* (
+              branchName: string,
+              sha: string
+            ) {
+              checkoutNewBranchAtCalledWith = { branchName, sha };
             }),
           });
 
           const mockPromptService = fromPartial<PromptService>({
-            selectLessonCommit: Effect.fn("selectLessonCommit")(
-              function* (
-                _commits: Array<{
-                  lessonId: string;
-                  message: string;
-                }>,
-                _promptMessage: string
-              ) {
-                return "01.02.03";
-              }
-            ),
-            selectProblemOrSolution: Effect.fn(
-              "selectProblemOrSolution"
-            )(function* () {
-              return "problem" as const;
+            selectLessonCommit: Effect.fn("selectLessonCommit")(function* (
+              _commits: Array<{ lessonId: string; message: string }>,
+              _promptMessage: string
+            ) {
+              return "01.02.03";
             }),
-            inputBranchName: Effect.fn("inputBranchName")(
-              function* (_context: "working" | "new") {
-                return "matt/problem-work";
+            selectProblemOrSolution: Effect.fn("selectProblemOrSolution")(
+              function* () {
+                return "problem" as const;
               }
             ),
+            inputBranchName: Effect.fn("inputBranchName")(function* (
+              _context: "working" | "new"
+            ) {
+              return "matt/problem-work";
+            }),
           });
 
           const testLayer = Layer.mergeAll(
@@ -1129,9 +1049,7 @@ def5678 01.02.02 Setup base structure`;
           let confirmResetWithUncommittedChangesCalled = false;
 
           const mockGitService = fromPartial<GitService>({
-            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(
-              function* () {}
-            ),
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(function* () {}),
             ensureUpstreamBranchConnected: Effect.fn(
               "ensureUpstreamBranchConnected"
             )(function* (_opts: { targetBranch: string }) {}),
@@ -1140,48 +1058,39 @@ def5678 01.02.02 Setup base structure`;
             ) {
               return `abc1234 01.02.03 Add new feature`;
             }),
-            getCurrentBranch: Effect.fn("getCurrentBranch")(
+            getCurrentBranch: Effect.fn("getCurrentBranch")(function* () {
+              return "matt/feature-branch";
+            }),
+            getUncommittedChanges: Effect.fn("getUncommittedChanges")(
               function* () {
-                return "matt/feature-branch";
+                return {
+                  hasUncommittedChanges: true,
+                  statusOutput: " M src/index.ts\n?? new-file.ts",
+                };
               }
             ),
-            getUncommittedChanges: Effect.fn(
-              "getUncommittedChanges"
-            )(function* () {
-              return {
-                hasUncommittedChanges: true,
-                statusOutput: " M src/index.ts\n?? new-file.ts",
-              };
-            }),
-            resetHard: Effect.fn("resetHard")(function* (
-              sha: string
-            ) {
+            resetHard: Effect.fn("resetHard")(function* (sha: string) {
               resetHardCalledWith = sha;
             }),
           });
 
           const mockPromptService = fromPartial<PromptService>({
-            selectLessonCommit: Effect.fn("selectLessonCommit")(
-              function* (
-                _commits: Array<{
-                  lessonId: string;
-                  message: string;
-                }>,
-                _promptMessage: string
-              ) {
-                return "01.02.03";
-              }
-            ),
-            selectProblemOrSolution: Effect.fn(
-              "selectProblemOrSolution"
-            )(function* () {
-              return "solution" as const;
+            selectLessonCommit: Effect.fn("selectLessonCommit")(function* (
+              _commits: Array<{ lessonId: string; message: string }>,
+              _promptMessage: string
+            ) {
+              return "01.02.03";
             }),
-            selectResetAction: Effect.fn("selectResetAction")(
-              function* (_branch: string) {
-                return "reset-current" as const;
+            selectProblemOrSolution: Effect.fn("selectProblemOrSolution")(
+              function* () {
+                return "solution" as const;
               }
             ),
+            selectResetAction: Effect.fn("selectResetAction")(function* (
+              _branch: string
+            ) {
+              return "reset-current" as const;
+            }),
             confirmResetWithUncommittedChanges: Effect.fn(
               "confirmResetWithUncommittedChanges"
             )(function* () {
@@ -1208,9 +1117,7 @@ def5678 01.02.02 Setup base structure`;
           }).pipe(Effect.provide(testLayer));
 
           // Verify confirmation prompt was called
-          expect(confirmResetWithUncommittedChangesCalled).toBe(
-            true
-          );
+          expect(confirmResetWithUncommittedChangesCalled).toBe(true);
           // Verify reset still proceeded after confirmation
           expect(resetHardCalledWith).toBe("abc1234");
         })
@@ -1223,9 +1130,7 @@ def5678 01.02.02 Setup base structure`;
           let resetHardCalled = false;
 
           const mockGitService = fromPartial<GitService>({
-            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(
-              function* () {}
-            ),
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(function* () {}),
             ensureUpstreamBranchConnected: Effect.fn(
               "ensureUpstreamBranchConnected"
             )(function* (_opts: { targetBranch: string }) {}),
@@ -1234,55 +1139,44 @@ def5678 01.02.02 Setup base structure`;
             ) {
               return `abc1234 01.02.03 Add new feature`;
             }),
-            getCurrentBranch: Effect.fn("getCurrentBranch")(
+            getCurrentBranch: Effect.fn("getCurrentBranch")(function* () {
+              return "matt/feature-branch";
+            }),
+            getUncommittedChanges: Effect.fn("getUncommittedChanges")(
               function* () {
-                return "matt/feature-branch";
+                return {
+                  hasUncommittedChanges: true,
+                  statusOutput: " M src/index.ts",
+                };
               }
             ),
-            getUncommittedChanges: Effect.fn(
-              "getUncommittedChanges"
-            )(function* () {
-              return {
-                hasUncommittedChanges: true,
-                statusOutput: " M src/index.ts",
-              };
-            }),
-            resetHard: Effect.fn("resetHard")(function* (
-              _sha: string
-            ) {
+            resetHard: Effect.fn("resetHard")(function* (_sha: string) {
               resetHardCalled = true;
             }),
           });
 
           const mockPromptService = fromPartial<PromptService>({
-            selectLessonCommit: Effect.fn("selectLessonCommit")(
-              function* (
-                _commits: Array<{
-                  lessonId: string;
-                  message: string;
-                }>,
-                _promptMessage: string
-              ) {
-                return "01.02.03";
-              }
-            ),
-            selectProblemOrSolution: Effect.fn(
-              "selectProblemOrSolution"
-            )(function* () {
-              return "solution" as const;
+            selectLessonCommit: Effect.fn("selectLessonCommit")(function* (
+              _commits: Array<{ lessonId: string; message: string }>,
+              _promptMessage: string
+            ) {
+              return "01.02.03";
             }),
-            selectResetAction: Effect.fn("selectResetAction")(
-              function* (_branch: string) {
-                return "reset-current" as const;
+            selectProblemOrSolution: Effect.fn("selectProblemOrSolution")(
+              function* () {
+                return "solution" as const;
               }
             ),
+            selectResetAction: Effect.fn("selectResetAction")(function* (
+              _branch: string
+            ) {
+              return "reset-current" as const;
+            }),
             confirmResetWithUncommittedChanges: Effect.fn(
               "confirmResetWithUncommittedChanges"
             )(function* () {
               // User declines - throw PromptCancelledError
-              return yield* Effect.fail(
-                new PromptCancelledError()
-              );
+              return yield* Effect.fail(new PromptCancelledError());
             }),
           });
 
@@ -1317,9 +1211,7 @@ def5678 01.02.02 Setup base structure`;
           let resetHardCalledWith: string | undefined;
 
           const mockGitService = fromPartial<GitService>({
-            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(
-              function* () {}
-            ),
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(function* () {}),
             ensureUpstreamBranchConnected: Effect.fn(
               "ensureUpstreamBranchConnected"
             )(function* (_opts: { targetBranch: string }) {}),
@@ -1328,48 +1220,39 @@ def5678 01.02.02 Setup base structure`;
             ) {
               return `abc1234 01.02.03 Add new feature`;
             }),
-            getCurrentBranch: Effect.fn("getCurrentBranch")(
+            getCurrentBranch: Effect.fn("getCurrentBranch")(function* () {
+              return "matt/feature-branch";
+            }),
+            getUncommittedChanges: Effect.fn("getUncommittedChanges")(
               function* () {
-                return "matt/feature-branch";
+                return {
+                  hasUncommittedChanges: false,
+                  statusOutput: "",
+                };
               }
             ),
-            getUncommittedChanges: Effect.fn(
-              "getUncommittedChanges"
-            )(function* () {
-              return {
-                hasUncommittedChanges: false,
-                statusOutput: "",
-              };
-            }),
-            resetHard: Effect.fn("resetHard")(function* (
-              sha: string
-            ) {
+            resetHard: Effect.fn("resetHard")(function* (sha: string) {
               resetHardCalledWith = sha;
             }),
           });
 
           const mockPromptService = fromPartial<PromptService>({
-            selectLessonCommit: Effect.fn("selectLessonCommit")(
-              function* (
-                _commits: Array<{
-                  lessonId: string;
-                  message: string;
-                }>,
-                _promptMessage: string
-              ) {
-                return "01.02.03";
-              }
-            ),
-            selectProblemOrSolution: Effect.fn(
-              "selectProblemOrSolution"
-            )(function* () {
-              return "solution" as const;
+            selectLessonCommit: Effect.fn("selectLessonCommit")(function* (
+              _commits: Array<{ lessonId: string; message: string }>,
+              _promptMessage: string
+            ) {
+              return "01.02.03";
             }),
-            selectResetAction: Effect.fn("selectResetAction")(
-              function* (_branch: string) {
-                return "reset-current" as const;
+            selectProblemOrSolution: Effect.fn("selectProblemOrSolution")(
+              function* () {
+                return "solution" as const;
               }
             ),
+            selectResetAction: Effect.fn("selectResetAction")(function* (
+              _branch: string
+            ) {
+              return "reset-current" as const;
+            }),
             confirmResetWithUncommittedChanges: Effect.fn(
               "confirmResetWithUncommittedChanges"
             )(function* () {
@@ -1395,9 +1278,7 @@ def5678 01.02.02 Setup base structure`;
           }).pipe(Effect.provide(testLayer));
 
           // Verify confirmation prompt was NOT called
-          expect(confirmResetWithUncommittedChangesCalled).toBe(
-            false
-          );
+          expect(confirmResetWithUncommittedChangesCalled).toBe(false);
           // Verify reset proceeded
           expect(resetHardCalledWith).toBe("abc1234");
         })
@@ -1417,9 +1298,7 @@ def5678 01.02.02 Setup base structure`;
           let getUncommittedChangesCalled = false;
 
           const mockGitService = fromPartial<GitService>({
-            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(
-              function* () {}
-            ),
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(function* () {}),
             ensureUpstreamBranchConnected: Effect.fn(
               "ensureUpstreamBranchConnected"
             )(function* (_opts: { targetBranch: string }) {}),
@@ -1429,59 +1308,48 @@ def5678 01.02.02 Setup base structure`;
               return `abc1234 01.02.03 Add new feature
 def5678 01.02.02 Setup base structure`;
             }),
-            getCurrentBranch: Effect.fn("getCurrentBranch")(
+            getCurrentBranch: Effect.fn("getCurrentBranch")(function* () {
+              return "matt/feature-branch";
+            }),
+            getUncommittedChanges: Effect.fn("getUncommittedChanges")(
               function* () {
-                return "matt/feature-branch";
+                getUncommittedChangesCalled = true;
+                return {
+                  hasUncommittedChanges: true,
+                  statusOutput: " M src/index.ts",
+                };
               }
             ),
-            getUncommittedChanges: Effect.fn(
-              "getUncommittedChanges"
-            )(function* () {
-              getUncommittedChangesCalled = true;
-              return {
-                hasUncommittedChanges: true,
-                statusOutput: " M src/index.ts",
-              };
-            }),
-            resetHard: Effect.fn("resetHard")(function* (
-              sha: string
-            ) {
+            resetHard: Effect.fn("resetHard")(function* (sha: string) {
               resetHardCalledWith = sha;
             }),
             resetHead: Effect.fn("resetHead")(function* () {
               resetHeadCalled = true;
             }),
-            restoreStaged: Effect.fn("restoreStaged")(
-              function* () {
-                restoreStagedCalled = true;
-              }
-            ),
+            restoreStaged: Effect.fn("restoreStaged")(function* () {
+              restoreStagedCalled = true;
+            }),
           });
 
           const mockPromptService = fromPartial<PromptService>({
-            selectLessonCommit: Effect.fn("selectLessonCommit")(
-              function* (
-                _commits: Array<{
-                  lessonId: string;
-                  message: string;
-                }>,
-                _promptMessage: string
-              ) {
-                return "01.02.03";
-              }
-            ),
-            selectProblemOrSolution: Effect.fn(
-              "selectProblemOrSolution"
-            )(function* () {
-              selectProblemOrSolutionCalled = true;
-              return "problem" as const; // Should NOT be called
+            selectLessonCommit: Effect.fn("selectLessonCommit")(function* (
+              _commits: Array<{ lessonId: string; message: string }>,
+              _promptMessage: string
+            ) {
+              return "01.02.03";
             }),
-            selectResetAction: Effect.fn("selectResetAction")(
-              function* (_branch: string) {
-                selectResetActionCalled = true;
-                return "create-branch" as const; // Should NOT be called
+            selectProblemOrSolution: Effect.fn("selectProblemOrSolution")(
+              function* () {
+                selectProblemOrSolutionCalled = true;
+                return "problem" as const; // Should NOT be called
               }
             ),
+            selectResetAction: Effect.fn("selectResetAction")(function* (
+              _branch: string
+            ) {
+              selectResetActionCalled = true;
+              return "create-branch" as const; // Should NOT be called
+            }),
           });
 
           const testLayer = Layer.mergeAll(
@@ -1521,9 +1389,7 @@ def5678 01.02.02 Setup base structure`;
       () =>
         Effect.gen(function* () {
           const mockGitService = fromPartial<GitService>({
-            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(
-              function* () {}
-            ),
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(function* () {}),
             ensureUpstreamBranchConnected: Effect.fn(
               "ensureUpstreamBranchConnected"
             )(function* (_opts: { targetBranch: string }) {}),
@@ -1538,14 +1404,10 @@ def5678 01.02.02 Setup base structure`;
           });
 
           const mockPromptService = fromPartial<PromptService>({
-            selectLessonCommit: Effect.fn("selectLessonCommit")(
-              function* () {
-                // User presses Ctrl+C during prompt
-                return yield* Effect.fail(
-                  new PromptCancelledError()
-                );
-              }
-            ),
+            selectLessonCommit: Effect.fn("selectLessonCommit")(function* () {
+              // User presses Ctrl+C during prompt
+              return yield* Effect.fail(new PromptCancelledError());
+            }),
           });
 
           const testLayer = Layer.mergeAll(
@@ -1579,9 +1441,7 @@ def5678 01.02.02 Setup base structure`;
           let resetHardCalledWith: string | undefined;
 
           const mockGitService = fromPartial<GitService>({
-            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(
-              function* () {}
-            ),
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(function* () {}),
             ensureUpstreamBranchConnected: Effect.fn(
               "ensureUpstreamBranchConnected"
             )(function* (_opts: { targetBranch: string }) {}),
@@ -1592,37 +1452,33 @@ def5678 01.02.02 Setup base structure`;
               return `abc1234 01.01.01 Initial setup
 def5678 01.02.03 Add new feature`;
             }),
-            getCurrentBranch: Effect.fn("getCurrentBranch")(
+            getCurrentBranch: Effect.fn("getCurrentBranch")(function* () {
+              return "matt/feature-branch";
+            }),
+            getUncommittedChanges: Effect.fn("getUncommittedChanges")(
               function* () {
-                return "matt/feature-branch";
+                return {
+                  hasUncommittedChanges: false,
+                  statusOutput: "",
+                };
               }
             ),
-            getUncommittedChanges: Effect.fn(
-              "getUncommittedChanges"
-            )(function* () {
-              return {
-                hasUncommittedChanges: false,
-                statusOutput: "",
-              };
-            }),
-            resetHard: Effect.fn("resetHard")(function* (
-              sha: string
-            ) {
+            resetHard: Effect.fn("resetHard")(function* (sha: string) {
               resetHardCalledWith = sha;
             }),
           });
 
           const mockPromptService = fromPartial<PromptService>({
-            selectProblemOrSolution: Effect.fn(
-              "selectProblemOrSolution"
-            )(function* () {
-              return "solution" as const;
-            }),
-            selectResetAction: Effect.fn("selectResetAction")(
-              function* (_branch: string) {
-                return "reset-current" as const;
+            selectProblemOrSolution: Effect.fn("selectProblemOrSolution")(
+              function* () {
+                return "solution" as const;
               }
             ),
+            selectResetAction: Effect.fn("selectResetAction")(function* (
+              _branch: string
+            ) {
+              return "reset-current" as const;
+            }),
           });
 
           const testLayer = Layer.mergeAll(
@@ -1655,9 +1511,7 @@ def5678 01.02.03 Add new feature`;
           let resetHardCalledWith: string | undefined;
 
           const mockGitService = fromPartial<GitService>({
-            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(
-              function* () {}
-            ),
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(function* () {}),
             ensureUpstreamBranchConnected: Effect.fn(
               "ensureUpstreamBranchConnected"
             )(function* (_opts: { targetBranch: string }) {}),
@@ -1666,37 +1520,33 @@ def5678 01.02.03 Add new feature`;
             ) {
               return `abc1234 01.02.03 Add new feature`;
             }),
-            getCurrentBranch: Effect.fn("getCurrentBranch")(
+            getCurrentBranch: Effect.fn("getCurrentBranch")(function* () {
+              return "matt/feature-branch";
+            }),
+            getUncommittedChanges: Effect.fn("getUncommittedChanges")(
               function* () {
-                return "matt/feature-branch";
+                return {
+                  hasUncommittedChanges: false,
+                  statusOutput: "",
+                };
               }
             ),
-            getUncommittedChanges: Effect.fn(
-              "getUncommittedChanges"
-            )(function* () {
-              return {
-                hasUncommittedChanges: false,
-                statusOutput: "",
-              };
-            }),
-            resetHard: Effect.fn("resetHard")(function* (
-              sha: string
-            ) {
+            resetHard: Effect.fn("resetHard")(function* (sha: string) {
               resetHardCalledWith = sha;
             }),
           });
 
           const mockPromptService = fromPartial<PromptService>({
-            selectProblemOrSolution: Effect.fn(
-              "selectProblemOrSolution"
-            )(function* () {
-              return "solution" as const;
-            }),
-            selectResetAction: Effect.fn("selectResetAction")(
-              function* (_branch: string) {
-                return "reset-current" as const;
+            selectProblemOrSolution: Effect.fn("selectProblemOrSolution")(
+              function* () {
+                return "solution" as const;
               }
             ),
+            selectResetAction: Effect.fn("selectResetAction")(function* (
+              _branch: string
+            ) {
+              return "reset-current" as const;
+            }),
           });
 
           const testLayer = Layer.mergeAll(
@@ -1751,10 +1601,7 @@ def5678 01.02.03 Add new feature`;
           const mockPromptService = fromPartial<PromptService>({
             selectLessonCommit: Effect.fn("selectLessonCommit")(
               function* (
-                _commits: Array<{
-                  lessonId: string;
-                  message: string;
-                }>,
+                _commits: Array<{ lessonId: string; message: string }>,
                 _promptMessage: string
               ) {
                 return "01.02.03";
@@ -1789,9 +1636,7 @@ def5678 01.02.03 Add new feature`;
             demo: false,
           }).pipe(Effect.provide(testLayer), Effect.flip);
 
-          expect(result).toBeInstanceOf(
-            InvalidBranchOperationError
-          );
+          expect(result).toBeInstanceOf(InvalidBranchOperationError);
           if (result instanceof InvalidBranchOperationError) {
             expect(result.message).toContain(
               'Cannot reset current branch when on target branch "live-run-through"'
@@ -1807,9 +1652,7 @@ def5678 01.02.03 Add new feature`;
       () =>
         Effect.gen(function* () {
           const mockGitService = fromPartial<GitService>({
-            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(
-              function* () {}
-            ),
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(function* () {}),
             ensureUpstreamBranchConnected: Effect.fn(
               "ensureUpstreamBranchConnected"
             )(function* (_opts: { targetBranch: string }) {}),
@@ -1818,14 +1661,13 @@ def5678 01.02.03 Add new feature`;
             ) {
               return `abc1234 01.02.03 Add new feature`;
             }),
-            getCurrentBranch: Effect.fn("getCurrentBranch")(
-              function* () {
-                return "matt/feature-branch";
-              }
-            ),
-            checkoutNewBranchAt: Effect.fn(
-              "checkoutNewBranchAt"
-            )(function* (branchName: string, _sha: string) {
+            getCurrentBranch: Effect.fn("getCurrentBranch")(function* () {
+              return "matt/feature-branch";
+            }),
+            checkoutNewBranchAt: Effect.fn("checkoutNewBranchAt")(function* (
+              branchName: string,
+              _sha: string
+            ) {
               // Branch already exists - fail
               return yield* Effect.fail(
                 new FailedToCreateBranchError({
@@ -1837,32 +1679,27 @@ def5678 01.02.03 Add new feature`;
           });
 
           const mockPromptService = fromPartial<PromptService>({
-            selectLessonCommit: Effect.fn("selectLessonCommit")(
-              function* (
-                _commits: Array<{
-                  lessonId: string;
-                  message: string;
-                }>,
-                _promptMessage: string
-              ) {
-                return "01.02.03";
-              }
-            ),
-            selectProblemOrSolution: Effect.fn(
-              "selectProblemOrSolution"
-            )(function* () {
-              return "solution" as const;
+            selectLessonCommit: Effect.fn("selectLessonCommit")(function* (
+              _commits: Array<{ lessonId: string; message: string }>,
+              _promptMessage: string
+            ) {
+              return "01.02.03";
             }),
-            selectResetAction: Effect.fn("selectResetAction")(
-              function* (_branch: string) {
-                return "create-branch" as const;
+            selectProblemOrSolution: Effect.fn("selectProblemOrSolution")(
+              function* () {
+                return "solution" as const;
               }
             ),
-            inputBranchName: Effect.fn("inputBranchName")(
-              function* (_context: "working" | "new") {
-                return "existing-branch";
-              }
-            ),
+            selectResetAction: Effect.fn("selectResetAction")(function* (
+              _branch: string
+            ) {
+              return "create-branch" as const;
+            }),
+            inputBranchName: Effect.fn("inputBranchName")(function* (
+              _context: "working" | "new"
+            ) {
+              return "existing-branch";
+            }),
           });
 
           const testLayer = Layer.mergeAll(
@@ -1882,14 +1719,10 @@ def5678 01.02.03 Add new feature`;
             demo: false,
           }).pipe(Effect.provide(testLayer), Effect.flip);
 
-          expect(result).toBeInstanceOf(
-            FailedToCreateBranchError
-          );
+          expect(result).toBeInstanceOf(FailedToCreateBranchError);
           if (result instanceof FailedToCreateBranchError) {
             expect(result.branchName).toBe("existing-branch");
-            expect(result.message).toContain(
-              "Failed to create branch"
-            );
+            expect(result.message).toContain("Failed to create branch");
           }
         })
     );
@@ -1901,9 +1734,7 @@ def5678 01.02.03 Add new feature`;
       () =>
         Effect.gen(function* () {
           const mockGitService = fromPartial<GitService>({
-            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(
-              function* () {}
-            ),
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(function* () {}),
             ensureUpstreamBranchConnected: Effect.fn(
               "ensureUpstreamBranchConnected"
             )(function* (_opts: { targetBranch: string }) {}),
@@ -1913,24 +1744,20 @@ def5678 01.02.03 Add new feature`;
               // Only one commit - the root commit
               return `abc1234 01.01.01 Initial commit`;
             }),
-            getCurrentBranch: Effect.fn("getCurrentBranch")(
-              function* () {
-                return "matt/feature-branch";
-              }
-            ),
-            getParentCommit: Effect.fn("getParentCommit")(
-              function* (sha: string) {
-                // Root commit has no parent
-                return yield* Effect.fail(
-                  new NoParentCommitError({ commitSha: sha })
-                );
-              }
-            ),
+            getCurrentBranch: Effect.fn("getCurrentBranch")(function* () {
+              return "matt/feature-branch";
+            }),
+            getParentCommit: Effect.fn("getParentCommit")(function* (
+              sha: string
+            ) {
+              // Root commit has no parent
+              return yield* Effect.fail(
+                new NoParentCommitError({ commitSha: sha })
+              );
+            }),
           });
 
-          const mockPromptService = fromPartial<PromptService>(
-            {}
-          );
+          const mockPromptService = fromPartial<PromptService>({});
 
           const testLayer = Layer.mergeAll(
             Layer.succeed(GitService, mockGitService),
@@ -1954,6 +1781,184 @@ def5678 01.02.03 Add new feature`;
           if (result instanceof NoParentCommitError) {
             expect(result.commitSha).toBe("abc1234");
           }
+        })
+    );
+  });
+
+  describe("PRD: User resets from custom source branch", () => {
+    it.effect(
+      "should fetch and use custom branch when --branch option is provided",
+      () =>
+        Effect.gen(function* () {
+          let ensureUpstreamBranchArg = "";
+          let resetHardCalledWith: string | undefined;
+
+          const mockGitService = fromPartial<GitService>({
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(function* () {}),
+            ensureUpstreamBranchConnected: Effect.fn(
+              "ensureUpstreamBranchConnected"
+            )(function* (opts: { targetBranch: string }) {
+              ensureUpstreamBranchArg = opts.targetBranch;
+            }),
+            getLogOneline: Effect.fn("getLogOneline")(function* (
+              branch: string
+            ) {
+              // Custom branch has different lessons
+              if (
+                branch.includes("custom-lessons") ||
+                branch === "custom-lessons"
+              ) {
+                return `xyz9999 02.01.01 Custom lesson from custom branch`;
+              }
+              // Default branch would have different content
+              return `def5678 01.02.03 Add new feature`;
+            }),
+            getCurrentBranch: Effect.fn("getCurrentBranch")(function* () {
+              return "matt/feature-branch";
+            }),
+            getUncommittedChanges: Effect.fn("getUncommittedChanges")(
+              function* () {
+                return {
+                  hasUncommittedChanges: false,
+                  statusOutput: "",
+                };
+              }
+            ),
+            resetHard: Effect.fn("resetHard")(function* (sha: string) {
+              resetHardCalledWith = sha;
+            }),
+          });
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectLessonCommit: Effect.fn("selectLessonCommit")(function* (
+              _commits: Array<{ lessonId: string; message: string }>,
+              _promptMessage: string
+            ) {
+              return "02.01.01";
+            }),
+            selectProblemOrSolution: Effect.fn("selectProblemOrSolution")(
+              function* () {
+                return "solution" as const;
+              }
+            ),
+            selectResetAction: Effect.fn("selectResetAction")(function* (
+              _branch: string
+            ) {
+              return "reset-current" as const;
+            }),
+          });
+
+          const testLayer = Layer.mergeAll(
+            Layer.succeed(GitService, mockGitService),
+            Layer.succeed(PromptService, mockPromptService),
+            Layer.succeed(GitServiceConfig, {
+              cwd: "/test/repo",
+            }),
+            NodeContext.layer
+          );
+
+          yield* runReset({
+            branch: "custom-lessons", // Custom branch provided
+            lessonId: Option.none(),
+            problem: false,
+            solution: false,
+            demo: false,
+          }).pipe(Effect.provide(testLayer));
+
+          // Verify ensureUpstreamBranchConnected was called with custom branch
+          expect(ensureUpstreamBranchArg).toBe("custom-lessons");
+          // Verify reset used commit from custom branch
+          expect(resetHardCalledWith).toBe("xyz9999");
+        })
+    );
+
+    it.effect(
+      "should reset to specific lesson from custom branch when ID provided",
+      () =>
+        Effect.gen(function* () {
+          let ensureUpstreamBranchArg = "";
+          let resetHardCalledWith: string | undefined;
+          let selectLessonCommitCalled = false;
+
+          const mockGitService = fromPartial<GitService>({
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(function* () {}),
+            ensureUpstreamBranchConnected: Effect.fn(
+              "ensureUpstreamBranchConnected"
+            )(function* (opts: { targetBranch: string }) {
+              ensureUpstreamBranchArg = opts.targetBranch;
+            }),
+            getLogOneline: Effect.fn("getLogOneline")(function* (
+              branch: string
+            ) {
+              // Custom branch has different lessons
+              if (
+                branch.includes("custom-lessons") ||
+                branch === "custom-lessons"
+              ) {
+                return `xyz9999 02.01.01 Custom lesson from custom branch
+aaa1111 02.01.02 Another custom lesson`;
+              }
+              return `def5678 01.02.03 Add new feature`;
+            }),
+            getCurrentBranch: Effect.fn("getCurrentBranch")(function* () {
+              return "matt/feature-branch";
+            }),
+            getUncommittedChanges: Effect.fn("getUncommittedChanges")(
+              function* () {
+                return {
+                  hasUncommittedChanges: false,
+                  statusOutput: "",
+                };
+              }
+            ),
+            resetHard: Effect.fn("resetHard")(function* (sha: string) {
+              resetHardCalledWith = sha;
+            }),
+          });
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectLessonCommit: Effect.fn("selectLessonCommit")(function* (
+              _commits: Array<{ lessonId: string; message: string }>,
+              _promptMessage: string
+            ) {
+              selectLessonCommitCalled = true;
+              return "02.01.01";
+            }),
+            selectProblemOrSolution: Effect.fn("selectProblemOrSolution")(
+              function* () {
+                return "solution" as const;
+              }
+            ),
+            selectResetAction: Effect.fn("selectResetAction")(function* (
+              _branch: string
+            ) {
+              return "reset-current" as const;
+            }),
+          });
+
+          const testLayer = Layer.mergeAll(
+            Layer.succeed(GitService, mockGitService),
+            Layer.succeed(PromptService, mockPromptService),
+            Layer.succeed(GitServiceConfig, {
+              cwd: "/test/repo",
+            }),
+            NodeContext.layer
+          );
+
+          yield* runReset({
+            branch: "custom-lessons", // Custom branch provided
+            lessonId: Option.some("02.01.01"), // Direct lesson ID
+            problem: false,
+            solution: false,
+            demo: false,
+          }).pipe(Effect.provide(testLayer));
+
+          // Verify custom branch was used
+          expect(ensureUpstreamBranchArg).toBe("custom-lessons");
+          // Verify selectLessonCommit prompt was skipped when ID provided
+          expect(selectLessonCommitCalled).toBe(false);
+          // Verify reset used commit from custom branch
+          expect(resetHardCalledWith).toBe("xyz9999");
         })
     );
   });

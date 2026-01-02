@@ -443,7 +443,7 @@
     "command": "reset",
     "category": "user-flow",
     "description": "User resets from custom source branch",
-    "tested": false,
+    "tested": true,
     "steps": [
       "User runs `ai-hero reset --branch custom-lessons`",
       "System fetches 'custom-lessons' branch from upstream",

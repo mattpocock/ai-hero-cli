@@ -391,3 +391,22 @@ Changes:
      - Verifies selectLessonCommit prompt is skipped
 
 PRD item marked as tested=true.
+
+---
+
+## Session 2026-01-02 (cont. 11)
+
+Added test for PRD: "User resets from custom source branch" (reset user-flow).
+
+Changes:
+- Added 2 tests in reset.test.ts:
+  1. "should fetch and use custom branch when --branch option is provided"
+     - Verifies ensureUpstreamBranchConnected called with custom branch name
+     - Verifies reset uses commit from custom branch
+  2. "should reset to specific lesson from custom branch when ID provided"
+     - Verifies custom branch used with direct lesson ID
+     - Verifies selectLessonCommit prompt is skipped when ID provided
+
+PRD item marked as tested=true.
+
+🎉 ALL PRD ITEMS NOW TESTED! PRD is complete.
