@@ -431,7 +431,7 @@
     "command": "reset",
     "category": "behavior",
     "description": "Lesson IDs are normalized to standard format",
-    "tested": false,
+    "tested": true,
     "steps": [
       "User runs `ai-hero reset 1.1.1`",
       "System normalizes to '01.01.01'",

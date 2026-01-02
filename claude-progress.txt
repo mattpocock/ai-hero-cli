@@ -330,3 +330,19 @@ Changes:
 - Added FailedToCreateBranchError import to cherry-pick.test.ts
 
 PRD item marked as tested=true.
+
+---
+
+## Session 2026-01-02 (cont. 7)
+
+Added test for PRD: "Lesson IDs are normalized to standard format" (reset behavior).
+
+Changes:
+- Added normalizeLessonId() function to commit-utils.ts
+- Modified selectLessonCommit to normalize user-provided lesson IDs (e.g., "1.1.1" -> "01.01.01")
+- Added 2 tests in reset.test.ts:
+  1. "should normalize lesson ID 1.1.1 to 01.01.01 and find matching commit"
+  2. "should normalize lesson ID with dashes (1-2-3) to 01.02.03"
+- Supports both dots (1.1.1) and dashes (1-1-1) as separators
+
+PRD item marked as tested=true.

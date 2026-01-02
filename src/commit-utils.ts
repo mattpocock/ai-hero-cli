@@ -4,6 +4,19 @@ import { PromptService } from "./prompt-service.js";
 
 export { NoParentCommitError };
 
+/**
+ * Normalizes a lesson ID to the standard format (e.g., "1.1.1" -> "01.01.01").
+ * Handles various input formats like "1.1.1", "01.1.01", "1-1-1", etc.
+ */
+export const normalizeLessonId = (lessonId: string): string | null => {
+  // Match pattern like 1.1.1, 01.01.01, 1-1-1, etc.
+  const match = lessonId.match(/^(\d+)[.-](\d+)[.-](\d+)$/);
+  if (!match) {
+    return null;
+  }
+  return `${match[1]!.padStart(2, "0")}.${match[2]!.padStart(2, "0")}.${match[3]!.padStart(2, "0")}`;
+};
+
 export class CommitNotFoundError extends Data.TaggedError(
   "CommitNotFoundError"
 )<{
@@ -106,7 +119,9 @@ export const selectLessonCommit = ({
     let selectedLessonId: string;
 
     if (Option.isSome(lessonId)) {
-      selectedLessonId = lessonId.value;
+      // Normalize the user-provided lesson ID (e.g., "1.1.1" -> "01.01.01")
+      const normalized = normalizeLessonId(lessonId.value);
+      selectedLessonId = normalized ?? lessonId.value;
       yield* Console.log(
         `Searching for lesson ${selectedLessonId} on branch ${branch}...`
       );
