@@ -303,3 +303,16 @@ Changes:
 - Added PromptCancelledError import to cherry-pick.test.ts
 
 PRD item marked as tested=true.
+
+---
+
+## Session 2026-01-02 (cont. 5)
+
+Added test for PRD: "User cancels lesson selection" (reset user-flow).
+
+Changes:
+- Added test in reset.test.ts that mocks selectLessonCommit to fail with PromptCancelledError
+- Verified runReset propagates PromptCancelledError when user presses Ctrl+C
+- Mirrors the cherry-pick cancel test for parity between commands
+
+PRD item marked as tested=true.
