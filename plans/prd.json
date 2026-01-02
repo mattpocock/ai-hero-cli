@@ -139,7 +139,7 @@
     "command": "cherry-pick",
     "category": "error",
     "description": "Branch creation fails during main protection flow",
-    "tested": false,
+    "tested": true,
     "steps": [
       "User is on 'main' branch",
       "User runs `ai-hero cherry-pick 01.02.03`",

@@ -316,3 +316,17 @@ Changes:
 - Mirrors the cherry-pick cancel test for parity between commands
 
 PRD item marked as tested=true.
+
+---
+
+## Session 2026-01-02 (cont. 6)
+
+Added test for PRD: "Branch creation fails during main protection flow" (cherry-pick error).
+
+Changes:
+- Added test in cherry-pick.test.ts that mocks checkoutNewBranch to fail with FailedToCreateBranchError
+- Test scenario: user is on main, selects lesson, enters existing branch name
+- Verified runCherryPick propagates FailedToCreateBranchError with branchName and error message
+- Added FailedToCreateBranchError import to cherry-pick.test.ts
+
+PRD item marked as tested=true.
