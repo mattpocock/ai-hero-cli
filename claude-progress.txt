@@ -210,3 +210,21 @@ Changes:
   - Confirms state selection prompt is skipped when --problem flag provided
 
 PRD item marked as tested=true.
+
+---
+
+## Session 2026-01-02
+
+Added test for PRD: "User creates new branch from lesson" (reset user-flow).
+
+Changes:
+- Added 2 tests in reset.test.ts:
+  1. "should create new branch at target commit when user selects create-branch"
+     - Mocks selectResetAction to return "create-branch"
+     - Mocks inputBranchName to return "matt/lesson-work"
+     - Verifies checkoutNewBranchAt called with branch name and solution commit SHA
+  2. "should create branch at parent commit when user selects problem state"
+     - Same setup but selectProblemOrSolution returns "problem"
+     - Verifies checkoutNewBranchAt called with parent commit SHA (problem state)
+
+PRD item marked as tested=true.

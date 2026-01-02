@@ -237,7 +237,7 @@
     "command": "reset",
     "category": "user-flow",
     "description": "User creates new branch from lesson",
-    "tested": false,
+    "tested": true,
     "steps": [
       "User runs `ai-hero reset 01.02.03`",
       "User selects state (problem or solution)",
