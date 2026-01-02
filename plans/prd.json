@@ -370,7 +370,7 @@
     "command": "reset",
     "category": "error",
     "description": "User requests problem state for root commit",
-    "tested": false,
+    "tested": true,
     "steps": [
       "First lesson commit is the initial commit (no parent)",
       "User runs `ai-hero reset 01.01.01 --problem`",

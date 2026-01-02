@@ -360,3 +360,17 @@ Changes:
 - Added FailedToCreateBranchError to imports in reset.test.ts
 
 PRD item marked as tested=true.
+
+---
+
+## Session 2026-01-02 (cont. 9)
+
+Added test for PRD: "User requests problem state for root commit" (reset error).
+
+Changes:
+- Added test in reset.test.ts that mocks getParentCommit to fail with NoParentCommitError
+- Test scenario: user runs `ai-hero reset 01.01.01 --problem` on initial commit
+- Verified runReset propagates NoParentCommitError with commitSha
+- Added NoParentCommitError to imports in reset.test.ts
+
+PRD item marked as tested=true.
