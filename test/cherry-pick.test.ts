@@ -6,7 +6,10 @@ import {
   InvalidBranchOperationError,
   runCherryPick,
 } from "../src/cherry-pick.js";
-import { PromptCancelledError } from "../src/prompt-service.js";
+import {
+  PromptCancelledError,
+  PromptService,
+} from "../src/prompt-service.js";
 import {
   CommitNotFoundError,
   selectLessonCommit,
@@ -19,7 +22,6 @@ import {
   NoUpstreamFoundError,
   NotAGitRepoError,
 } from "../src/git-service.js";
-import { PromptService } from "../src/prompt-service.js";
 
 /**
  * Tests for the cherry-pick command business logic.
@@ -402,7 +404,9 @@ newer456 01.01.01 Updated version`;
             ),
           });
 
-          const mockPromptService = fromPartial<PromptService>({});
+          const mockPromptService = fromPartial<PromptService>(
+            {}
+          );
 
           const testLayer = Layer.mergeAll(
             Layer.succeed(GitService, mockGitService),
@@ -453,7 +457,9 @@ Add upstream remote:
             }),
           });
 
-          const mockPromptService = fromPartial<PromptService>({});
+          const mockPromptService = fromPartial<PromptService>(
+            {}
+          );
 
           const testLayer = Layer.mergeAll(
             Layer.succeed(GitService, mockGitService),
@@ -534,7 +540,9 @@ Add upstream remote:
             lessonId: Option.none(),
           }).pipe(Effect.provide(testLayer), Effect.flip);
 
-          expect(result).toBeInstanceOf(InvalidBranchOperationError);
+          expect(result).toBeInstanceOf(
+            InvalidBranchOperationError
+          );
           if (result instanceof InvalidBranchOperationError) {
             expect(result.message).toContain(
               'Cannot cherry-pick when on target branch "live-run-through"'
@@ -606,7 +614,9 @@ Add upstream remote:
           expect(result).toBeInstanceOf(CherryPickConflictError);
           if (result instanceof CherryPickConflictError) {
             expect(result.range).toBe("def5678");
-            expect(result.message).toContain("Cherry-pick conflict");
+            expect(result.message).toContain(
+              "Cherry-pick conflict"
+            );
           }
         })
     );
@@ -638,7 +648,9 @@ Add upstream remote:
             selectLessonCommit: Effect.fn("selectLessonCommit")(
               function* () {
                 // User presses Ctrl+C during prompt
-                return yield* Effect.fail(new PromptCancelledError());
+                return yield* Effect.fail(
+                  new PromptCancelledError()
+                );
               }
             ),
           });
@@ -880,7 +892,9 @@ bbb2222 03.01.01 First custom lesson`;
             lessonId: Option.none(),
           }).pipe(Effect.provide(testLayer), Effect.flip);
 
-          expect(result).toBeInstanceOf(FailedToCreateBranchError);
+          expect(result).toBeInstanceOf(
+            FailedToCreateBranchError
+          );
           if (result instanceof FailedToCreateBranchError) {
             expect(result.branchName).toBe("existing-branch");
             expect(result.message).toContain(

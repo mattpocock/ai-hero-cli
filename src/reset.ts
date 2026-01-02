@@ -3,7 +3,8 @@ import {
   Command as CLICommand,
   Options,
 } from "@effect/cli";
-import { Console, Data, Effect, Option } from "effect";
+import type { Option } from "effect";
+import { Console, Data, Effect } from "effect";
 import {
   getParentCommit,
   selectLessonCommit,
@@ -19,16 +20,22 @@ export class InvalidBranchOperationError extends Data.TaggedError(
   message: string;
 }> {}
 
+export class InvalidOptionsError extends Data.TaggedError(
+  "InvalidOptionsError"
+)<{
+  message: string;
+}> {}
+
 /**
  * Core reset logic, extracted for testability.
  * Takes options as Effect Option types.
  */
 export const runReset = ({
   branch,
+  demo,
   lessonId,
   problem,
   solution,
-  demo,
 }: {
   branch: string;
   lessonId: Option.Option<string>;
@@ -47,16 +54,14 @@ export const runReset = ({
       targetBranch: branch,
     });
 
-    const {
-      commit: targetCommit,
-      lessonId: selectedLessonId,
-    } = yield* selectLessonCommit({
-      branch,
-      lessonId,
-      promptMessage:
-        "Which lesson do you want to reset to? (type to search)",
-      excludeCurrentBranch: false,
-    });
+    const { commit: targetCommit, lessonId: selectedLessonId } =
+      yield* selectLessonCommit({
+        branch,
+        lessonId,
+        promptMessage:
+          "Which lesson do you want to reset to? (type to search)",
+        excludeCurrentBranch: false,
+      });
 
     // Determine which commit to use based on problem/solution state
     let commitToUse = targetCommit.sha;
@@ -64,26 +69,23 @@ export const runReset = ({
 
     // Check for conflicting flags
     if (problem && solution) {
-      return yield* Effect.fail(
-        new InvalidBranchOperationError({
-          message:
-            "Cannot use both --problem and --solution flags",
-        })
-      );
+      return yield* new InvalidOptionsError({
+        message:
+          "Cannot use both --problem and --solution flags",
+      });
     }
 
     if (demo && (problem || solution)) {
-      return yield* Effect.fail(
-        new InvalidBranchOperationError({
-          message:
-            "Cannot use --demo with --problem or --solution flags",
-        })
-      );
+      return yield* new InvalidOptionsError({
+        message:
+          "Cannot use --demo with --problem or --solution flags",
+      });
     }
 
     // If neither flag is provided, prompt user (unless demo mode)
     if (!problem && !solution && !demo) {
-      const state = yield* promptService.selectProblemOrSolution();
+      const state =
+        yield* promptService.selectProblemOrSolution();
 
       if (state === "problem") {
         commitToUse = yield* getParentCommit({
@@ -111,7 +113,9 @@ export const runReset = ({
     } else if (demo) {
       action = "reset-current";
     } else {
-      action = yield* promptService.selectResetAction(currentBranch);
+      action = yield* promptService.selectResetAction(
+        currentBranch
+      );
     }
 
     if (action === "reset-current") {
@@ -124,7 +128,9 @@ export const runReset = ({
     }
 
     if (action === "create-branch") {
-      const branchName = yield* promptService.inputBranchName("new");
+      const branchName = yield* promptService.inputBranchName(
+        "new"
+      );
 
       yield* Console.log(
         `Creating branch ${branchName} from ${commitToUse} (${stateDescription})...`
@@ -206,14 +212,7 @@ export const reset = CLICommand.make(
     demo: Options.boolean("demo").pipe(Options.withAlias("d")),
     cwd: cwdOption,
   },
-  ({
-    branch,
-    cwd,
-    demo,
-    lessonId,
-    problem,
-    solution,
-  }) =>
+  ({ branch, cwd, demo, lessonId, problem, solution }) =>
     runReset({ branch, lessonId, problem, solution, demo }).pipe(
       Effect.provideService(
         GitServiceConfig,

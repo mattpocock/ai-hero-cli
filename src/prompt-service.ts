@@ -5,7 +5,9 @@ export class PromptCancelledError extends Data.TaggedError(
   "PromptCancelledError"
 ) {}
 
-const runPrompt = <T extends object>(promptFn: () => Promise<T>) => {
+const runPrompt = <T extends object>(
+  promptFn: () => Promise<T>
+) => {
   return Effect.gen(function* () {
     const result = yield* Effect.promise(() => promptFn());
 
@@ -69,6 +71,7 @@ const normalizeExerciseNumber = (str: string): Array<string> => {
 export class PromptService extends Effect.Service<PromptService>()(
   "PromptService",
   {
+    // eslint-disable-next-line require-yield
     effect: Effect.gen(function* () {
       /**
        * Prompts user to confirm ready to commit changes.
@@ -653,7 +656,10 @@ export class PromptService extends Effect.Service<PromptService>()(
        * @throws PromptCancelledError if user declines or cancels
        */
       const confirmContinue = Effect.fn("confirmContinue")(
-        function* (message: string, defaultToContinue: boolean = true) {
+        function* (
+          message: string,
+          defaultToContinue: boolean = true
+        ) {
           const { confirm } = yield* runPrompt<{
             confirm: boolean;
           }>(() =>

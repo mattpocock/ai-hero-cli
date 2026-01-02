@@ -3,7 +3,8 @@ import {
   Command as CLICommand,
   Options,
 } from "@effect/cli";
-import { Console, Data, Effect, Option } from "effect";
+import type { Option } from "effect";
+import { Console, Data, Effect } from "effect";
 import { selectLessonCommit } from "./commit-utils.js";
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "./constants.js";
 import { GitService, GitServiceConfig } from "./git-service.js";
@@ -38,16 +39,14 @@ export const runCherryPick = ({
       targetBranch: branch,
     });
 
-    const {
-      commit: targetCommit,
-      lessonId: selectedLessonId,
-    } = yield* selectLessonCommit({
-      branch,
-      lessonId,
-      promptMessage:
-        "Which lesson do you want to cherry-pick? (type to search)",
-      excludeCurrentBranch: true,
-    });
+    const { commit: targetCommit, lessonId: selectedLessonId } =
+      yield* selectLessonCommit({
+        branch,
+        lessonId,
+        promptMessage:
+          "Which lesson do you want to cherry-pick? (type to search)",
+        excludeCurrentBranch: true,
+      });
 
     // Get current branch name and validate
     const currentBranch = yield* git.getCurrentBranch();
@@ -65,8 +64,9 @@ export const runCherryPick = ({
         "You cannot cherry-pick onto the main branch."
       );
 
-      const branchName =
-        yield* promptService.inputBranchName("working");
+      const branchName = yield* promptService.inputBranchName(
+        "working"
+      );
 
       yield* git.checkoutNewBranch(branchName);
 
