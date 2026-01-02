@@ -270,3 +270,23 @@ Changes:
 - Added PromptCancelledError import to reset.test.ts
 
 PRD item marked as tested=true.
+
+---
+
+## Session 2026-01-02 (cont. 3)
+
+Added test for PRD: "User runs reset in demo mode" (reset user-flow).
+
+Changes:
+- Added test in reset.test.ts that verifies demo mode behavior:
+  - Mocks all required GitService methods including resetHead, restoreStaged
+  - Passes demo=true flag to runReset
+  - Tracks whether selectProblemOrSolution was called (should NOT be)
+  - Tracks whether selectResetAction was called (should NOT be)
+  - Tracks whether getUncommittedChanges was called (should NOT be - demo skips check)
+  - Verifies resetHard called with solution commit SHA (abc1234)
+  - Verifies resetHead called (undo commit)
+  - Verifies restoreStaged called (unstage changes)
+- Also marked PRD item "User cancels reset due to uncommitted changes" as tested=true (test already existed from previous session)
+
+PRD items marked as tested=true.

@@ -1283,6 +1283,104 @@ def5678 01.02.02 Setup base structure`;
     );
   });
 
+  describe("PRD: User runs reset in demo mode", () => {
+    it.effect(
+      "should skip prompts, reset to solution, then undo commit and unstage changes",
+      () =>
+        Effect.gen(function* () {
+          let resetHardCalledWith: string | undefined;
+          let resetHeadCalled = false;
+          let restoreStagedCalled = false;
+          let selectProblemOrSolutionCalled = false;
+          let selectResetActionCalled = false;
+          let getUncommittedChangesCalled = false;
+
+          const mockGitService = fromPartial<GitService>({
+            ensureIsGitRepo: Effect.fn("ensureIsGitRepo")(function* () {}),
+            ensureUpstreamBranchConnected: Effect.fn(
+              "ensureUpstreamBranchConnected"
+            )(function* (_opts: { targetBranch: string }) {}),
+            getLogOneline: Effect.fn("getLogOneline")(function* (
+              _branch: string
+            ) {
+              return `abc1234 01.02.03 Add new feature
+def5678 01.02.02 Setup base structure`;
+            }),
+            getCurrentBranch: Effect.fn("getCurrentBranch")(function* () {
+              return "matt/feature-branch";
+            }),
+            getUncommittedChanges: Effect.fn("getUncommittedChanges")(
+              function* () {
+                getUncommittedChangesCalled = true;
+                return {
+                  hasUncommittedChanges: true,
+                  statusOutput: " M src/index.ts",
+                };
+              }
+            ),
+            resetHard: Effect.fn("resetHard")(function* (sha: string) {
+              resetHardCalledWith = sha;
+            }),
+            resetHead: Effect.fn("resetHead")(function* () {
+              resetHeadCalled = true;
+            }),
+            restoreStaged: Effect.fn("restoreStaged")(function* () {
+              restoreStagedCalled = true;
+            }),
+          });
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectLessonCommit: Effect.fn("selectLessonCommit")(function* (
+              _commits: Array<{ lessonId: string; message: string }>,
+              _promptMessage: string
+            ) {
+              return "01.02.03";
+            }),
+            selectProblemOrSolution: Effect.fn("selectProblemOrSolution")(
+              function* () {
+                selectProblemOrSolutionCalled = true;
+                return "problem" as const; // Should NOT be called
+              }
+            ),
+            selectResetAction: Effect.fn("selectResetAction")(function* (
+              _branch: string
+            ) {
+              selectResetActionCalled = true;
+              return "create-branch" as const; // Should NOT be called
+            }),
+          });
+
+          const testLayer = Layer.mergeAll(
+            Layer.succeed(GitService, mockGitService),
+            Layer.succeed(PromptService, mockPromptService),
+            Layer.succeed(GitServiceConfig, {
+              cwd: "/test/repo",
+            }),
+            NodeContext.layer
+          );
+
+          yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.some("01.02.03"),
+            problem: false,
+            solution: false,
+            demo: true, // Demo mode enabled
+          }).pipe(Effect.provide(testLayer));
+
+          // Verify prompts were skipped
+          expect(selectProblemOrSolutionCalled).toBe(false);
+          expect(selectResetActionCalled).toBe(false);
+          // Verify uncommitted changes check was skipped
+          expect(getUncommittedChangesCalled).toBe(false);
+          // Verify reset to solution commit
+          expect(resetHardCalledWith).toBe("abc1234");
+          // Verify demo mode operations: undo commit and unstage
+          expect(resetHeadCalled).toBe(true);
+          expect(restoreStagedCalled).toBe(true);
+        })
+    );
+  });
+
   describe("PRD: User attempts reset when on target branch", () => {
     it.effect(
       "should fail with InvalidBranchOperationError when on target branch and selecting reset-current",

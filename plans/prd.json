@@ -285,7 +285,7 @@
     "command": "reset",
     "category": "user-flow",
     "description": "User cancels reset due to uncommitted changes",
-    "tested": false,
+    "tested": true,
     "steps": [
       "User has uncommitted changes",
       "User runs `ai-hero reset 01.02.03`",
@@ -301,7 +301,7 @@
     "command": "reset",
     "category": "user-flow",
     "description": "User runs reset in demo mode",
-    "tested": false,
+    "tested": true,
     "steps": [
       "User runs `ai-hero reset 01.02.03 --demo`",
       "System skips state selection (uses solution)",
