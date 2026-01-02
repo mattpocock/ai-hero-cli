@@ -1,0 +1,14 @@
+[
+  {
+    "command": "internal/upgrade",
+    "category": "user-flow",
+    "description": "Upgrade @modelcontextprotocol/sdk and @ai-sdk/mcp if present",
+    "tested": false,
+    "steps": [
+      "User runs `ai-hero internal/upgrade`",
+      "System runs `pnpm up @modelcontextprotocol/sdk @ai-sdk/mcp`",
+      "pnpm upgrades only packages already in package.json",
+      "System displays result"
+    ]
+  }
+]
