@@ -22,6 +22,7 @@ If, while implementing the feature, you notice the PRD is complete, output <prom
 
   if [[ "$result" == *"<promise>COMPLETE</promise>"* ]]; then
     echo "PRD complete, exiting."
+    tt notify "AI Hero CLI PRD complete after $i iterations"
     exit 0
   fi
 done
