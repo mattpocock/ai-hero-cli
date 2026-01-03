@@ -1,5 +1,11 @@
 # ai-hero-cli
 
+## 0.2.15
+
+### Patch Changes
+
+- 0912ded: Added @modelcontextprotocol/sdk to upgrade cmd
+
 ## 0.2.14
 
 ### Patch Changes
