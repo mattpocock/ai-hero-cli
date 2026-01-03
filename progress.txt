@@ -1,0 +1,1 @@
+2026-01-03: Added @modelcontextprotocol/sdk@latest to internal/upgrade cmd. The @ai-sdk/mcp was already covered by @ai-sdk/*@latest pattern. Updated description to "Upgrade AI SDK and MCP packages". All tests pass.

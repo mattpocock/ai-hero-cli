@@ -36,6 +36,7 @@ const upgradePackages = CLICommand.make(
         "upgrade",
         "ai@latest",
         "@ai-sdk/*@latest",
+        "@modelcontextprotocol/sdk@latest",
         "ai-hero-cli@latest",
         "evalite@beta",
         "vitest@latest"
@@ -60,7 +61,7 @@ const upgradePackages = CLICommand.make(
       }
     })
 ).pipe(
-  CLICommand.withDescription("Upgrade the AI SDK packages")
+  CLICommand.withDescription("Upgrade AI SDK and MCP packages")
 );
 
 export const internal: any = CLICommand.make("internal").pipe(
