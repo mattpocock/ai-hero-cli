@@ -51,3 +51,9 @@ STATUS: Core user commands at 100%
 - commit-utils.ts: 100%
 - Remaining uncovered: git-service (mocked by design), prompt-service (UI wrappers),
   exercise.ts (requires heavy mocking), src/internal/* (internal tooling)
+
+test(lesson-parser-service): ignores files mixed with section/lesson directories
+- Coverage: 18.28% -> 18.37%
+- lesson-parser-service.ts: 70.28% -> 72.16%
+- Tests that README.md in root and notes.txt in sections are ignored
+- Real course repos have files alongside lesson folders - parser must filter them out

@@ -149,4 +149,54 @@ describe("LessonParserService", () => {
       Effect.provide(LessonParserService.Default)
     )
   );
+
+  it.effect(
+    "should ignore files mixed with section and lesson directories",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+
+        const tmpDir = yield* fs.makeTempDirectoryScoped();
+
+        // Create a valid section with a lesson
+        yield* fs.makeDirectory(
+          path.join(tmpDir, "1-introduction")
+        );
+        yield* fs.makeDirectory(
+          path.join(tmpDir, "1-introduction", "1-getting-started")
+        );
+
+        // Add files at root level (should be ignored, not treated as sections)
+        yield* fs.writeFileString(
+          path.join(tmpDir, "README.md"),
+          "# Course README"
+        );
+
+        // Add files inside section (should be ignored, not treated as lessons)
+        yield* fs.writeFileString(
+          path.join(tmpDir, "1-introduction", "notes.txt"),
+          "Section notes"
+        );
+
+        const service = yield* LessonParserService;
+        const lessons = yield* service.getLessonsFromRepo(tmpDir);
+
+        // Should only find the actual lesson directory, ignoring files
+        expect(lessons).toEqual([
+          new Lesson({
+            lessonNum: 1,
+            lessonName: "getting-started",
+            lessonPath: "1-getting-started",
+            sectionNum: 1,
+            sectionName: "introduction",
+            sectionPath: "1-introduction",
+            root: tmpDir,
+          }),
+        ]);
+      }).pipe(
+        Effect.scoped,
+        Effect.provide(NodeFileSystem.layer),
+        Effect.provide(LessonParserService.Default)
+      )
+  );
 });
