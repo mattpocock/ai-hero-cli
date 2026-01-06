@@ -8,3 +8,9 @@ test(pull): pull command fails when user has uncommitted changes
 - Coverage: 17.08% -> 17.17%
 - pull.ts: 39.09% -> 42.72%
 - Tests UncommittedChangesError when working directory is dirty
+
+test(pull): pull command fails when user is on main branch
+- Coverage: 17.17% -> 17.28%
+- pull.ts: 42.72% -> 47.27%
+- Tests InvalidBranchOperationError prevents accidental main branch corruption
+- Fixed existing test type narrowing for statusOutput property

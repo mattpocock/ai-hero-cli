@@ -98,7 +98,40 @@ describe("pull", () => {
           );
 
           expect(result._tag).toBe("UncommittedChangesError");
-          expect(result.statusOutput).toBe(" M src/index.ts\n?? new-file.ts");
+          if (result._tag === "UncommittedChangesError") {
+            expect(result.statusOutput).toBe(" M src/index.ts\n?? new-file.ts");
+          }
+        })
+    );
+  });
+
+  describe("PRD: User attempts pull while on main branch", () => {
+    it.effect(
+      "should fail with InvalidBranchOperationError when current branch is main",
+      () =>
+        Effect.gen(function* () {
+          const mockGitService = fromPartial<GitService>({
+            ensureIsGitRepo: () => Effect.succeed(undefined),
+            getCurrentBranch: Effect.fn("getCurrentBranch")(function* () {
+              return "main";
+            }),
+          });
+
+          const testLayer = Layer.mergeAll(
+            Layer.succeed(GitService, mockGitService),
+            Layer.succeed(GitServiceConfig, {
+              cwd: "/test/repo",
+            }),
+            NodeContext.layer
+          );
+
+          const result = yield* runPull().pipe(
+            Effect.provide(testLayer),
+            Effect.flip
+          );
+
+          expect(result._tag).toBe("InvalidBranchOperationError");
+          expect(result.message).toContain("Cannot pull when on main branch");
         })
     );
   });
