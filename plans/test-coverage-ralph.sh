@@ -17,8 +17,8 @@ add /* v8 ignore next */ or /* v8 ignore start */ comments instead of writing lo
 PROCESS: \
 1. Run pnpm coverage to see which files have low coverage. \
 2. Read the uncovered lines and identify the most important USER-FACING FEATURE that lacks tests. \
-   Prioritize: error handling users will hit, CLI commands, git operations, file parsing. \
-   Deprioritize: internal utilities, edge cases users won't encounter, boilerplate. \
+   Prioritize: error handling users will hit, CLI commands (including internal commands - Matt Pocock is still a user), git operations, file parsing. \
+   Deprioritize: pure utilities with no user impact, edge cases users won't encounter, boilerplate. \
 3. Write ONE meaningful test that validates the feature works correctly for users. \
 4. Run pnpm coverage again - coverage should increase as a side effect of testing real behavior. \
 5. Run pnpm typecheck to verify the types are correct. \  
