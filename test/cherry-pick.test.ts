@@ -827,6 +827,64 @@ bbb2222 03.01.01 First custom lesson`;
     );
   });
 
+  describe("PRD: User selects from branch with no lesson commits", () => {
+    it.effect(
+      "should fail with CommitNotFoundError when branch has no lesson-formatted commits",
+      () =>
+        Effect.gen(function* () {
+          const mockGitService = fromPartial<GitService>({
+            getLogOneline: Effect.fn("getLogOneline")(function* (
+              branch: string
+            ) {
+              if (branch === "HEAD") {
+                // Current branch has no lesson commits
+                return "abc1234 Initial commit";
+              }
+              // Target branch has commits but none with lesson IDs
+              return `def5678 Fix typo in readme
+ghi9012 Update dependencies
+jkl3456 Initial commit`;
+            }),
+          });
+
+          const mockPromptService = fromPartial<PromptService>({
+            // selectLessonCommit should NOT be called
+            // because there are no commits to show
+            selectLessonCommit: Effect.fn("selectLessonCommit")(
+              function* () {
+                throw new Error(
+                  "selectLessonCommit should not be called when no lessons exist"
+                );
+              }
+            ),
+          });
+
+          const testLayer = Layer.mergeAll(
+            Layer.succeed(GitService, mockGitService),
+            Layer.succeed(PromptService, mockPromptService),
+            Layer.succeed(GitServiceConfig, {
+              cwd: "/test/dir",
+            }),
+            NodeContext.layer
+          );
+
+          // Act & Assert: should fail because no lesson commits exist
+          const result = yield* selectLessonCommit({
+            branch: "live-run-through",
+            lessonId: Option.none(),
+            promptMessage: "Select lesson",
+            excludeCurrentBranch: true,
+          }).pipe(Effect.provide(testLayer), Effect.flip);
+
+          expect(result).toBeInstanceOf(CommitNotFoundError);
+          if (result instanceof CommitNotFoundError) {
+            expect(result.lessonId).toBe("any");
+            expect(result.branch).toBe("live-run-through");
+          }
+        })
+    );
+  });
+
   describe("PRD: Branch creation fails during main protection flow", () => {
     it.effect(
       "should fail with FailedToCreateBranchError when branch already exists",

@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//home/mattpocock/repos/ai/evalite/**)",
+      "WebSearch",
+      "WebFetch(domain:effect-ts.github.io)",
+      "Bash(pnpm build:*)",
+      "Bash(gh issue view:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git help:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(tree:*)",
+      "WebFetch(domain:stackoverflow.com)",
+      "Bash(cat:*)",
+      "Bash(pnpm typecheck:*)",
+      "Bash(pnpm test:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
