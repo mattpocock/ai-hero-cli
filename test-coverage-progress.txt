@@ -101,3 +101,9 @@ test(exercise): runLesson fails with LessonEntrypointNotFoundError for malformed
 - exercise.ts: 21.57% -> 24.48%
 - Tests that lesson with no subfolders (no problem/solution dirs) returns clear error
 - Users with malformed course structure get helpful error instead of silent failure
+
+test(exercise): runLesson fails when subfolder has no main.ts or readme.md
+- Coverage: 22.58% -> 23.72%
+- exercise.ts: 24.48% -> 38.48%
+- Tests LessonEntrypointNotFoundError when problem/solution folder exists but is empty
+- Covers getMainAndReadmeFiles error path - users get clear error for malformed lessons

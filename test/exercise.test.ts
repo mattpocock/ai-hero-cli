@@ -140,4 +140,50 @@ describe("exercise", () => {
         )
     );
   });
+
+  describe("PRD: User runs a lesson with empty subfolder (no main.ts or readme.md)", () => {
+    it.effect(
+      "should fail with LessonEntrypointNotFoundError when subfolder has no main.ts or readme.md",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+
+          // Create a lesson with a problem subfolder but no main.ts or readme.md inside
+          // This simulates a malformed course where someone created folders but no content
+          const tmpDir = yield* fs.makeTempDirectoryScoped();
+
+          yield* fs.makeDirectory(
+            path.join(tmpDir, "1-basics", "1-intro", "problem"),
+            { recursive: true }
+          );
+          // Add a random file that isn't main.ts or readme.md
+          yield* fs.writeFileString(
+            path.join(tmpDir, "1-basics", "1-intro", "problem", "notes.txt"),
+            "Some notes but no main.ts"
+          );
+
+          // User tries to run lesson 1 which has a subfolder but no entrypoint
+          const error = yield* runLesson({
+            lesson: 1,
+            root: tmpDir,
+            envFilePath: ".env",
+            cwd: tmpDir,
+            forceSubfolderIndex: 0, // Force selecting the problem subfolder
+          }).pipe(Effect.flip);
+
+          expect(error).toBeInstanceOf(LessonEntrypointNotFoundError);
+          expect(error).toEqual(
+            new LessonEntrypointNotFoundError({
+              lesson: 1,
+              message: "main.ts file for exercise problem not found",
+            })
+          );
+        }).pipe(
+          Effect.scoped,
+          Effect.provide(NodeFileSystem.layer),
+          Effect.provide(LessonParserService.Default),
+          Effect.provide(createMockPromptService())
+        )
+    );
+  });
 });
