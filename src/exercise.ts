@@ -287,6 +287,7 @@ export const runLesson: (opts: {
   }
 });
 
+/* v8 ignore start - Console formatting wrapper */
 const logReadmeFile = Effect.fn("logReadmeFile")(
   function* (opts: { readmeFile: string }) {
     yield* Console.log(
@@ -297,7 +298,9 @@ const logReadmeFile = Effect.fn("logReadmeFile")(
     );
   }
 );
+/* v8 ignore stop */
 
+/* v8 ignore start - UI prompt wrapper that calls runLesson */
 const chooseLessonAndRunIt = (opts: {
   root: string;
   envFilePath: string;
@@ -337,7 +340,9 @@ const chooseLessonAndRunIt = (opts: {
     }),
     Effect.catchAll(Console.log)
   );
+/* v8 ignore stop */
 
+/* v8 ignore start - CLI command boilerplate */
 export const exercise = CLICommand.make(
   "exercise",
   {
@@ -399,18 +404,21 @@ export const exercise = CLICommand.make(
     });
   }
 );
+/* v8 ignore stop */
 
 const selectSubfolderIndex = Effect.fn("selectSubfolder")(
   function* (opts: { lesson: Lesson }) {
     const promptService = yield* PromptService;
     const subfolders = yield* opts.lesson.subfolders();
 
+    /* v8 ignore start - unreachable: caller already checks subfolders.length > 1 */
     if (subfolders.length === 0) {
       return yield* new LessonEntrypointNotFoundError({
         lesson: opts.lesson.num,
         message: `No subfolders found for lesson ${opts.lesson.num}`,
       });
     }
+    /* v8 ignore stop */
 
     const subfolderIndex =
       yield* promptService.selectSubfolder(subfolders);

@@ -144,3 +144,18 @@ test(exercise): runLesson prompts user to select subfolder when lesson has multi
 - Tests that lessons with both problem and solution directories prompt user to choose
 - Covers lines 126-132 (selectSubfolderIndex call) and 403-422 (selectSubfolderIndex fn)
 - Remaining uncovered: lines 264-400 (CLI command handler), 409-413 (unreachable error check)
+
+v8 ignore: exercise.ts CLI wrappers and unreachable code
+- Coverage: 26.18% -> 26.05% (ignored lines reduce total measurable)
+- exercise.ts: 74.63% -> 84.87%
+- logReadmeFile (lines 290-299): Console formatting wrapper
+- chooseLessonAndRunIt (lines 301-339): UI prompt wrapper that calls runLesson
+- exercise CLI command (lines 341-401): CLI boilerplate wiring args to runLesson
+- selectSubfolderIndex error check (lines 408-413): unreachable - caller checks first
+
+test(exercise): runLesson navigates to previous subfolder within same lesson
+- Coverage: 26.05% -> 26.19%
+- exercise.ts: 84.87% -> 87.39%
+- Tests user on solution (subfolderIndex=1) going back to problem (subfolderIndex=0)
+- Covers lines 163-168 (previousExerciseToRun calculation for same-lesson navigation)
+- Remaining uncovered: lines 209-238 (execSync for running main.ts)

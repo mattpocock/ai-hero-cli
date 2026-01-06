@@ -778,6 +778,127 @@ describe("exercise", () => {
     );
   });
 
+  describe("PRD: User navigates to previous subfolder within same lesson", () => {
+    it.effect(
+      "should navigate to previous subfolder when user selects previous-exercise on non-first subfolder",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+
+          // Create a lesson with multiple subfolders (problem, solution)
+          // User starts on solution and navigates back to problem
+          const tmpDir = yield* fs.makeTempDirectoryScoped();
+
+          // Lesson with problem and solution subfolders
+          yield* fs.makeDirectory(
+            path.join(tmpDir, "1-basics", "1-intro", "problem"),
+            { recursive: true }
+          );
+          yield* fs.writeFileString(
+            path.join(tmpDir, "1-basics", "1-intro", "problem", "readme.md"),
+            "# Problem"
+          );
+          yield* fs.makeDirectory(
+            path.join(tmpDir, "1-basics", "1-intro", "solution"),
+            { recursive: true }
+          );
+          yield* fs.writeFileString(
+            path.join(tmpDir, "1-basics", "1-intro", "solution", "readme.md"),
+            "# Solution"
+          );
+
+          const subfoldersVisited: string[] = [];
+
+          const mockPromptService = Layer.succeed(PromptService, {
+            confirmReadyToCommit: () => {
+              throw new Error("Should not be called");
+            },
+            confirmSaveToTargetBranch: () => {
+              throw new Error("Should not be called");
+            },
+            confirmForcePush: () => {
+              throw new Error("Should not be called");
+            },
+            selectCherryPickConflictAction: () => {
+              throw new Error("Should not be called");
+            },
+            selectProblemOrSolution: () => {
+              throw new Error("Should not be called");
+            },
+            selectResetAction: () => {
+              throw new Error("Should not be called");
+            },
+            confirmResetWithUncommittedChanges: () => {
+              throw new Error("Should not be called");
+            },
+            inputBranchName: () => {
+              throw new Error("Should not be called");
+            },
+            selectLessonCommit: () => {
+              throw new Error("Should not be called");
+            },
+            selectExercise: () => {
+              throw new Error("Should not be called");
+            },
+            confirmProceedWithUncommittedChanges: () => {
+              throw new Error("Should not be called");
+            },
+            selectWalkThroughAction: () => {
+              throw new Error("Should not be called");
+            },
+            selectSubfolder: () => {
+              throw new Error("Should not be called");
+            },
+            selectExerciseAction: (opts: {
+              result: "success" | "failed" | "readme-only";
+              hasNext: boolean;
+              hasPrevious: boolean;
+              nextLabel?: string | undefined;
+              previousLabel?: string | undefined;
+              lessonType: "exercise" | "explainer";
+            }) => {
+              // Track which subfolder we're on based on previousLabel
+              if (opts.previousLabel?.includes("problem")) {
+                // On solution subfolder - previous goes to problem
+                subfoldersVisited.push("solution");
+                expect(opts.hasPrevious).toBe(true);
+                return Effect.succeed("previous-exercise" as const);
+              } else {
+                // On problem subfolder - no more previous in same lesson
+                subfoldersVisited.push("problem");
+                return Effect.succeed("exit" as const);
+              }
+            },
+            confirmContinue: () => {
+              throw new Error("Should not be called");
+            },
+            selectSubdirectory: () => {
+              throw new Error("Should not be called");
+            },
+            inputText: () => {
+              throw new Error("Should not be called");
+            },
+          } as unknown as PromptService);
+
+          // User starts on solution (subfolderIndex=1) and goes back to problem
+          yield* runLesson({
+            lesson: 1,
+            root: tmpDir,
+            envFilePath: ".env",
+            cwd: tmpDir,
+            forceSubfolderIndex: 1, // Start on solution
+          }).pipe(Effect.provide(mockPromptService));
+
+          // Verify user navigated from solution back to problem within same lesson
+          expect(subfoldersVisited).toEqual(["solution", "problem"]);
+        }).pipe(
+          Effect.scoped,
+          Effect.provide(NodeFileSystem.layer),
+          Effect.provide(LessonParserService.Default)
+        )
+    );
+  });
+
   describe("PRD: User navigates to previous exercise", () => {
     it.effect(
       "should navigate to previous lesson when user selects previous-exercise",
