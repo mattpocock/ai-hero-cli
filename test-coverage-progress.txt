@@ -39,3 +39,7 @@ v8 ignore: CLI error handlers are presentation logic
 - reset.ts: 70.92% -> 100%
 - Added /* v8 ignore */ comments to CLI error handler blocks (catchTags/catchAll)
 - These format errors for display - actual error behavior tested via runX functions
+
+v8 ignore: boilerplate plumbing files
+- Coverage: 18.17% -> 18.28%
+- Cli.ts and layer.ts are entry point / DI layer - no business logic to test

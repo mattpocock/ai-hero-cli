@@ -1,3 +1,4 @@
+/* v8 ignore start - CLI entry point, no business logic */
 import { Command } from "@effect/cli";
 import { cherryPick } from "./cherry-pick.js";
 import { exercise } from "./exercise.js";
@@ -13,3 +14,4 @@ export const run = Command.run(command, {
   name: "AI Hero",
   version: "0.0.0",
 });
+/* v8 ignore stop */

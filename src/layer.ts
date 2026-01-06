@@ -1,3 +1,4 @@
+/* v8 ignore start - dependency injection layer, no business logic */
 import { NodeContext } from "@effect/platform-node";
 import { Layer } from "effect";
 import { GitService } from "./git-service.js";
@@ -10,3 +11,4 @@ export const layerLive = Layer.mergeAll(
   LessonParserService.Default,
   PromptService.Default
 );
+/* v8 ignore stop */
