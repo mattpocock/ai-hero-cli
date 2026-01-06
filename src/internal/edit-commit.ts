@@ -81,12 +81,27 @@ export const editCommit = CLICommand.make(
       }
 
       // Get current branch name
-      const currentBranch = yield* gitService.getCurrentBranch();
+      const originalBranch =
+        yield* gitService.getCurrentBranch();
 
-      // Check if current branch is the target branch
-      if (currentBranch === liveBranch) {
+      // Create temporary branch for edit-commit work
+      const tempBranchName = `matt/edit-commit-${Date.now()}`;
+      yield* Console.log(
+        `Creating temporary branch: ${tempBranchName}`
+      );
+
+      const createBranchResult = yield* gitService
+        .checkoutNewBranch(tempBranchName)
+        .pipe(
+          Effect.map(() => ({ failed: false as const })),
+          Effect.catchTag("FailedToCreateBranchError", () =>
+            Effect.succeed({ failed: true as const })
+          )
+        );
+
+      if (createBranchResult.failed) {
         yield* Console.error(
-          `Error: Cannot edit commit on target branch "${liveBranch}". Switch to a different branch first.`
+          `Failed to create temporary branch "${tempBranchName}". A branch with this name may already exist.`
         );
         process.exitCode = 1;
         return;
@@ -255,14 +270,14 @@ export const editCommit = CLICommand.make(
 
       if (checkoutResult.failed) {
         yield* Console.error(
-          `Failed to checkout ${liveBranch}. Changes remain on ${currentBranch}.`
+          `Failed to checkout ${liveBranch}. Changes remain on ${tempBranchName}.`
         );
         process.exitCode = 1;
         return;
       }
 
       const resetToCurrentResult = yield* gitService
-        .resetHard(currentBranch)
+        .resetHard(tempBranchName)
         .pipe(
           Effect.map(() => ({ failed: false as const })),
           Effect.catchTag("FailedToResetError", () =>
@@ -272,7 +287,7 @@ export const editCommit = CLICommand.make(
 
       if (resetToCurrentResult.failed) {
         yield* Console.error(
-          `Failed to reset ${liveBranch} to ${currentBranch}.`
+          `Failed to reset ${liveBranch} to ${tempBranchName}.`
         );
         process.exitCode = 1;
         return;
@@ -311,10 +326,10 @@ export const editCommit = CLICommand.make(
 
       // Go back to the original branch
       yield* Console.log(
-        `Switching back to ${currentBranch}...`
+        `Switching back to ${originalBranch}...`
       );
       yield* gitService
-        .checkout(currentBranch)
+        .checkout(originalBranch)
         .pipe(
           Effect.catchTag(
             "FailedToCheckoutError",
@@ -322,7 +337,22 @@ export const editCommit = CLICommand.make(
           )
         );
 
-      yield* Console.log(`✓ Switched back to ${currentBranch}`);
+      yield* Console.log(`✓ Switched back to ${originalBranch}`);
+
+      // Delete temporary branch
+      yield* Console.log(
+        `Deleting temporary branch ${tempBranchName}...`
+      );
+      yield* gitService
+        .deleteBranch(tempBranchName)
+        .pipe(
+          Effect.catchTag(
+            "FailedToDeleteBranchError",
+            () => Effect.void
+          )
+        );
+
+      yield* Console.log(`✓ Deleted temporary branch`);
     }).pipe(
       Effect.catchTags({
         NotAGitRepoError: (error) => {

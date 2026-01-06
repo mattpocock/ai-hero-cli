@@ -696,6 +696,34 @@ Add upstream remote:
         ),
 
         /**
+         * Deletes a local branch.
+         * Uses `git branch -D` which force deletes even if not fully merged.
+         *
+         * @param branchName - The name of the branch to delete
+         * @returns Effect that succeeds when branch is deleted
+         * @throws FailedToDeleteBranchError if deletion fails
+         */
+        deleteBranch: Effect.fn("deleteBranch")(function* (
+          branchName: string
+        ) {
+          const exitCode = yield* runCommandWithExitCode(
+            "git",
+            "branch",
+            "-D",
+            branchName
+          );
+
+          if (exitCode !== 0) {
+            return yield* Effect.fail(
+              new FailedToDeleteBranchError({
+                branchName,
+                message: `Failed to delete branch ${branchName} (exit code: ${exitCode})`,
+              })
+            );
+          }
+        }),
+
+        /**
          * Fetches a specific branch from a remote.
          * Updates the remote-tracking branch (e.g., origin/main) without
          * modifying local branches or the working directory.
