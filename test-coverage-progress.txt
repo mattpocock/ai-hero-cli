@@ -125,3 +125,9 @@ test(exercise): runLesson navigates to previous lesson when user selects previou
 - exercise.ts: 53.93% -> 56.55%
 - Tests user navigating from lesson 2 back to lesson 1 via "previous-exercise" action
 - Covers lines 160-187 (previousExerciseToRun calculation) and 276-287 (previous-exercise handler)
+
+test(exercise): runLesson re-runs same exercise when user selects run-again
+- Coverage: 25.2% -> 25.37%
+- exercise.ts: 56.55% -> 58.6%
+- Tests user running exercise, selecting "run-again", then exiting
+- Covers lines 253-261 (run-again handler recursive call)

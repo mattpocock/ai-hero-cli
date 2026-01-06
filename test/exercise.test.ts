@@ -426,6 +426,107 @@ describe("exercise", () => {
     );
   });
 
+  describe("PRD: User re-runs exercise after failure", () => {
+    it.effect(
+      "should re-run same lesson when user selects run-again",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+
+          // Create a lesson with readme
+          const tmpDir = yield* fs.makeTempDirectoryScoped();
+
+          yield* fs.makeDirectory(
+            path.join(tmpDir, "1-basics", "1-intro", "explainer"),
+            { recursive: true }
+          );
+          yield* fs.writeFileString(
+            path.join(tmpDir, "1-basics", "1-intro", "explainer", "readme.md"),
+            "# Lesson 1"
+          );
+
+          let runCount = 0;
+
+          const mockPromptService = Layer.succeed(PromptService, {
+            confirmReadyToCommit: () => {
+              throw new Error("Should not be called");
+            },
+            confirmSaveToTargetBranch: () => {
+              throw new Error("Should not be called");
+            },
+            confirmForcePush: () => {
+              throw new Error("Should not be called");
+            },
+            selectCherryPickConflictAction: () => {
+              throw new Error("Should not be called");
+            },
+            selectProblemOrSolution: () => {
+              throw new Error("Should not be called");
+            },
+            selectResetAction: () => {
+              throw new Error("Should not be called");
+            },
+            confirmResetWithUncommittedChanges: () => {
+              throw new Error("Should not be called");
+            },
+            inputBranchName: () => {
+              throw new Error("Should not be called");
+            },
+            selectLessonCommit: () => {
+              throw new Error("Should not be called");
+            },
+            selectExercise: () => {
+              throw new Error("Should not be called");
+            },
+            confirmProceedWithUncommittedChanges: () => {
+              throw new Error("Should not be called");
+            },
+            selectWalkThroughAction: () => {
+              throw new Error("Should not be called");
+            },
+            selectSubfolder: () => {
+              throw new Error("Should not be called");
+            },
+            selectExerciseAction: () => {
+              runCount++;
+              if (runCount === 1) {
+                // First run - user selects "run-again"
+                return Effect.succeed("run-again" as const);
+              } else {
+                // Second run - user exits
+                return Effect.succeed("exit" as const);
+              }
+            },
+            confirmContinue: () => {
+              throw new Error("Should not be called");
+            },
+            selectSubdirectory: () => {
+              throw new Error("Should not be called");
+            },
+            inputText: () => {
+              throw new Error("Should not be called");
+            },
+          } as unknown as PromptService);
+
+          // User runs lesson 1, selects "run-again", then exits
+          yield* runLesson({
+            lesson: 1,
+            root: tmpDir,
+            envFilePath: ".env",
+            cwd: tmpDir,
+            forceSubfolderIndex: 0,
+          }).pipe(Effect.provide(mockPromptService));
+
+          // Verify the exercise was run twice (original + re-run)
+          expect(runCount).toBe(2);
+        }).pipe(
+          Effect.scoped,
+          Effect.provide(NodeFileSystem.layer),
+          Effect.provide(LessonParserService.Default)
+        )
+    );
+  });
+
   describe("PRD: User navigates to previous exercise", () => {
     it.effect(
       "should navigate to previous lesson when user selects previous-exercise",
