@@ -1,0 +1,5 @@
+test(pull): pull command fetches upstream main and merges into current branch
+- Coverage: 16.15% -> 17.08%
+- pull.ts: 0% -> 39.09%
+- Refactored pull.ts to export runPull() for testability (matching reset.ts pattern)
+- Test validates: fetch upstream/main, merge into current branch

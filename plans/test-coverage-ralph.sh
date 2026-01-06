@@ -21,8 +21,8 @@ PROCESS: \
    Deprioritize: internal utilities, edge cases users won't encounter, boilerplate. \
 3. Write ONE meaningful test that validates the feature works correctly for users. \
 4. Run pnpm coverage again - coverage should increase as a side effect of testing real behavior. \
-5. Commit with message: test(<file>): <describe the user behavior being tested> \
-6. Append super-concise notes to test-coverage-progress.txt: what you tested, coverage %, any learnings. \
+5. Append super-concise notes to test-coverage-progress.txt: what you tested, coverage %, any learnings. \
+6. Commit with message: test(<file>): <describe the user behavior being tested> \
 \
 ONLY WRITE ONE TEST PER ITERATION. \
 If statement coverage reaches 100%, output <promise>COMPLETE</promise>. \
