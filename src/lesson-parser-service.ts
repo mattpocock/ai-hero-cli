@@ -115,6 +115,7 @@ export class Lesson {
 const getNameAndNumberFromPath = (path: string) => {
   const numSection = path.split("-")[0];
 
+  /* v8 ignore next 8 -- unreachable: split always returns at least one element */
   if (typeof numSection === "undefined") {
     return Effect.fail(
       new InvalidPathError({

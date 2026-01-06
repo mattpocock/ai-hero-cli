@@ -70,3 +70,9 @@ test(lesson-parser-service): Lesson.isExplainer identifies explainer vs exercise
 - Tests that isExplainer() returns true for lessons with "explainer" subfolder
 - Used by exercise command to display differently for explainer vs exercise lessons
 - Remaining uncovered lines 119-125: edge case for malformed paths (no hyphen separator)
+
+v8 ignore: unreachable defensive code in getNameAndNumberFromPath
+- Coverage: 19.61% -> 19.62%
+- lesson-parser-service.ts: 96.69% -> 100%
+- Lines 119-126: checks if split("-")[0] is undefined, but split always returns >= 1 element
+- This is defensive TypeScript that can never execute at runtime
