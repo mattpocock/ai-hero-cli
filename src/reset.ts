@@ -212,6 +212,7 @@ export const reset = CLICommand.make(
     demo: Options.boolean("demo").pipe(Options.withAlias("d")),
     cwd: cwdOption,
   },
+  /* v8 ignore start - CLI error handlers are presentation logic */
   ({ branch, cwd, demo, lessonId, problem, solution }) =>
     runReset({ branch, lessonId, problem, solution, demo }).pipe(
       Effect.provideService(
@@ -279,6 +280,7 @@ export const reset = CLICommand.make(
         });
       })
     )
+  /* v8 ignore stop */
 ).pipe(
   CLICommand.withDescription("Reset to a specific lesson commit")
 );

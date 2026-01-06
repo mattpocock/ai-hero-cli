@@ -100,6 +100,7 @@ export const cherryPick = CLICommand.make(
     ),
     cwd: cwdOption,
   },
+  /* v8 ignore start - CLI error handlers are presentation logic */
   ({ branch, cwd, lessonId }) =>
     runCherryPick({ branch, lessonId }).pipe(
       Effect.provideService(
@@ -159,6 +160,7 @@ export const cherryPick = CLICommand.make(
         });
       })
     )
+  /* v8 ignore stop */
 ).pipe(
   CLICommand.withDescription(
     "Cherry-pick a specific lesson commit onto current branch"

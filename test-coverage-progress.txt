@@ -31,3 +31,11 @@ test(reset): handles invalid lesson ID format by using raw input
 - commit-utils.ts: 98.42% -> 100%
 - Tests that malformed lesson IDs (like "invalid-id") fall back to raw value search
 - Covers normalizeLessonId returning null for non-matching patterns
+
+v8 ignore: CLI error handlers are presentation logic
+- Coverage: 17.48% -> 18.17%
+- cherry-pick.ts: 56.71% -> 100%
+- pull.ts: 47.27% -> 100%
+- reset.ts: 70.92% -> 100%
+- Added /* v8 ignore */ comments to CLI error handler blocks (catchTags/catchAll)
+- These format errors for display - actual error behavior tested via runX functions

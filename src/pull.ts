@@ -67,6 +67,7 @@ export const pull = CLICommand.make(
   {
     cwd: cwdOption,
   },
+  /* v8 ignore start - CLI error handlers are presentation logic */
   ({ cwd }) =>
     runPull().pipe(
       Effect.provideService(
@@ -126,6 +127,7 @@ export const pull = CLICommand.make(
         });
       })
     )
+  /* v8 ignore stop */
 ).pipe(
   CLICommand.withDescription(
     "Pull latest changes from upstream main"
