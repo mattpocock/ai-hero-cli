@@ -113,3 +113,9 @@ test(exercise): runLesson handles readme-only lessons (no main.ts)
 - exercise.ts: 38.48% -> 45.48%
 - Tests that lessons with only readme.md (no main.ts) show "Read the readme" and prompt for action
 - Validates result: "readme-only" is passed to selectExerciseAction for proper UI
+
+test(exercise): runLesson navigates to next lesson when user selects next-exercise
+- Coverage: 24.3% -> 24.99%
+- exercise.ts: 45.48% -> 53.93%
+- Tests user navigating from lesson 1 to lesson 2 via "next-exercise" action
+- Covers lines 139-158 (nextExerciseToRun calculation) and 268-275 (next-exercise handler)

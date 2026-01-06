@@ -300,4 +300,129 @@ describe("exercise", () => {
         )
     );
   });
+
+  describe("PRD: User navigates to next exercise after completing current one", () => {
+    it.effect(
+      "should navigate to next lesson when user selects next-exercise",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+
+          // Create two lessons so user can navigate between them
+          const tmpDir = yield* fs.makeTempDirectoryScoped();
+
+          // Lesson 1 with readme
+          yield* fs.makeDirectory(
+            path.join(tmpDir, "1-basics", "1-intro", "explainer"),
+            { recursive: true }
+          );
+          yield* fs.writeFileString(
+            path.join(tmpDir, "1-basics", "1-intro", "explainer", "readme.md"),
+            "# Lesson 1"
+          );
+
+          // Lesson 2 with readme
+          yield* fs.makeDirectory(
+            path.join(tmpDir, "1-basics", "2-variables", "explainer"),
+            { recursive: true }
+          );
+          yield* fs.writeFileString(
+            path.join(tmpDir, "1-basics", "2-variables", "explainer", "readme.md"),
+            "# Lesson 2"
+          );
+
+          const lessonsVisited: number[] = [];
+
+          const mockPromptService = Layer.succeed(PromptService, {
+            confirmReadyToCommit: () => {
+              throw new Error("Should not be called");
+            },
+            confirmSaveToTargetBranch: () => {
+              throw new Error("Should not be called");
+            },
+            confirmForcePush: () => {
+              throw new Error("Should not be called");
+            },
+            selectCherryPickConflictAction: () => {
+              throw new Error("Should not be called");
+            },
+            selectProblemOrSolution: () => {
+              throw new Error("Should not be called");
+            },
+            selectResetAction: () => {
+              throw new Error("Should not be called");
+            },
+            confirmResetWithUncommittedChanges: () => {
+              throw new Error("Should not be called");
+            },
+            inputBranchName: () => {
+              throw new Error("Should not be called");
+            },
+            selectLessonCommit: () => {
+              throw new Error("Should not be called");
+            },
+            selectExercise: () => {
+              throw new Error("Should not be called");
+            },
+            confirmProceedWithUncommittedChanges: () => {
+              throw new Error("Should not be called");
+            },
+            selectWalkThroughAction: () => {
+              throw new Error("Should not be called");
+            },
+            selectSubfolder: () => {
+              throw new Error("Should not be called");
+            },
+            selectExerciseAction: (opts: {
+              result: "success" | "failed" | "readme-only";
+              hasNext: boolean;
+              hasPrevious: boolean;
+              nextLabel?: string | undefined;
+              previousLabel?: string | undefined;
+              lessonType: "exercise" | "explainer";
+            }) => {
+              // Track which lesson we're on based on nextLabel
+              if (opts.nextLabel?.includes("2-variables")) {
+                lessonsVisited.push(1);
+                // User selects "next" on lesson 1
+                expect(opts.hasNext).toBe(true);
+                expect(opts.nextLabel).toContain("2-variables");
+                return Effect.succeed("next-exercise" as const);
+              } else {
+                // We're now on lesson 2
+                lessonsVisited.push(2);
+                expect(opts.hasNext).toBe(false); // No more lessons
+                expect(opts.hasPrevious).toBe(true);
+                return Effect.succeed("exit" as const);
+              }
+            },
+            confirmContinue: () => {
+              throw new Error("Should not be called");
+            },
+            selectSubdirectory: () => {
+              throw new Error("Should not be called");
+            },
+            inputText: () => {
+              throw new Error("Should not be called");
+            },
+          } as unknown as PromptService);
+
+          // User starts on lesson 1 and navigates to lesson 2
+          yield* runLesson({
+            lesson: 1,
+            root: tmpDir,
+            envFilePath: ".env",
+            cwd: tmpDir,
+            forceSubfolderIndex: 0,
+          }).pipe(Effect.provide(mockPromptService));
+
+          // Verify user successfully navigated from lesson 1 to lesson 2
+          expect(lessonsVisited).toEqual([1, 2]);
+        }).pipe(
+          Effect.scoped,
+          Effect.provide(NodeFileSystem.layer),
+          Effect.provide(LessonParserService.Default)
+        )
+    );
+  });
 });
