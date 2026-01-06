@@ -679,6 +679,61 @@ export class PromptService extends Effect.Service<PromptService>()(
         }
       );
 
+      /**
+       * Prompts user to select a subdirectory from a list.
+       *
+       * @param subdirs - Array of subdirectory names
+       * @param message - Custom prompt message
+       * @returns The selected subdirectory name
+       * @throws PromptCancelledError if user presses Ctrl+C
+       */
+      const selectSubdirectory = Effect.fn("selectSubdirectory")(
+        function* (subdirs: Array<string>, message: string) {
+          const { subdirectory } = yield* runPrompt<{
+            subdirectory: string;
+          }>(() =>
+            prompt([
+              {
+                type: "autocomplete",
+                name: "subdirectory",
+                message,
+                choices: subdirs.map((dir) => ({
+                  title: dir,
+                  value: dir,
+                })),
+              },
+            ])
+          );
+
+          return subdirectory;
+        }
+      );
+
+      /**
+       * Prompts user for text input.
+       *
+       * @param message - The prompt message
+       * @returns The entered text
+       * @throws PromptCancelledError if user presses Ctrl+C
+       */
+      const inputText = Effect.fn("inputText")(
+        function* (message: string) {
+          const { text } = yield* runPrompt<{
+            text: string;
+          }>(() =>
+            prompt([
+              {
+                type: "text",
+                name: "text",
+                message,
+              },
+            ])
+          );
+
+          return text;
+        }
+      );
+
       return {
         confirmReadyToCommit,
         confirmSaveToTargetBranch,
@@ -695,6 +750,8 @@ export class PromptService extends Effect.Service<PromptService>()(
         selectSubfolder,
         selectExerciseAction,
         confirmContinue,
+        selectSubdirectory,
+        inputText,
       };
     }),
     dependencies: [],
