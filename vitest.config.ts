@@ -9,7 +9,14 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "json"],
       include: ["src/**/*.ts"],
-      exclude: ["src/bin.ts"]
+      exclude: [
+        "src/bin.ts",
+        "src/Cli.ts",
+        "src/layer.ts",
+        "src/internal/**/*.ts",
+        "src/git-service.ts",
+        "src/prompt-service.ts"
+      ]
     }
   }
 })
