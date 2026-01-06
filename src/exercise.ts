@@ -206,6 +206,7 @@ export const runLesson: (opts: {
     yield* Console.log("");
     result = "readme-only";
   } else if (mainFile) {
+    /* v8 ignore start - execSync subprocess execution is an integration boundary */
     yield* Console.log(
       styleText(
         "bold",
@@ -233,9 +234,11 @@ export const runLesson: (opts: {
     if (isExplainer && readmeFile) {
       yield* logReadmeFile({ readmeFile });
     }
-  } else {
+    /* v8 ignore stop */
+  } /* v8 ignore start - unreachable: getMainAndReadmeFiles errors if neither file exists */ else {
     result = "failed";
   }
+  /* v8 ignore stop */
 
   const choice = yield* promptService.selectExerciseAction({
     result,

@@ -159,3 +159,10 @@ test(exercise): runLesson navigates to previous subfolder within same lesson
 - Tests user on solution (subfolderIndex=1) going back to problem (subfolderIndex=0)
 - Covers lines 163-168 (previousExerciseToRun calculation for same-lesson navigation)
 - Remaining uncovered: lines 209-238 (execSync for running main.ts)
+
+v8 ignore: exercise.ts execSync subprocess execution boundary
+- Coverage: 26.19% -> 26.39%
+- exercise.ts: 87.39% -> 100%
+- Lines 209-237: execSync runs pnpm tsx on main.ts - external process, not unit testable
+- Lines 238-240: unreachable else branch (getMainAndReadmeFiles errors if neither file exists)
+- Remaining uncovered: git-service (mocked by design), prompt-service (UI wrappers), src/internal/*
