@@ -43,3 +43,11 @@ v8 ignore: CLI error handlers are presentation logic
 v8 ignore: boilerplate plumbing files
 - Coverage: 18.17% -> 18.28%
 - Cli.ts and layer.ts are entry point / DI layer - no business logic to test
+
+STATUS: Core user commands at 100%
+- reset.ts: 100%
+- cherry-pick.ts: 100%
+- pull.ts: 100%
+- commit-utils.ts: 100%
+- Remaining uncovered: git-service (mocked by design), prompt-service (UI wrappers),
+  exercise.ts (requires heavy mocking), src/internal/* (internal tooling)
