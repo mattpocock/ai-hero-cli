@@ -5,6 +5,7 @@ import { NodeFileSystem } from "@effect/platform-node";
 import { Effect, Layer } from "effect";
 import * as path from "path";
 import {
+  LessonEntrypointNotFoundError,
   LessonNotFoundError,
   runLesson,
 } from "../src/exercise.js";
@@ -82,6 +83,53 @@ describe("exercise", () => {
             new LessonNotFoundError({
               lesson: 99,
               message: "Lesson 99 not found",
+            })
+          );
+        }).pipe(
+          Effect.scoped,
+          Effect.provide(NodeFileSystem.layer),
+          Effect.provide(LessonParserService.Default),
+          Effect.provide(createMockPromptService())
+        )
+    );
+  });
+
+  describe("PRD: User runs a malformed lesson with no subfolders", () => {
+    it.effect(
+      "should fail with LessonEntrypointNotFoundError when lesson has no problem/solution directories",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+
+          // Create a lesson directory that exists but has no subfolders (no problem/solution)
+          // This simulates a malformed course structure
+          const tmpDir = yield* fs.makeTempDirectoryScoped();
+
+          // Create lesson directory with just a file, no subdirectories
+          yield* fs.makeDirectory(
+            path.join(tmpDir, "1-basics", "1-intro"),
+            { recursive: true }
+          );
+          // Add a file so the directory isn't empty
+          yield* fs.writeFileString(
+            path.join(tmpDir, "1-basics", "1-intro", "notes.txt"),
+            "Some notes"
+          );
+
+          // User tries to run lesson 1 which exists but has no problem/solution folders
+          const error = yield* runLesson({
+            lesson: 1,
+            root: tmpDir,
+            envFilePath: ".env",
+            cwd: tmpDir,
+            forceSubfolderIndex: undefined,
+          }).pipe(Effect.flip);
+
+          expect(error).toBeInstanceOf(LessonEntrypointNotFoundError);
+          expect(error).toEqual(
+            new LessonEntrypointNotFoundError({
+              lesson: 1,
+              message: "No subfolders found for lesson 1",
             })
           );
         }).pipe(
