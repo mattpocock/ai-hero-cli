@@ -119,3 +119,9 @@ test(exercise): runLesson navigates to next lesson when user selects next-exerci
 - exercise.ts: 45.48% -> 53.93%
 - Tests user navigating from lesson 1 to lesson 2 via "next-exercise" action
 - Covers lines 139-158 (nextExerciseToRun calculation) and 268-275 (next-exercise handler)
+
+test(exercise): runLesson navigates to previous lesson when user selects previous-exercise
+- Coverage: 24.99% -> 25.2%
+- exercise.ts: 53.93% -> 56.55%
+- Tests user navigating from lesson 2 back to lesson 1 via "previous-exercise" action
+- Covers lines 160-187 (previousExerciseToRun calculation) and 276-287 (previous-exercise handler)
