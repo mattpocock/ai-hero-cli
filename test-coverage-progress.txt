@@ -137,3 +137,10 @@ test(exercise): runLesson lets user browse and pick a different lesson via choos
 - exercise.ts: 58.6% -> 68.51%
 - Tests user selecting "choose-exercise" to browse all lessons and pick a specific one
 - Covers lines 262-267 (choose-exercise handler) and 301-330 (chooseLessonAndRunIt)
+
+test(exercise): runLesson prompts user to select subfolder when lesson has multiple
+- Coverage: 26.18% -> 26.68%
+- exercise.ts: 68.51% -> 74.63%
+- Tests that lessons with both problem and solution directories prompt user to choose
+- Covers lines 126-132 (selectSubfolderIndex call) and 403-422 (selectSubfolderIndex fn)
+- Remaining uncovered: lines 264-400 (CLI command handler), 409-413 (unreachable error check)

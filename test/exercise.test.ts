@@ -667,6 +667,117 @@ describe("exercise", () => {
     );
   });
 
+  describe("PRD: User selects subfolder when lesson has multiple (problem/solution)", () => {
+    it.effect(
+      "should prompt user to select subfolder when lesson has both problem and solution directories",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+
+          // Create a lesson with both problem and solution subfolders
+          // This is the standard exercise format where users work through both states
+          const tmpDir = yield* fs.makeTempDirectoryScoped();
+
+          // Lesson with both problem and solution
+          yield* fs.makeDirectory(
+            path.join(tmpDir, "1-basics", "1-intro", "problem"),
+            { recursive: true }
+          );
+          yield* fs.writeFileString(
+            path.join(tmpDir, "1-basics", "1-intro", "problem", "readme.md"),
+            "# Problem - Start here"
+          );
+          yield* fs.makeDirectory(
+            path.join(tmpDir, "1-basics", "1-intro", "solution"),
+            { recursive: true }
+          );
+          yield* fs.writeFileString(
+            path.join(tmpDir, "1-basics", "1-intro", "solution", "readme.md"),
+            "# Solution - Reference"
+          );
+
+          let selectSubfolderCalled = false;
+          let subfoldersPassed: string[] = [];
+
+          const mockPromptService = Layer.succeed(PromptService, {
+            confirmReadyToCommit: () => {
+              throw new Error("Should not be called");
+            },
+            confirmSaveToTargetBranch: () => {
+              throw new Error("Should not be called");
+            },
+            confirmForcePush: () => {
+              throw new Error("Should not be called");
+            },
+            selectCherryPickConflictAction: () => {
+              throw new Error("Should not be called");
+            },
+            selectProblemOrSolution: () => {
+              throw new Error("Should not be called");
+            },
+            selectResetAction: () => {
+              throw new Error("Should not be called");
+            },
+            confirmResetWithUncommittedChanges: () => {
+              throw new Error("Should not be called");
+            },
+            inputBranchName: () => {
+              throw new Error("Should not be called");
+            },
+            selectLessonCommit: () => {
+              throw new Error("Should not be called");
+            },
+            selectExercise: () => {
+              throw new Error("Should not be called");
+            },
+            confirmProceedWithUncommittedChanges: () => {
+              throw new Error("Should not be called");
+            },
+            selectWalkThroughAction: () => {
+              throw new Error("Should not be called");
+            },
+            selectSubfolder: (subfolders: string[]) => {
+              selectSubfolderCalled = true;
+              subfoldersPassed = subfolders;
+              // User selects the "problem" subfolder (index 0)
+              return Effect.succeed(0);
+            },
+            selectExerciseAction: () => {
+              // Exit after first run
+              return Effect.succeed("exit" as const);
+            },
+            confirmContinue: () => {
+              throw new Error("Should not be called");
+            },
+            selectSubdirectory: () => {
+              throw new Error("Should not be called");
+            },
+            inputText: () => {
+              throw new Error("Should not be called");
+            },
+          } as unknown as PromptService);
+
+          // User runs lesson without forceSubfolderIndex - should be prompted
+          yield* runLesson({
+            lesson: 1,
+            root: tmpDir,
+            envFilePath: ".env",
+            cwd: tmpDir,
+            forceSubfolderIndex: undefined, // No forced subfolder - triggers prompt
+          }).pipe(Effect.provide(mockPromptService));
+
+          // Verify user was prompted to select between problem and solution
+          expect(selectSubfolderCalled).toBe(true);
+          expect(subfoldersPassed).toContain("problem");
+          expect(subfoldersPassed).toContain("solution");
+        }).pipe(
+          Effect.scoped,
+          Effect.provide(NodeFileSystem.layer),
+          Effect.provide(LessonParserService.Default)
+        )
+    );
+  });
+
   describe("PRD: User navigates to previous exercise", () => {
     it.effect(
       "should navigate to previous lesson when user selects previous-exercise",
