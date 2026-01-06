@@ -1,12 +1,11 @@
-import {
-  Args,
-  Command as CLICommand,
-  Options,
-} from "@effect/cli";
+import { Command as CLICommand, Options } from "@effect/cli";
 import { Console, Data, Effect } from "effect";
 import { existsSync } from "node:fs";
 import * as path from "node:path";
-import { selectLessonCommit } from "../commit-utils.js";
+import {
+  getCommitsBetweenBranches,
+  selectCommit,
+} from "../branch-commits.js";
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "../constants.js";
 import { GitService } from "../git-service.js";
 import {
@@ -41,17 +40,16 @@ export class CommitFailedError extends Data.TaggedError(
 export const editCommit = CLICommand.make(
   "edit-commit",
   {
-    lessonId: Args.text({ name: "lesson-id" }).pipe(
-      Args.optional
-    ),
     branch: Options.text("branch").pipe(
-      Options.withDescription(
-        "Branch to search for the lesson commit"
-      ),
+      Options.withDescription("Branch to get commits from"),
       Options.withDefault(DEFAULT_PROJECT_TARGET_BRANCH)
     ),
+    mainBranch: Options.text("main-branch").pipe(
+      Options.withDescription("The main branch of the project"),
+      Options.withDefault("main")
+    ),
   },
-  ({ branch, lessonId }) =>
+  ({ branch: liveBranch, mainBranch }) =>
     Effect.gen(function* () {
       const cwd = process.cwd();
       const gitService = yield* GitService;
@@ -70,10 +68,10 @@ export const editCommit = CLICommand.make(
 
       // Fetch origin
       const fetchResult = yield* gitService.fetchOrigin().pipe(
+        Effect.map(() => ({ failed: false as const })),
         Effect.catchTag("FailedToFetchOriginError", () =>
           Effect.succeed({ failed: true as const })
-        ),
-        Effect.map(() => ({ failed: false as const }))
+        )
       );
 
       if (fetchResult.failed) {
@@ -86,49 +84,48 @@ export const editCommit = CLICommand.make(
       const currentBranch = yield* gitService.getCurrentBranch();
 
       // Check if current branch is the target branch
-      if (currentBranch === branch) {
+      if (currentBranch === liveBranch) {
         yield* Console.error(
-          `Error: Cannot edit commit on target branch "${branch}". Switch to a different branch first.`
+          `Error: Cannot edit commit on target branch "${liveBranch}". Switch to a different branch first.`
         );
         process.exitCode = 1;
         return;
       }
 
-      // Select lesson commit
-      const {
-        commit: targetCommit,
-        lessonId: selectedLessonId,
-      } = yield* selectLessonCommit({
-        branch,
-        lessonId,
-        promptMessage:
-          "Which lesson do you want to edit? (type to search)",
-        excludeCurrentBranch: false,
+      // Get commits between main and live branch
+      const commits = yield* getCommitsBetweenBranches({
+        mainBranch,
+        liveBranch,
       });
 
-      // Store original commit message with lesson ID prefix
-      const originalMessage = `${selectedLessonId} ${targetCommit.message}`;
+      // Select commit to edit
+      const targetCommit = yield* selectCommit({
+        commits,
+        promptMessage:
+          "Which commit do you want to edit? (type to search)",
+      });
+
+      // Store original commit message
+      const originalMessage = targetCommit.message;
       const targetSha = targetCommit.sha;
+      const commitLabel = `#${targetCommit.sequence}`;
 
       // Get HEAD of target branch to know what to cherry-pick
       const targetBranchHead = yield* gitService.revParse(
-        `origin/${branch}`
+        liveBranch
       );
 
       // Count following commits on target branch
       const followingCommitCount =
-        yield* gitService.revListCount(
-          targetSha,
-          `origin/${branch}`
-        );
+        yield* gitService.revListCount(targetSha, liveBranch);
 
       if (followingCommitCount === 0) {
         yield* Console.log(
-          `Warning: No commits after ${selectedLessonId}. You can still edit this commit.`
+          `Warning: No commits after ${commitLabel}. You can still edit this commit.`
         );
       } else {
         yield* Console.log(
-          `Will reset to ${selectedLessonId}. Will cherry-pick ${followingCommitCount} commit${
+          `Will reset to ${commitLabel}. Will cherry-pick ${followingCommitCount} commit${
             followingCommitCount === 1 ? "" : "s"
           } after.`
         );
@@ -136,16 +133,16 @@ export const editCommit = CLICommand.make(
 
       // Reset to target commit
       yield* Console.log(
-        `Resetting to ${targetSha} (${selectedLessonId})...`
+        `Resetting to ${targetSha} (${commitLabel})...`
       );
 
       const resetResult = yield* gitService
         .resetHard(targetSha)
         .pipe(
+          Effect.map(() => ({ failed: false as const })),
           Effect.catchTag("FailedToResetError", () =>
             Effect.succeed({ failed: true as const })
-          ),
-          Effect.map(() => ({ failed: false as const }))
+          )
         );
 
       if (resetResult.failed) {
@@ -183,10 +180,10 @@ export const editCommit = CLICommand.make(
       const commitResult = yield* gitService
         .commit(originalMessage)
         .pipe(
+          Effect.map(() => ({ failed: false as const })),
           Effect.catchTag("FailedToCommitError", () =>
             Effect.succeed({ failed: true as const })
-          ),
-          Effect.map(() => ({ failed: false as const }))
+          )
         );
 
       if (commitResult.failed) {
@@ -213,10 +210,10 @@ export const editCommit = CLICommand.make(
         const cherryPickResult = yield* gitService
           .cherryPick(`${targetSha}..${targetBranchHead}`)
           .pipe(
+            Effect.map(() => ({ conflict: false as const })),
             Effect.catchTag("CherryPickConflictError", () =>
               Effect.succeed({ conflict: true as const })
-            ),
-            Effect.map(() => ({ conflict: false as const }))
+            )
           );
 
         if (cherryPickResult.conflict) {
@@ -236,29 +233,29 @@ export const editCommit = CLICommand.make(
       }
 
       yield* Console.log(
-        `\n✓ Edit complete! Lesson ${selectedLessonId} updated.`
+        `\n✓ Edit complete! Commit ${commitLabel} updated.`
       );
 
       // Prompt to save changes to target branch
-      yield* promptService.confirmSaveToTargetBranch(branch);
+      yield* promptService.confirmSaveToTargetBranch(liveBranch);
 
       // Checkout target branch and reset to current branch
       yield* Console.log(
-        `Switching to ${branch} and applying changes...`
+        `Switching to ${liveBranch} and applying changes...`
       );
 
       const checkoutResult = yield* gitService
-        .checkout(branch)
+        .checkout(liveBranch)
         .pipe(
+          Effect.map(() => ({ failed: false as const })),
           Effect.catchTag("FailedToCheckoutError", () =>
             Effect.succeed({ failed: true as const })
-          ),
-          Effect.map(() => ({ failed: false as const }))
+          )
         );
 
       if (checkoutResult.failed) {
         yield* Console.error(
-          `Failed to checkout ${branch}. Changes remain on ${currentBranch}.`
+          `Failed to checkout ${liveBranch}. Changes remain on ${currentBranch}.`
         );
         process.exitCode = 1;
         return;
@@ -267,37 +264,39 @@ export const editCommit = CLICommand.make(
       const resetToCurrentResult = yield* gitService
         .resetHard(currentBranch)
         .pipe(
+          Effect.map(() => ({ failed: false as const })),
           Effect.catchTag("FailedToResetError", () =>
             Effect.succeed({ failed: true as const })
-          ),
-          Effect.map(() => ({ failed: false as const }))
+          )
         );
 
       if (resetToCurrentResult.failed) {
         yield* Console.error(
-          `Failed to reset ${branch} to ${currentBranch}.`
+          `Failed to reset ${liveBranch} to ${currentBranch}.`
         );
         process.exitCode = 1;
         return;
       }
 
       yield* Console.log(
-        `✓ ${branch} updated with your changes`
+        `✓ ${liveBranch} updated with your changes`
       );
 
       // Prompt to force push
-      yield* promptService.confirmForcePush(branch);
+      yield* promptService.confirmForcePush(liveBranch);
 
       // Force push to origin
-      yield* Console.log(`Force pushing ${branch} to origin...`);
+      yield* Console.log(
+        `Force pushing ${liveBranch} to origin...`
+      );
 
       const forcePushResult = yield* gitService
-        .pushForceWithLease("origin", branch)
+        .pushForceWithLease("origin", liveBranch)
         .pipe(
+          Effect.map(() => ({ failed: false as const })),
           Effect.catchTag("FailedToPushError", () =>
             Effect.succeed({ failed: true as const })
-          ),
-          Effect.map(() => ({ failed: false as const }))
+          )
         );
 
       if (forcePushResult.failed) {
@@ -307,7 +306,7 @@ export const editCommit = CLICommand.make(
       }
 
       yield* Console.log(
-        `✓ Successfully pushed ${branch} to origin`
+        `✓ Successfully pushed ${liveBranch} to origin`
       );
 
       // Go back to the original branch
@@ -332,10 +331,10 @@ export const editCommit = CLICommand.make(
             process.exitCode = 1;
           });
         },
-        CommitNotFoundError: (error) => {
+        NoCommitsFoundError: (error) => {
           return Effect.gen(function* () {
             yield* Console.error(
-              `Error: No commit found for lesson ${error.lessonId} on branch ${error.branch}`
+              `Error: No commits found on ${error.liveBranch} beyond ${error.mainBranch}`
             );
             process.exitCode = 1;
           });
@@ -406,10 +405,10 @@ function resolveConflictLoop(
     const continueResult = yield* gitService
       .cherryPickContinue()
       .pipe(
+        Effect.map(() => ({ conflict: false as const })),
         Effect.catchTag("CherryPickConflictError", () =>
           Effect.succeed({ conflict: true as const })
-        ),
-        Effect.map(() => ({ conflict: false as const }))
+        )
       );
 
     if (continueResult.conflict) {

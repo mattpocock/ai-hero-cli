@@ -2,4 +2,4 @@
 set -e
 
 pnpm run build
-(cd ../cohort-002-project && node ../ai-hero-cli/dist/bin.cjs internal edit-commit)
+(cd ../ralph-tutorial && node ../ai-hero-cli/dist/bin.cjs internal edit-commit)

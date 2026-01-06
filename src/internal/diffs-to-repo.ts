@@ -3,6 +3,7 @@ import { Command, FileSystem } from "@effect/platform";
 import { Console, Data, Effect } from "effect";
 import { existsSync } from "node:fs";
 import * as path from "node:path";
+import { getCommitsBetweenBranches } from "../branch-commits.js";
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "../constants.js";
 import { GitService, GitServiceConfig } from "../git-service.js";
 
@@ -26,13 +27,6 @@ export class DirtyWorkingTreeError extends Data.TaggedError(
 )<{
   path: string;
   message: string;
-}> {}
-
-export class NoCommitsFoundError extends Data.TaggedError(
-  "NoCommitsFoundError"
-)<{
-  mainBranch: string;
-  liveBranch: string;
 }> {}
 
 export const diffsToRepo = CLICommand.make(
@@ -108,37 +102,10 @@ export const diffsToRepo = CLICommand.make(
       // Phase 2: Retrieve commit history
       yield* Console.log("\nRetrieving commit history...");
 
-      const commitHistory = yield* git.getLogOnelineReverse(
-        `${mainBranch}..${liveBranch}`
-      );
-
-      // Parse commits: format is "SHA message"
-      type ParsedCommit = {
-        sha: string;
-        message: string;
-        sequence: number; // 1-based sequence
-      };
-
-      const commits: Array<ParsedCommit> = commitHistory
-        .trim()
-        .split("\n")
-        .filter(Boolean)
-        .map((line, index) => {
-          const [sha, ...messageParts] = line.split(" ");
-          const message = messageParts.join(" ");
-
-          return {
-            sha: sha!,
-            message,
-            sequence: index + 1, // 1-based sequence
-          };
-        });
-
-      if (commits.length === 0) {
-        return yield* Effect.fail(
-          new NoCommitsFoundError({ mainBranch, liveBranch })
-        );
-      }
+      const commits = yield* getCommitsBetweenBranches({
+        mainBranch,
+        liveBranch,
+      });
 
       yield* Console.dir(commits, { depth: Infinity });
       yield* Console.log(
