@@ -76,3 +76,10 @@ v8 ignore: unreachable defensive code in getNameAndNumberFromPath
 - lesson-parser-service.ts: 96.69% -> 100%
 - Lines 119-126: checks if split("-")[0] is undefined, but split always returns >= 1 element
 - This is defensive TypeScript that can never execute at runtime
+
+test(branch-commits): getCommitsBetweenBranches returns commits with sequence numbers
+- Coverage: 19.62% -> 20.5%
+- branch-commits.ts: 0% -> 66.07%
+- Tests commit retrieval for internal edit-commit and diffs-to-repo commands
+- Tests NoCommitsFoundError when no commits exist between branches
+- Remaining uncovered: selectCommit (lines 68-94) - UI prompt wrapper
