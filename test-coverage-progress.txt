@@ -3,3 +3,8 @@ test(pull): pull command fetches upstream main and merges into current branch
 - pull.ts: 0% -> 39.09%
 - Refactored pull.ts to export runPull() for testability (matching reset.ts pattern)
 - Test validates: fetch upstream/main, merge into current branch
+
+test(pull): pull command fails when user has uncommitted changes
+- Coverage: 17.08% -> 17.17%
+- pull.ts: 39.09% -> 42.72%
+- Tests UncommittedChangesError when working directory is dirty

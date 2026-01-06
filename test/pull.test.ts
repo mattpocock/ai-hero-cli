@@ -63,4 +63,43 @@ describe("pull", () => {
         })
     );
   });
+
+  describe("PRD: User has uncommitted changes", () => {
+    it.effect(
+      "should fail with UncommittedChangesError when working directory is dirty",
+      () =>
+        Effect.gen(function* () {
+          const mockGitService = fromPartial<GitService>({
+            ensureIsGitRepo: () => Effect.succeed(undefined),
+            getCurrentBranch: Effect.fn("getCurrentBranch")(function* () {
+              return "matt/feature-branch";
+            }),
+            getUncommittedChanges: Effect.fn("getUncommittedChanges")(
+              function* () {
+                return {
+                  hasUncommittedChanges: true,
+                  statusOutput: " M src/index.ts\n?? new-file.ts",
+                };
+              }
+            ),
+          });
+
+          const testLayer = Layer.mergeAll(
+            Layer.succeed(GitService, mockGitService),
+            Layer.succeed(GitServiceConfig, {
+              cwd: "/test/repo",
+            }),
+            NodeContext.layer
+          );
+
+          const result = yield* runPull().pipe(
+            Effect.provide(testLayer),
+            Effect.flip
+          );
+
+          expect(result._tag).toBe("UncommittedChangesError");
+          expect(result.statusOutput).toBe(" M src/index.ts\n?? new-file.ts");
+        })
+    );
+  });
 });
