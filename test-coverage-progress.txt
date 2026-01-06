@@ -63,3 +63,10 @@ test(lesson-parser-service): Lesson.subfolders returns problem/solution dirs for
 - lesson-parser-service.ts: 72.16% -> 92.92%
 - Tests that subfolders() returns only directories (problem, solution), filtering files
 - Users navigate lesson states via these subfolders - critical for exercise command
+
+test(lesson-parser-service): Lesson.isExplainer identifies explainer vs exercise lessons
+- Coverage: 19.42% -> 19.61%
+- lesson-parser-service.ts: 92.92% -> 96.69%
+- Tests that isExplainer() returns true for lessons with "explainer" subfolder
+- Used by exercise command to display differently for explainer vs exercise lessons
+- Remaining uncovered lines 119-125: edge case for malformed paths (no hyphen separator)

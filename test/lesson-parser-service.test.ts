@@ -239,4 +239,50 @@ describe("LessonParserService", () => {
         Effect.provide(LessonParserService.Default)
       )
   );
+
+  it.effect(
+    "should identify explainer lessons for different UI treatment",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+
+        const tmpDir = yield* fs.makeTempDirectoryScoped();
+
+        // Create an explainer lesson (has "explainer" subfolder)
+        yield* fs.makeDirectory(
+          path.join(tmpDir, "1-basics", "1-intro", "explainer"),
+          { recursive: true }
+        );
+
+        // Create a regular exercise lesson (has problem/solution)
+        yield* fs.makeDirectory(
+          path.join(tmpDir, "1-basics", "2-variables", "problem"),
+          { recursive: true }
+        );
+        yield* fs.makeDirectory(
+          path.join(tmpDir, "1-basics", "2-variables", "solution"),
+          { recursive: true }
+        );
+
+        const service = yield* LessonParserService;
+        const lessons = yield* service.getLessonsFromRepo(tmpDir);
+
+        expect(lessons).toHaveLength(2);
+
+        const explainerLesson = lessons.find((l) => l.num === 1)!;
+        const exerciseLesson = lessons.find((l) => l.num === 2)!;
+
+        // Explainer lesson should be identified as such
+        const isExplainer = yield* explainerLesson.isExplainer();
+        expect(isExplainer).toBe(true);
+
+        // Regular exercise should not be an explainer
+        const isExercise = yield* exerciseLesson.isExplainer();
+        expect(isExercise).toBe(false);
+      }).pipe(
+        Effect.scoped,
+        Effect.provide(NodeFileSystem.layer),
+        Effect.provide(LessonParserService.Default)
+      )
+  );
 });
