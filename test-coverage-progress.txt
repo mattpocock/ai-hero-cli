@@ -14,3 +14,8 @@ test(pull): pull command fails when user is on main branch
 - pull.ts: 42.72% -> 47.27%
 - Tests InvalidBranchOperationError prevents accidental main branch corruption
 - Fixed existing test type narrowing for statusOutput property
+
+test(pull): pull command fails with MergeConflictError when upstream conflicts with local
+- Coverage: 17.28% (unchanged - CLI error handlers are presentation logic, not testable via runPull)
+- Tests MergeConflictError when git merge encounters conflicts during pull
+- Remaining pull.ts uncovered lines (71-128) are CLI error formatters

@@ -135,4 +135,60 @@ describe("pull", () => {
         })
     );
   });
+
+  describe("PRD: User encounters merge conflict during pull", () => {
+    it.effect(
+      "should fail with MergeConflictError when upstream changes conflict with local branch",
+      () =>
+        Effect.gen(function* () {
+          const { MergeConflictError } = yield* Effect.promise(() =>
+            import("../src/git-service.js")
+          );
+
+          const mockGitService = fromPartial<GitService>({
+            ensureIsGitRepo: () => Effect.succeed(undefined),
+            getCurrentBranch: Effect.fn("getCurrentBranch")(function* () {
+              return "matt/feature-branch";
+            }),
+            getUncommittedChanges: Effect.fn("getUncommittedChanges")(
+              function* () {
+                return {
+                  hasUncommittedChanges: false,
+                  statusOutput: "",
+                };
+              }
+            ),
+            detectUpstreamRemote: Effect.fn("detectUpstreamRemote")(
+              function* () {
+                return { remoteName: "upstream", url: "git@github.com:mattpocock/repo.git" };
+              }
+            ),
+            fetch: Effect.fn("fetch")(function* () {
+              // Fetch succeeds
+            }),
+            merge: Effect.fn("merge")(function* () {
+              return yield* new MergeConflictError({
+                ref: "upstream/main",
+                message: "Automatic merge failed; fix conflicts and then commit the result.",
+              });
+            }),
+          });
+
+          const testLayer = Layer.mergeAll(
+            Layer.succeed(GitService, mockGitService),
+            Layer.succeed(GitServiceConfig, {
+              cwd: "/test/repo",
+            }),
+            NodeContext.layer
+          );
+
+          const result = yield* runPull().pipe(
+            Effect.provide(testLayer),
+            Effect.flip
+          );
+
+          expect(result._tag).toBe("MergeConflictError");
+        })
+    );
+  });
 });
