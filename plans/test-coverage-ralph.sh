@@ -26,7 +26,7 @@ PROCESS: \
 7. Commit with message: test(<file>): <describe the user behavior being tested> \
 \
 ONLY WRITE ONE TEST PER ITERATION. \
-If statement coverage reaches 100% and the types check, output <promise>COMPLETE</promise>. \
+If statement coverage on the entire codebase reaches 100% and the types check, output <promise>COMPLETE</promise>. \
 ")
 
   echo "$result"

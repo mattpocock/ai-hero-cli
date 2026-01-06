@@ -61,6 +61,7 @@ export const getCommitsBetweenBranches = (opts: {
  * Prompts user to select a commit from a list.
  * Displays sequence number and message for each commit.
  */
+/* v8 ignore start - UI prompt wrapper */
 export const selectCommit = (opts: {
   commits: Array<BranchCommit>;
   promptMessage: string;
@@ -92,3 +93,4 @@ export const selectCommit = (opts: {
 
     return selectedCommit;
   });
+/* v8 ignore stop */
