@@ -527,6 +527,146 @@ describe("exercise", () => {
     );
   });
 
+  describe("PRD: User chooses a specific exercise from the list", () => {
+    it.effect(
+      "should navigate to chosen lesson when user selects choose-exercise",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+
+          // Create three lessons so user can choose between them
+          const tmpDir = yield* fs.makeTempDirectoryScoped();
+
+          // Lesson 1
+          yield* fs.makeDirectory(
+            path.join(tmpDir, "1-basics", "1-intro", "explainer"),
+            { recursive: true }
+          );
+          yield* fs.writeFileString(
+            path.join(tmpDir, "1-basics", "1-intro", "explainer", "readme.md"),
+            "# Lesson 1"
+          );
+
+          // Lesson 2
+          yield* fs.makeDirectory(
+            path.join(tmpDir, "1-basics", "2-variables", "explainer"),
+            { recursive: true }
+          );
+          yield* fs.writeFileString(
+            path.join(tmpDir, "1-basics", "2-variables", "explainer", "readme.md"),
+            "# Lesson 2"
+          );
+
+          // Lesson 3
+          yield* fs.makeDirectory(
+            path.join(tmpDir, "1-basics", "3-functions", "explainer"),
+            { recursive: true }
+          );
+          yield* fs.writeFileString(
+            path.join(tmpDir, "1-basics", "3-functions", "explainer", "readme.md"),
+            "# Lesson 3"
+          );
+
+          const lessonsVisited: number[] = [];
+          let selectExerciseCalled = false;
+
+          const mockPromptService = Layer.succeed(PromptService, {
+            confirmReadyToCommit: () => {
+              throw new Error("Should not be called");
+            },
+            confirmSaveToTargetBranch: () => {
+              throw new Error("Should not be called");
+            },
+            confirmForcePush: () => {
+              throw new Error("Should not be called");
+            },
+            selectCherryPickConflictAction: () => {
+              throw new Error("Should not be called");
+            },
+            selectProblemOrSolution: () => {
+              throw new Error("Should not be called");
+            },
+            selectResetAction: () => {
+              throw new Error("Should not be called");
+            },
+            confirmResetWithUncommittedChanges: () => {
+              throw new Error("Should not be called");
+            },
+            inputBranchName: () => {
+              throw new Error("Should not be called");
+            },
+            selectLessonCommit: () => {
+              throw new Error("Should not be called");
+            },
+            selectExercise: (lessons: unknown[], _prompt: string) => {
+              selectExerciseCalled = true;
+              // User sees all 3 lessons and picks lesson 3
+              expect(Array.isArray(lessons)).toBe(true);
+              expect((lessons as { num: number }[]).length).toBe(3);
+              // Return lesson 3's number
+              return Effect.succeed(3);
+            },
+            confirmProceedWithUncommittedChanges: () => {
+              throw new Error("Should not be called");
+            },
+            selectWalkThroughAction: () => {
+              throw new Error("Should not be called");
+            },
+            selectSubfolder: () => {
+              throw new Error("Should not be called");
+            },
+            selectExerciseAction: (opts: {
+              result: "success" | "failed" | "readme-only";
+              hasNext: boolean;
+              hasPrevious: boolean;
+              nextLabel?: string | undefined;
+              previousLabel?: string | undefined;
+              lessonType: "exercise" | "explainer";
+            }) => {
+              // Track which lesson we're on
+              if (opts.nextLabel?.includes("2-variables")) {
+                lessonsVisited.push(1);
+                // User on lesson 1 selects "choose-exercise"
+                return Effect.succeed("choose-exercise" as const);
+              } else if (!opts.hasNext) {
+                // We're on lesson 3 (the last one user chose)
+                lessonsVisited.push(3);
+                expect(opts.hasPrevious).toBe(true);
+                return Effect.succeed("exit" as const);
+              }
+              throw new Error("Unexpected state");
+            },
+            confirmContinue: () => {
+              throw new Error("Should not be called");
+            },
+            selectSubdirectory: () => {
+              throw new Error("Should not be called");
+            },
+            inputText: () => {
+              throw new Error("Should not be called");
+            },
+          } as unknown as PromptService);
+
+          // User starts on lesson 1, chooses to browse, picks lesson 3
+          yield* runLesson({
+            lesson: 1,
+            root: tmpDir,
+            envFilePath: ".env",
+            cwd: tmpDir,
+            forceSubfolderIndex: 0,
+          }).pipe(Effect.provide(mockPromptService));
+
+          // Verify user was shown exercise picker and navigated to lesson 3
+          expect(selectExerciseCalled).toBe(true);
+          expect(lessonsVisited).toEqual([1, 3]);
+        }).pipe(
+          Effect.scoped,
+          Effect.provide(NodeFileSystem.layer),
+          Effect.provide(LessonParserService.Default)
+        )
+    );
+  });
+
   describe("PRD: User navigates to previous exercise", () => {
     it.effect(
       "should navigate to previous lesson when user selects previous-exercise",

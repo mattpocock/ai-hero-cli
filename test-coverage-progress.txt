@@ -131,3 +131,9 @@ test(exercise): runLesson re-runs same exercise when user selects run-again
 - exercise.ts: 56.55% -> 58.6%
 - Tests user running exercise, selecting "run-again", then exiting
 - Covers lines 253-261 (run-again handler recursive call)
+
+test(exercise): runLesson lets user browse and pick a different lesson via choose-exercise
+- Coverage: 25.37% -> 26.18%
+- exercise.ts: 58.6% -> 68.51%
+- Tests user selecting "choose-exercise" to browse all lessons and pick a specific one
+- Covers lines 262-267 (choose-exercise handler) and 301-330 (chooseLessonAndRunIt)
