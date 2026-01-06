@@ -186,4 +186,118 @@ describe("exercise", () => {
         )
     );
   });
+
+  describe("PRD: User runs a readme-only lesson (no main.ts)", () => {
+    it.effect(
+      "should display readme path and prompt for next action when lesson has only readme.md",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+
+          // Create a lesson with a readme but no main.ts
+          // This is a valid "documentation-only" lesson users might have
+          const tmpDir = yield* fs.makeTempDirectoryScoped();
+
+          yield* fs.makeDirectory(
+            path.join(tmpDir, "1-basics", "1-intro", "explainer"),
+            { recursive: true }
+          );
+          // Only readme.md, no main.ts
+          yield* fs.writeFileString(
+            path.join(tmpDir, "1-basics", "1-intro", "explainer", "readme.md"),
+            "# Introduction\n\nRead this documentation."
+          );
+
+          let exerciseActionCalled = false;
+
+          const mockPromptService = Layer.succeed(PromptService, {
+            confirmReadyToCommit: () => {
+              throw new Error("Should not be called");
+            },
+            confirmSaveToTargetBranch: () => {
+              throw new Error("Should not be called");
+            },
+            confirmForcePush: () => {
+              throw new Error("Should not be called");
+            },
+            selectCherryPickConflictAction: () => {
+              throw new Error("Should not be called");
+            },
+            selectProblemOrSolution: () => {
+              throw new Error("Should not be called");
+            },
+            selectResetAction: () => {
+              throw new Error("Should not be called");
+            },
+            confirmResetWithUncommittedChanges: () => {
+              throw new Error("Should not be called");
+            },
+            inputBranchName: () => {
+              throw new Error("Should not be called");
+            },
+            selectLessonCommit: () => {
+              throw new Error("Should not be called");
+            },
+            selectExercise: () => {
+              throw new Error("Should not be called");
+            },
+            confirmProceedWithUncommittedChanges: () => {
+              throw new Error("Should not be called");
+            },
+            selectWalkThroughAction: () => {
+              throw new Error("Should not be called");
+            },
+            selectSubfolder: () => {
+              throw new Error("Should not be called");
+            },
+            selectExerciseAction: (opts: {
+              result: "success" | "failed" | "readme-only";
+              hasNext: boolean;
+              hasPrevious: boolean;
+              nextLabel?: string | undefined;
+              previousLabel?: string | undefined;
+              lessonType: "exercise" | "explainer";
+            }) => {
+              exerciseActionCalled = true;
+              // Verify the result is "readme-only" when no main.ts exists
+              expect(opts.result).toBe("readme-only");
+              // Return a valid choice to exit the loop
+              return Effect.succeed(
+                "exit" as
+                  | "run-again"
+                  | "choose-exercise"
+                  | "next-exercise"
+                  | "previous-exercise"
+                  | "exit"
+              );
+            },
+            confirmContinue: () => {
+              throw new Error("Should not be called");
+            },
+            selectSubdirectory: () => {
+              throw new Error("Should not be called");
+            },
+            inputText: () => {
+              throw new Error("Should not be called");
+            },
+          } as unknown as PromptService);
+
+          // User runs lesson 1 which has only readme.md
+          yield* runLesson({
+            lesson: 1,
+            root: tmpDir,
+            envFilePath: ".env",
+            cwd: tmpDir,
+            forceSubfolderIndex: 0,
+          }).pipe(Effect.provide(mockPromptService));
+
+          // Verify the action prompt was called with readme-only result
+          expect(exerciseActionCalled).toBe(true);
+        }).pipe(
+          Effect.scoped,
+          Effect.provide(NodeFileSystem.layer),
+          Effect.provide(LessonParserService.Default)
+        )
+    );
+  });
 });

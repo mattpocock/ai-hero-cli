@@ -107,3 +107,9 @@ test(exercise): runLesson fails when subfolder has no main.ts or readme.md
 - exercise.ts: 24.48% -> 38.48%
 - Tests LessonEntrypointNotFoundError when problem/solution folder exists but is empty
 - Covers getMainAndReadmeFiles error path - users get clear error for malformed lessons
+
+test(exercise): runLesson handles readme-only lessons (no main.ts)
+- Coverage: 23.72% -> 24.3%
+- exercise.ts: 38.48% -> 45.48%
+- Tests that lessons with only readme.md (no main.ts) show "Read the readme" and prompt for action
+- Validates result: "readme-only" is passed to selectExerciseAction for proper UI
