@@ -2099,4 +2099,54 @@ aaa1111 02.01.02 Another custom lesson`;
         })
     );
   });
+
+  describe("PRD: User provides invalid lesson ID format", () => {
+    it.effect(
+      "should search using raw input when lesson ID does not match expected format",
+      () =>
+        Effect.gen(function* () {
+          const mockGitService = fromPartial<GitService>({
+            ensureIsGitRepo: () => Effect.succeed(undefined),
+            ensureUpstreamBranchConnected: Effect.fn(
+              "ensureUpstreamBranchConnected"
+            )(function* (_opts: { targetBranch: string }) {}),
+            getLogOneline: Effect.fn("getLogOneline")(function* (
+              _branch: string
+            ) {
+              // Branch has valid lesson commits, but none match "invalid-id"
+              return `abc1234 01.02.03 Add new feature
+def5678 01.02.02 Setup base structure`;
+            }),
+          });
+
+          const mockPromptService = fromPartial<PromptService>({});
+
+          const testLayer = Layer.mergeAll(
+            Layer.succeed(GitService, mockGitService),
+            Layer.succeed(PromptService, mockPromptService),
+            Layer.succeed(GitServiceConfig, {
+              cwd: "/test/repo",
+            }),
+            NodeContext.layer
+          );
+
+          // Act: provide invalid lesson ID format (not XX.XX.XX)
+          const result = yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.some("invalid-id"), // Invalid format
+            problem: false,
+            solution: false,
+            demo: false,
+          }).pipe(Effect.provide(testLayer), Effect.flip);
+
+          // Assert: Should fail with CommitNotFoundError using raw "invalid-id"
+          expect(result).toBeInstanceOf(CommitNotFoundError);
+          if (result instanceof CommitNotFoundError) {
+            // The raw value is used since normalization returned null
+            expect(result.lessonId).toBe("invalid-id");
+            expect(result.branch).toBe("live-run-through");
+          }
+        })
+    );
+  });
 });

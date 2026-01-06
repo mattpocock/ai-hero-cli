@@ -25,3 +25,9 @@ test(cherry-pick): selection fails when branch has no lesson-formatted commits
 - commit-utils.ts: 92.91% -> 98.42%
 - Tests CommitNotFoundError when branch has commits but none with lesson ID format
 - Only lines 15-16 remain uncovered (invalid lesson ID format edge case)
+
+test(reset): handles invalid lesson ID format by using raw input
+- Coverage: 17.44% -> 17.48%
+- commit-utils.ts: 98.42% -> 100%
+- Tests that malformed lesson IDs (like "invalid-id") fall back to raw value search
+- Covers normalizeLessonId returning null for non-matching patterns
