@@ -1,5 +1,13 @@
 # ai-hero-cli
 
+## 0.2.15
+
+### Patch Changes
+
+- 73a190f: Added init script
+- 0912ded: Added @modelcontextprotocol/sdk to upgrade cmd
+- f7115a4: Made edit-commit use a temporary branch
+
 ## 0.2.14
 
 ### Patch Changes
