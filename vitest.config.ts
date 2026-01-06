@@ -6,7 +6,10 @@ export default defineConfig({
     exclude: [],
     globals: true,
     coverage: {
-      provider: "v8"
+      provider: "v8",
+      reporter: ["text", "json"],
+      include: ["src/**/*.ts"],
+      exclude: ["src/bin.ts"]
     }
   }
 })
