@@ -9,58 +9,66 @@ export class InvalidBranchOperationError extends Data.TaggedError(
   message: string;
 }> {}
 
+export class UncommittedChangesError extends Data.TaggedError(
+  "UncommittedChangesError"
+)<{
+  statusOutput: string;
+}> {}
+
+/**
+ * Core pull logic, extracted for testability.
+ */
+export const runPull = () =>
+  Effect.gen(function* () {
+    const git = yield* GitService;
+
+    // Validate git repository
+    yield* git.ensureIsGitRepo();
+
+    // Get current branch (cannot be main)
+    const currentBranch = yield* git.getCurrentBranch();
+    if (currentBranch === "main") {
+      return yield* new InvalidBranchOperationError({
+        message:
+          "Cannot pull when on main branch. Switch to a working branch first.",
+      });
+    }
+
+    // Check for uncommitted changes
+    const { hasUncommittedChanges, statusOutput } =
+      yield* git.getUncommittedChanges();
+
+    if (hasUncommittedChanges) {
+      return yield* new UncommittedChangesError({
+        statusOutput,
+      });
+    }
+
+    // Detect upstream remote
+    const { remoteName } = yield* git.detectUpstreamRemote();
+
+    // Fetch main from upstream
+    yield* Console.log(`Fetching main from ${remoteName}...`);
+    yield* git.fetch(remoteName, "main");
+
+    // Merge upstream/main into current branch
+    yield* Console.log(
+      `Merging ${remoteName}/main into ${currentBranch}...`
+    );
+    yield* git.merge(`${remoteName}/main`);
+
+    yield* Console.log(
+      `\n✓ Successfully merged ${remoteName}/main into ${currentBranch}`
+    );
+  });
+
 export const pull = CLICommand.make(
   "pull",
   {
     cwd: cwdOption,
   },
   ({ cwd }) =>
-    Effect.gen(function* () {
-      const git = yield* GitService;
-
-      // Validate git repository
-      yield* git.ensureIsGitRepo();
-
-      // Get current branch (cannot be main)
-      const currentBranch = yield* git.getCurrentBranch();
-      if (currentBranch === "main") {
-        return yield* new InvalidBranchOperationError({
-          message:
-            "Cannot pull when on main branch. Switch to a working branch first.",
-        });
-      }
-
-      // Check for uncommitted changes
-      const { hasUncommittedChanges, statusOutput } =
-        yield* git.getUncommittedChanges();
-
-      if (hasUncommittedChanges) {
-        yield* Console.error("You have uncommitted changes:\n");
-        yield* Console.error(statusOutput);
-        yield* Console.error(
-          "\nCommit or stash your changes before pulling:\n  git stash\n  ai-hero pull\n  git stash pop"
-        );
-        process.exitCode = 1;
-        return;
-      }
-
-      // Detect upstream remote
-      const { remoteName } = yield* git.detectUpstreamRemote();
-
-      // Fetch main from upstream
-      yield* Console.log(`Fetching main from ${remoteName}...`);
-      yield* git.fetch(remoteName, "main");
-
-      // Merge upstream/main into current branch
-      yield* Console.log(
-        `Merging ${remoteName}/main into ${currentBranch}...`
-      );
-      yield* git.merge(`${remoteName}/main`);
-
-      yield* Console.log(
-        `\n✓ Successfully merged ${remoteName}/main into ${currentBranch}`
-      );
-    }).pipe(
+    runPull().pipe(
       Effect.provideService(
         GitServiceConfig,
         GitServiceConfig.of({
@@ -68,6 +76,16 @@ export const pull = CLICommand.make(
         })
       ),
       Effect.catchTags({
+        UncommittedChangesError: (error) => {
+          return Effect.gen(function* () {
+            yield* Console.error("You have uncommitted changes:\n");
+            yield* Console.error(error.statusOutput);
+            yield* Console.error(
+              "\nCommit or stash your changes before pulling:\n  git stash\n  ai-hero pull\n  git stash pop"
+            );
+            process.exitCode = 1;
+          });
+        },
         NotAGitRepoError: (error) => {
           return Effect.gen(function* () {
             yield* Console.error(`Error: ${error.message}`);
