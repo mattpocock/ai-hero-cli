@@ -199,4 +199,44 @@ describe("LessonParserService", () => {
         Effect.provide(LessonParserService.Default)
       )
   );
+
+  it.effect(
+    "should return subfolders (problem/solution) for navigating lesson states",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+
+        const tmpDir = yield* fs.makeTempDirectoryScoped();
+
+        // Create lesson structure with problem/solution subfolders
+        yield* fs.makeDirectory(
+          path.join(tmpDir, "1-basics", "1-variables", "problem"),
+          { recursive: true }
+        );
+        yield* fs.makeDirectory(
+          path.join(tmpDir, "1-basics", "1-variables", "solution"),
+          { recursive: true }
+        );
+        // Add a file inside the lesson (should be filtered out)
+        yield* fs.writeFileString(
+          path.join(tmpDir, "1-basics", "1-variables", "README.md"),
+          "# Variables lesson"
+        );
+
+        const service = yield* LessonParserService;
+        const lessons = yield* service.getLessonsFromRepo(tmpDir);
+
+        expect(lessons).toHaveLength(1);
+        const lesson = lessons[0]!;
+
+        const subfolders = yield* lesson.subfolders();
+
+        // Should find only directories, not files
+        expect(subfolders.sort()).toEqual(["problem", "solution"]);
+      }).pipe(
+        Effect.scoped,
+        Effect.provide(NodeFileSystem.layer),
+        Effect.provide(LessonParserService.Default)
+      )
+  );
 });

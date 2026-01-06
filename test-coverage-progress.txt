@@ -57,3 +57,9 @@ test(lesson-parser-service): ignores files mixed with section/lesson directories
 - lesson-parser-service.ts: 70.28% -> 72.16%
 - Tests that README.md in root and notes.txt in sections are ignored
 - Real course repos have files alongside lesson folders - parser must filter them out
+
+test(lesson-parser-service): Lesson.subfolders returns problem/solution dirs for navigation
+- Coverage: 18.37% -> 19.42%
+- lesson-parser-service.ts: 72.16% -> 92.92%
+- Tests that subfolders() returns only directories (problem, solution), filtering files
+- Users navigate lesson states via these subfolders - critical for exercise command
