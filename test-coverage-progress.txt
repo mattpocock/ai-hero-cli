@@ -88,3 +88,10 @@ v8 ignore: selectCommit UI prompt wrapper in branch-commits.ts
 - Coverage: 20.5% -> 20.57%
 - branch-commits.ts: 66.07% -> 100%
 - selectCommit formats commits for display and calls promptService - no business logic to test
+
+test(exercise): runLesson fails with LessonNotFoundError for non-existent lesson
+- Coverage: 20.57% -> 22.34%
+- exercise.ts: 0% -> 21.57%
+- Exported runLesson, LessonNotFoundError, LessonEntrypointNotFoundError for testability
+- Tests that user requesting lesson 99 in a course with only lessons 1-2 gets clear error
+- Critical user-facing error path - prevents confusion when typing wrong lesson number

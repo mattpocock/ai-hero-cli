@@ -32,14 +32,14 @@ import {
   PromptService,
 } from "./prompt-service.js";
 
-class LessonNotFoundError extends Data.TaggedError(
+export class LessonNotFoundError extends Data.TaggedError(
   "LessonNotFoundError"
 )<{
   lesson: number;
   message: string;
 }> {}
 
-class LessonEntrypointNotFoundError extends Data.TaggedError(
+export class LessonEntrypointNotFoundError extends Data.TaggedError(
   "LessonEntrypointNotFoundError"
 )<{
   lesson: number;
@@ -62,7 +62,11 @@ type ExerciseInstruction = {
   subfolder: string | undefined;
 };
 
-const runLesson: (opts: {
+/**
+ * Core exercise logic, extracted for testability.
+ * Runs a lesson by number, handling navigation and execution.
+ */
+export const runLesson: (opts: {
   lesson: number;
   root: string;
   envFilePath: string;
