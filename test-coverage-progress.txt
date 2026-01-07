@@ -223,3 +223,10 @@ test(update-cvm): getSectionAndLessonNumberFromPath rejects root-level lessons
 - update-cvm.ts: 93.2% -> 95.14%
 - Tests that lessons without section parent (e.g., "1-intro/readme.md") return notFound
 - Covers lines 53-55: sectionSegment undefined check for root-level lesson folders
+
+test(update-cvm): getSectionAndLessonNumberFromPath rejects non-numeric section prefix
+- Coverage: 35.39% -> 35.5%
+- update-cvm.ts: 95.14% -> 98.05%
+- Tests that lessons inside sections without numeric prefix return notFound
+- Covers lines 59-61: sectionNumber === notFound check
+- Remaining lines 28-29: unreachable defensive code (split never returns empty array)

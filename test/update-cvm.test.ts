@@ -117,5 +117,15 @@ describe("update-cvm", () => {
 
       expect(result).toBe(notFound);
     });
+
+    it("should return notFound for lesson inside section without numeric prefix", () => {
+      // User creates a lesson in a section folder that lacks a numeric prefix
+      // CVM should recognize this as invalid (sections must have numbered prefixes like "1-basics")
+      const result = getSectionAndLessonNumberFromPath(
+        "exercises/basics/2-variables/problem/main.ts"
+      );
+
+      expect(result).toBe(notFound);
+    });
   });
 });
