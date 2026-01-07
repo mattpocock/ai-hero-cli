@@ -271,3 +271,9 @@ test(lint): runLint reports error when readme.md contains broken absolute link
 - lint.ts: 71.11% -> 82.22%
 - Tests that absolute links (e.g., `/non-existent/file.ts`) are validated against filesystem
 - Users with broken documentation links get clear error before publishing
+
+test(lint): runLint reports error when readme.md contains broken relative link
+- Coverage: 41.63% -> 42.09%
+- lint.ts: 82.22% -> 89.44%
+- Tests that relative links (e.g., `./missing-file.ts`) are validated against filesystem
+- Users with broken relative documentation links get clear error before publishing

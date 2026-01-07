@@ -223,5 +223,53 @@ describe("lint", () => {
           Effect.provide(LessonParserService.Default)
         )
     );
+
+    it.effect(
+      "should report error when readme.md contains broken relative link",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+
+          // User writes readme with relative link to file that doesn't exist
+          // Lint should catch this - broken documentation links confuse users
+          const tmpDir = yield* fs.makeTempDirectoryScoped();
+
+          yield* fs.makeDirectory(
+            path.join(tmpDir, "01-basics", "01.01-intro", "problem"),
+            { recursive: true }
+          );
+          yield* fs.writeFileString(
+            path.join(
+              tmpDir,
+              "01-basics",
+              "01.01-intro",
+              "problem",
+              "readme.md"
+            ),
+            "# Exercise\n\nSee [the code](./missing-file.ts) for details."
+          );
+          // Add main.ts to avoid the "main.ts not found" error
+          yield* fs.writeFileString(
+            path.join(
+              tmpDir,
+              "01-basics",
+              "01.01-intro",
+              "problem",
+              "main.ts"
+            ),
+            "console.log('hello');\nconsole.log('world');"
+          );
+
+          const errors = yield* runLint({ cwd: tmpDir, root: tmpDir });
+
+          expect(errors.map((e) => e.error)).toContain(
+            "Broken relative link in readme.md: ./missing-file.ts"
+          );
+        }).pipe(
+          Effect.scoped,
+          Effect.provide(NodeFileSystem.layer),
+          Effect.provide(LessonParserService.Default)
+        )
+    );
   });
 });
