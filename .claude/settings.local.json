@@ -19,7 +19,9 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(find:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(grep:*)",
+      "Bash(xargs basename:*)"
     ],
     "deny": [],
     "ask": []

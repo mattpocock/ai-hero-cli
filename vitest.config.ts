@@ -13,7 +13,6 @@ export default defineConfig({
         "src/bin.ts",
         "src/Cli.ts",
         "src/layer.ts",
-        "src/internal/**/*.ts",
         "src/git-service.ts",
         "src/prompt-service.ts"
       ]
