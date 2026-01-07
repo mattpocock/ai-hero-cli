@@ -179,3 +179,9 @@ test(rename): internal rename command renumbers lessons to proper sequential for
 - Refactored to export runRename() for testability, wrapped CLI in v8 ignore
 - Tests user workflow: lessons with gaps (1,3,5) get renumbered to (01,02,03)
 - Remaining uncovered line 26: sort comparator never called with single section
+
+test(update-cvm): getSectionAndLessonNumberFromPath extracts lesson info from git diff paths
+- Coverage: 31.08% -> 32.91%
+- update-cvm.ts: 0% -> 29.03%
+- Tests pure function that parses file paths to identify which lesson was modified
+- CVM uses this to track lesson changes when user commits - critical for syncing
