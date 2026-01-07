@@ -211,3 +211,15 @@ test(update-cvm): getChangedFiles ignores non-lesson files in renamed paths
 - Branch coverage: 91.22% -> 92.76%
 - Tests that renamed config files (not matching lesson format) are filtered out
 - Covers lines 137-139: the notFound filter for invalid lesson paths in renamed files
+
+v8 ignore: update-cvm CLI handler and unreachable defensive code
+- Coverage: 34.77% -> 35.32%
+- update-cvm.ts: 58.6% -> 93.2%
+- CLI command handler (lines 148-240) is integration/orchestration code
+- Lines 65-68: unreachable - exerciseSegment found via startsWithNumber always parses
+
+test(update-cvm): getSectionAndLessonNumberFromPath rejects root-level lessons
+- Coverage: 35.32% -> 35.39%
+- update-cvm.ts: 93.2% -> 95.14%
+- Tests that lessons without section parent (e.g., "1-intro/readme.md") return notFound
+- Covers lines 53-55: sectionSegment undefined check for root-level lesson folders

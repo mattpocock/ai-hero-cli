@@ -108,4 +108,14 @@ describe("update-cvm", () => {
       expect(Object.keys(result.renamed)).toHaveLength(1);
     });
   });
+
+  describe("PRD: CVM ignores files without proper section/lesson structure", () => {
+    it("should return notFound for lesson at root level without section parent", () => {
+      // User creates a lesson folder directly at root without a section folder
+      // CVM should recognize this as invalid (lessons must be inside sections)
+      const result = getSectionAndLessonNumberFromPath("1-intro/readme.md");
+
+      expect(result).toBe(notFound);
+    });
+  });
 });

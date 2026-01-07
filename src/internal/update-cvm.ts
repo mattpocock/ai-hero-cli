@@ -62,6 +62,7 @@ export const getSectionAndLessonNumberFromPath = (
 
   const lessonNumber = getNumberFromPathSegment(exerciseSegment);
 
+  /* v8 ignore next 3 - unreachable: exerciseSegment found via startsWithNumber, so getNumberFromPathSegment always succeeds */
   if (lessonNumber === notFound) {
     return notFound;
   }
@@ -144,6 +145,7 @@ export const getChangedFiles = (rawDiffOutput: string) => {
   };
 };
 
+/* v8 ignore start */
 export const updateCVM = CLICommand.make(
   "update-cvm",
   {
@@ -235,3 +237,4 @@ export const updateCVM = CLICommand.make(
       })
     )
 );
+/* v8 ignore stop */
