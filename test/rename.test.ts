@@ -103,5 +103,69 @@ describe("rename", () => {
           Effect.provide(LessonParserService.Default)
         )
     );
+
+    it.effect(
+      "should rename lessons across multiple sections in correct order",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+
+          // Create a course with multiple sections to test section sorting
+          // User runs rename when they have lessons across multiple sections
+          const tmpDir = yield* fs.makeTempDirectoryScoped();
+
+          // Section 02 (created first but should be processed after 01)
+          yield* fs.makeDirectory(
+            path.join(tmpDir, "02-advanced", "02.03-async", "problem"),
+            { recursive: true }
+          );
+          yield* fs.writeFileString(
+            path.join(tmpDir, "02-advanced", "02.03-async", "problem", "readme.md"),
+            "# Async"
+          );
+
+          // Section 01 (created second but should be processed first)
+          yield* fs.makeDirectory(
+            path.join(tmpDir, "01-basics", "01.05-intro", "problem"),
+            { recursive: true }
+          );
+          yield* fs.writeFileString(
+            path.join(tmpDir, "01-basics", "01.05-intro", "problem", "readme.md"),
+            "# Intro"
+          );
+
+          // Run rename - should process sections in sorted order (01 before 02)
+          const renamedCount = yield* runRename({ root: tmpDir });
+
+          // Both lessons need renumbering (01.05->01.01, 02.03->02.01)
+          expect(renamedCount).toBe(2);
+
+          // Verify section 01 was renamed correctly
+          const exists0101 = yield* fs.exists(
+            path.join(tmpDir, "01-basics", "01.01-intro")
+          );
+          expect(exists0101).toBe(true);
+
+          // Verify section 02 was renamed correctly
+          const exists0201 = yield* fs.exists(
+            path.join(tmpDir, "02-advanced", "02.01-async")
+          );
+          expect(exists0201).toBe(true);
+
+          // Verify old names are gone
+          const existsOld0105 = yield* fs.exists(
+            path.join(tmpDir, "01-basics", "01.05-intro")
+          );
+          const existsOld0203 = yield* fs.exists(
+            path.join(tmpDir, "02-advanced", "02.03-async")
+          );
+          expect(existsOld0105).toBe(false);
+          expect(existsOld0203).toBe(false);
+        }).pipe(
+          Effect.scoped,
+          Effect.provide(NodeFileSystem.layer),
+          Effect.provide(LessonParserService.Default)
+        )
+    );
   });
 });
