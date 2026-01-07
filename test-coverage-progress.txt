@@ -204,3 +204,10 @@ test(update-cvm): getChangedFiles parses deleted lessons from git diff output
 - Branch coverage: 91.15% -> 91.22%
 - Tests parsing "delete mode" lines from git diff --summary to extract deleted lesson paths
 - Critical for CVM syncing - identifies removed lessons when user commits
+
+test(update-cvm): getChangedFiles ignores non-lesson files in renamed paths
+- Coverage: 34.57% -> 34.77%
+- update-cvm.ts: 55.37% -> 58.6%
+- Branch coverage: 91.22% -> 92.76%
+- Tests that renamed config files (not matching lesson format) are filtered out
+- Covers lines 137-139: the notFound filter for invalid lesson paths in renamed files

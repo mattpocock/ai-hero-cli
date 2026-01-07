@@ -89,4 +89,23 @@ describe("update-cvm", () => {
       expect(Object.keys(result.renamed)).toHaveLength(0);
     });
   });
+
+  describe("PRD: CVM ignores non-lesson files in git diff", () => {
+    it("should ignore renamed files that don't match lesson path format", () => {
+      // User renames a config file (not a lesson) alongside lesson changes
+      // CVM should ignore non-lesson files rather than error
+      const gitDiffOutput = `
+ rename {old-config => new-config}/settings.json (100%)
+ rename exercises/1-basics/{2-variables => 3-variables}/problem/main.ts (100%)
+      `;
+
+      const result = getChangedFiles(gitDiffOutput);
+
+      // Should only include the valid lesson rename, not the config file rename
+      expect(result.renamed).toEqual({
+        "1-basics/2-variables": "1-basics/3-variables",
+      });
+      expect(Object.keys(result.renamed)).toHaveLength(1);
+    });
+  });
 });
