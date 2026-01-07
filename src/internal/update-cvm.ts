@@ -24,6 +24,7 @@ type SectionAndLessonNumber = {
 const startsWithNumber = (segment: string): boolean => {
   const numberSegment = segment.split("-")[0];
 
+  /* v8 ignore next 3 - unreachable: split always returns at least one element */
   if (numberSegment === undefined) {
     return false;
   }
