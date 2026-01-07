@@ -283,3 +283,9 @@ test(lint): runLint reports error when main.ts has only one line
 - lint.ts: 89.44% -> 92.22%
 - Tests that 1-line main.ts files trigger error suggesting readme-only exercise
 - Users creating trivial main.ts files get guidance to use readme-only lessons instead
+
+test(lint): runLint reports error when lesson contains .gitkeep file
+- Coverage: 42.27% -> 42.34%
+- lint.ts: 92.22% -> 93.33%
+- Tests that leftover .gitkeep placeholder files are caught during lint
+- Users with development artifacts get clear error before publishing course
