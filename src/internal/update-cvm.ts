@@ -87,7 +87,7 @@ const mapToLessonPath = (filePath: string) => {
   return `${sectionAndLessonNumber.sectionPathWithNumber}${path.sep}${sectionAndLessonNumber.lessonPathWithNumber}`;
 };
 
-const getChangedFiles = (rawDiffOutput: string) => {
+export const getChangedFiles = (rawDiffOutput: string) => {
   const splitDiffOutput = rawDiffOutput
     .trim()
     .split("\n")

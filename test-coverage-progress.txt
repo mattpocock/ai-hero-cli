@@ -185,3 +185,10 @@ test(update-cvm): getSectionAndLessonNumberFromPath extracts lesson info from gi
 - update-cvm.ts: 0% -> 29.03%
 - Tests pure function that parses file paths to identify which lesson was modified
 - CVM uses this to track lesson changes when user commits - critical for syncing
+
+test(update-cvm): getChangedFiles parses git diff output to identify created lessons
+- Coverage: 32.91% -> 34.1%
+- update-cvm.ts: 29.03% -> 47.84%
+- Exported getChangedFiles for testability
+- Tests parsing "create mode" lines from git diff --summary to extract lesson paths
+- Critical for CVM syncing - identifies new lessons when user commits
