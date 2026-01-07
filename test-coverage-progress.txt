@@ -254,3 +254,9 @@ test(lint): runLint reports error when lesson problem folder is missing readme.m
 - lint.ts: 39.44% -> 62.77%
 - Tests that lessons with problem folder but no readme.md get clear error
 - Covers lines 114-127: readme.md existence check and missing main.ts validation
+
+test(lint): runLint reports error when readme.md exists but is empty
+- Coverage: 40.38% -> 40.66%
+- lint.ts: 62.77% -> 67.22%
+- Tests that lessons with whitespace-only readme.md get "readme.md file is empty" error
+- Covers lines 128-135: readme content read and empty check
