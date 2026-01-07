@@ -265,3 +265,9 @@ test(lint): runLint reports error when readme.md contains pnpm run exercise comm
 - lint.ts: 67.22% -> 71.11%
 - Tests that outdated instructions with `pnpm run exercise` are caught
 - Users with deprecated command syntax in readme get clear error message
+
+test(lint): runLint reports error when readme.md contains broken absolute link
+- Coverage: 40.91% -> 41.63%
+- lint.ts: 71.11% -> 82.22%
+- Tests that absolute links (e.g., `/non-existent/file.ts`) are validated against filesystem
+- Users with broken documentation links get clear error before publishing

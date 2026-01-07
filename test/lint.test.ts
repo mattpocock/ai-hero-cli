@@ -174,5 +174,54 @@ describe("lint", () => {
           Effect.provide(LessonParserService.Default)
         )
     );
+
+    it.effect(
+      "should report error when readme.md contains broken absolute link",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+
+          // User writes readme with absolute link to file that doesn't exist
+          // Lint should catch this - broken links confuse users
+          const tmpDir = yield* fs.makeTempDirectoryScoped();
+
+          yield* fs.makeDirectory(
+            path.join(tmpDir, "01-basics", "01.01-intro", "problem"),
+            { recursive: true }
+          );
+          yield* fs.writeFileString(
+            path.join(
+              tmpDir,
+              "01-basics",
+              "01.01-intro",
+              "problem",
+              "readme.md"
+            ),
+            "# Exercise\n\nSee [the example](/non-existent/file.ts) for details."
+          );
+          // Add main.ts to avoid the "main.ts not found" error
+          yield* fs.writeFileString(
+            path.join(
+              tmpDir,
+              "01-basics",
+              "01.01-intro",
+              "problem",
+              "main.ts"
+            ),
+            "console.log('hello');\nconsole.log('world');"
+          );
+
+          const errors = yield* runLint({ cwd: tmpDir, root: tmpDir });
+
+          // The url in the error is without the leading slash (due to slice(1, -1))
+          expect(errors.map((e) => e.error)).toContain(
+            "Broken absolute link in readme.md: non-existent/file.ts"
+          );
+        }).pipe(
+          Effect.scoped,
+          Effect.provide(NodeFileSystem.layer),
+          Effect.provide(LessonParserService.Default)
+        )
+    );
   });
 });
