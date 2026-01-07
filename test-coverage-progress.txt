@@ -236,3 +236,9 @@ test(rename): runRename correctly processes lessons across multiple sections
 - rename.ts: 97.5% -> 100%
 - Tests that sections are sorted before processing (01-basics before 02-advanced)
 - Covers line 26: section sort comparator that only runs with 2+ sections
+
+test(lint): runLint reports error when lesson has no subfolders
+- Coverage: 35.53% -> 38.42%
+- lint.ts: 0% -> 32.22%
+- Refactored to export runLint() for testability, wrapped CLI in v8 ignore
+- Tests user creating malformed lesson without problem/solution dirs gets clear error

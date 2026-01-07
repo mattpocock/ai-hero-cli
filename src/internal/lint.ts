@@ -7,12 +7,20 @@ import { styleText } from "node:util";
 import * as path from "path";
 import { FileSystem } from "@effect/platform";
 
+export type LintError = {
+  sectionPath: string;
+  lessonPath: string;
+  error: string;
+};
+
 const createErrorTracker = () => {
   const groupedErrors: {
     [section: string]: {
       [exercise: string]: Array<string>;
     };
   } = {};
+
+  const errors: Array<LintError> = [];
 
   return {
     addError: (lesson: Lesson, error: string) => {
@@ -23,22 +31,23 @@ const createErrorTracker = () => {
         groupedErrors[lesson.sectionPath][lesson.path] = [];
       }
       groupedErrors[lesson.sectionPath][lesson.path].push(error);
+      errors.push({
+        sectionPath: lesson.sectionPath,
+        lessonPath: lesson.path,
+        error,
+      });
     },
+    getErrors: () => errors,
+    /* v8 ignore start */
     log: Effect.gen(function* () {
-      for (const [section, exercises] of Object.entries(
-        groupedErrors
-      )) {
+      for (const [section, exercises] of Object.entries(groupedErrors)) {
         yield* Console.log(styleText(["bold"], section));
 
-        for (const [exercise, errors] of Object.entries(
-          exercises
-        )) {
+        for (const [exercise, errors] of Object.entries(exercises)) {
           yield* Console.log(`  ${exercise}`);
 
           for (const error of errors) {
-            yield* Console.log(
-              styleText(["red"], `    ${error}`)
-            );
+            yield* Console.log(styleText(["red"], `    ${error}`));
           }
         }
       }
@@ -47,9 +56,205 @@ const createErrorTracker = () => {
         process.exitCode = 1;
       }
     }),
+    /* v8 ignore stop */
   };
 };
 
+/**
+ * Core lint logic - exported for testability.
+ * Validates course repository structure and content.
+ */
+export const runLint = (opts: { cwd: string; root: string }) =>
+  Effect.gen(function* () {
+    const lessonParser = yield* LessonParserService;
+    const fs = yield* FileSystem.FileSystem;
+
+    const existsCache = yield* Cache.make({
+      capacity: 10_000,
+      timeToLive: Duration.infinity,
+      lookup: (key: string) =>
+        Effect.gen(function* () {
+          const exists = yield* fs.exists(key);
+          return exists;
+        }),
+    });
+
+    const allReadmeContents: Array<string> = [];
+
+    const errorTracker = createErrorTracker();
+
+    const lessons = yield* lessonParser.getLessonsFromRepo(opts.root);
+
+    for (const lesson of lessons) {
+      const subfolders = yield* lesson.subfolders();
+
+      if (subfolders.length === 0) {
+        errorTracker.addError(
+          lesson,
+          "No subfolders, like problem or solution, found in the exercise."
+        );
+        continue;
+      }
+
+      const folderForReadme = subfolders.find(
+        (folder) =>
+          folder === "problem" ||
+          folder === "explainer" ||
+          folder === "explainer.1"
+      );
+
+      if (!folderForReadme) {
+        errorTracker.addError(
+          lesson,
+          "No problem, explainer, or explainer.1 folder found in the exercise."
+        );
+        continue;
+      }
+
+      const readmePath = path.join(
+        lesson.absolutePath(),
+        folderForReadme,
+        "readme.md"
+      );
+
+      const readmeExists = yield* existsCache.get(readmePath);
+
+      if (!readmeExists) {
+        errorTracker.addError(
+          lesson,
+          "readme.md file not found in the exercise."
+        );
+      } else {
+        const readmeContent = yield* fs.readFileString(readmePath);
+
+        allReadmeContents.push(readmeContent);
+
+        if (readmeContent.trim().length === 0) {
+          errorTracker.addError(lesson, "readme.md file is empty");
+          continue;
+        }
+
+        if (readmeContent.includes("`pnpm run exercise ")) {
+          errorTracker.addError(
+            lesson,
+            "readme.md file contains a pnpm run exercise command. Please remove it."
+          );
+          continue;
+        }
+
+        const absoluteLinks =
+          readmeContent.match(/\[[^\]]+\]\(\/[^)]+\)/gm) ?? [];
+
+        for (const link of absoluteLinks) {
+          const splitResult = link.split("](");
+          const url = splitResult[1]?.slice(1, -1);
+
+          if (!url) continue;
+
+          const linkExists = yield* existsCache.get(path.join(opts.cwd, url));
+
+          if (!linkExists) {
+            errorTracker.addError(
+              lesson,
+              `Broken absolute link in readme.md: ${url}`
+            );
+          }
+        }
+
+        const relativeLinks =
+          readmeContent.match(/\[[^\]]+\]\(\.\/[^)]+\)/gm) ?? [];
+
+        for (const link of relativeLinks) {
+          const splitResult = link.split("](");
+          const url = splitResult[1]?.slice(0, -1);
+
+          if (!url) continue;
+
+          const linkExists = yield* existsCache.get(
+            path.resolve(lesson.absolutePath(), folderForReadme, url)
+          );
+
+          if (!linkExists) {
+            errorTracker.addError(
+              lesson,
+              `Broken relative link in readme.md: ${url}`
+            );
+          }
+        }
+      }
+
+      for (const subfolder of subfolders) {
+        const mainFilePath = path.join(
+          lesson.absolutePath(),
+          subfolder,
+          "main.ts"
+        );
+
+        const mainFileExists = yield* existsCache.get(mainFilePath);
+
+        if (!mainFileExists) {
+          // Check if readme.md exists in this subfolder - if so, skip main.ts error
+          const readmeInSubfolderPath = path.join(
+            lesson.absolutePath(),
+            subfolder,
+            "readme.md"
+          );
+          const readmeInSubfolderExists =
+            yield* existsCache.get(readmeInSubfolderPath);
+
+          if (!readmeInSubfolderExists) {
+            errorTracker.addError(
+              lesson,
+              `main.ts file not found in the ${subfolder} folder.`
+            );
+          }
+        } else {
+          const mainFileContent = yield* fs.readFileString(mainFilePath);
+
+          const lineCount = mainFileContent.trim().split("\n").length;
+          if (lineCount === 1) {
+            errorTracker.addError(
+              lesson,
+              `main.ts file in the ${subfolder} folder is too short (${lineCount} lines). Please use a readme-only exercise instead if you only need to show instructions.`
+            );
+          }
+        }
+      }
+
+      const files = yield* lesson.allFiles();
+
+      if (files.some((file) => file.includes(".gitkeep"))) {
+        errorTracker.addError(lesson, ".gitkeep file found in the exercise.");
+      }
+
+      if (files.some((file) => file.includes("speaker-notes.md"))) {
+        errorTracker.addError(
+          lesson,
+          "speaker-notes.md file found in the exercise. This should not be exposed to users."
+        );
+      }
+    }
+
+    // Check for unused reference lessons
+    const readmeContents = allReadmeContents.join("\n");
+
+    const referenceLessons = lessons.filter(
+      (lesson) => lesson.sectionName === "reference"
+    );
+
+    for (const referenceLesson of referenceLessons) {
+      if (!readmeContents.includes(referenceLesson.path)) {
+        errorTracker.addError(
+          referenceLesson,
+          `${referenceLesson.path} is not referenced in any other exercise.`
+        );
+      }
+    }
+
+    return errorTracker.getErrors();
+  });
+
+/* v8 ignore start */
 export const lint = CLICommand.make(
   "lint",
   {
@@ -58,216 +263,38 @@ export const lint = CLICommand.make(
   },
   Effect.fn("lint")(
     function* ({ cwd, root }) {
-      const existsCache = yield* Cache.make({
-        capacity: 10_000,
-        timeToLive: Duration.infinity,
-        lookup: (key: string) =>
-          Effect.gen(function* () {
-            const exists = yield* fs.exists(key);
-            return exists;
-          }),
-      });
+      const errors = yield* runLint({ cwd, root });
 
-      const allReadmeContents: Array<string> = [];
+      // Log errors grouped by section/exercise
+      const groupedErrors: {
+        [section: string]: { [exercise: string]: Array<string> };
+      } = {};
 
-      const errorTracker = createErrorTracker();
-      const lessonParser = yield* LessonParserService;
-      const fs = yield* FileSystem.FileSystem;
-
-      const lessons = yield* lessonParser.getLessonsFromRepo(
-        root
-      );
-
-      for (const lesson of lessons) {
-        const subfolders = yield* lesson.subfolders();
-
-        if (subfolders.length === 0) {
-          errorTracker.addError(
-            lesson,
-            "No subfolders, like problem or solution, found in the exercise."
-          );
-          continue;
+      for (const error of errors) {
+        if (!groupedErrors[error.sectionPath]) {
+          groupedErrors[error.sectionPath] = {};
         }
-
-        const folderForReadme = subfolders.find(
-          (folder) =>
-            folder === "problem" ||
-            folder === "explainer" ||
-            folder === "explainer.1"
-        );
-
-        if (!folderForReadme) {
-          errorTracker.addError(
-            lesson,
-            "No problem, explainer, or explainer.1 folder found in the exercise."
-          );
-          continue;
+        if (!groupedErrors[error.sectionPath][error.lessonPath]) {
+          groupedErrors[error.sectionPath][error.lessonPath] = [];
         }
+        groupedErrors[error.sectionPath][error.lessonPath].push(error.error);
+      }
 
-        const readmePath = path.join(
-          lesson.absolutePath(),
-          folderForReadme,
-          "readme.md"
-        );
+      for (const [section, exercises] of Object.entries(groupedErrors)) {
+        yield* Console.log(styleText(["bold"], section));
 
-        const readmeExists = yield* existsCache.get(readmePath);
+        for (const [exercise, errs] of Object.entries(exercises)) {
+          yield* Console.log(`  ${exercise}`);
 
-        if (!readmeExists) {
-          errorTracker.addError(
-            lesson,
-            "readme.md file not found in the exercise."
-          );
-        } else {
-          const readmeContent = yield* fs.readFileString(
-            readmePath
-          );
-
-          allReadmeContents.push(readmeContent);
-
-          if (readmeContent.trim().length === 0) {
-            errorTracker.addError(
-              lesson,
-              "readme.md file is empty"
-            );
-            continue;
+          for (const err of errs) {
+            yield* Console.log(styleText(["red"], `    ${err}`));
           }
-
-          if (readmeContent.includes("`pnpm run exercise ")) {
-            errorTracker.addError(
-              lesson,
-              "readme.md file contains a pnpm run exercise command. Please remove it."
-            );
-            continue;
-          }
-
-          const absoluteLinks =
-            readmeContent.match(/\[[^\]]+\]\(\/[^)]+\)/gm) ?? [];
-
-          for (const link of absoluteLinks) {
-            const splitResult = link.split("](");
-            const url = splitResult[1]?.slice(1, -1);
-
-            if (!url) continue;
-
-            const linkExists = yield* existsCache.get(
-              path.join(cwd, url)
-            );
-
-            if (!linkExists) {
-              errorTracker.addError(
-                lesson,
-                `Broken absolute link in readme.md: ${url}`
-              );
-            }
-          }
-
-          const relativeLinks =
-            readmeContent.match(/\[[^\]]+\]\(\.\/[^)]+\)/gm) ??
-            [];
-
-          for (const link of relativeLinks) {
-            const splitResult = link.split("](");
-            const url = splitResult[1]?.slice(0, -1);
-
-            if (!url) continue;
-
-            const linkExists = yield* existsCache.get(
-              path.resolve(
-                lesson.absolutePath(),
-                folderForReadme,
-                url
-              )
-            );
-
-            if (!linkExists) {
-              errorTracker.addError(
-                lesson,
-                `Broken relative link in readme.md: ${url}`
-              );
-            }
-          }
-        }
-
-        for (const subfolder of subfolders) {
-          const mainFilePath = path.join(
-            lesson.absolutePath(),
-            subfolder,
-            "main.ts"
-          );
-
-          const mainFileExists = yield* existsCache.get(
-            mainFilePath
-          );
-
-          if (!mainFileExists) {
-            // Check if readme.md exists in this subfolder - if so, skip main.ts error
-            const readmeInSubfolderPath = path.join(
-              lesson.absolutePath(),
-              subfolder,
-              "readme.md"
-            );
-            const readmeInSubfolderExists =
-              yield* existsCache.get(readmeInSubfolderPath);
-
-            if (!readmeInSubfolderExists) {
-              errorTracker.addError(
-                lesson,
-                `main.ts file not found in the ${subfolder} folder.`
-              );
-            }
-          } else {
-            const mainFileContent = yield* fs.readFileString(
-              mainFilePath
-            );
-
-            const lineCount = mainFileContent
-              .trim()
-              .split("\n").length;
-            if (lineCount === 1) {
-              errorTracker.addError(
-                lesson,
-                `main.ts file in the ${subfolder} folder is too short (${lineCount} lines). Please use a readme-only exercise instead if you only need to show instructions.`
-              );
-            }
-          }
-        }
-
-        const files = yield* lesson.allFiles();
-
-        if (files.some((file) => file.includes(".gitkeep"))) {
-          errorTracker.addError(
-            lesson,
-            ".gitkeep file found in the exercise."
-          );
-        }
-
-        if (
-          files.some((file) => file.includes("speaker-notes.md"))
-        ) {
-          errorTracker.addError(
-            lesson,
-            "speaker-notes.md file found in the exercise. This should not be exposed to users."
-          );
         }
       }
 
-      // Check for unused reference lessons
-      const readmeContents = allReadmeContents.join("\n");
-
-      const referenceLessons = lessons.filter(
-        (lesson) => lesson.sectionName === "reference"
-      );
-
-      for (const referenceLesson of referenceLessons) {
-        if (!readmeContents.includes(referenceLesson.path)) {
-          errorTracker.addError(
-            referenceLesson,
-            `${referenceLesson.path} is not referenced in any other exercise.`
-          );
-        }
+      if (errors.length > 0) {
+        process.exitCode = 1;
       }
-
-      yield* errorTracker.log;
     },
     Effect.catchTags({
       InvalidPathError: (error) => {
@@ -290,3 +317,4 @@ export const lint = CLICommand.make(
     "Lint the repository to ensure it is formatted correctly"
   )
 );
+/* v8 ignore stop */
