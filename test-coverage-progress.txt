@@ -289,3 +289,9 @@ test(lint): runLint reports error when lesson contains .gitkeep file
 - lint.ts: 92.22% -> 93.33%
 - Tests that leftover .gitkeep placeholder files are caught during lint
 - Users with development artifacts get clear error before publishing course
+
+test(lint): runLint reports error when lesson contains speaker-notes.md
+- Coverage: 42.34% -> 42.52%
+- lint.ts: 93.33% -> 96.11%
+- Tests that speaker-notes.md (internal presenter material) is caught during lint
+- Prevents exposing confidential speaker notes to course students
