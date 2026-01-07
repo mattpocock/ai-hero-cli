@@ -47,5 +47,35 @@ describe("lint", () => {
           Effect.provide(LessonParserService.Default)
         )
     );
+
+    it.effect(
+      "should report error when lesson has subfolders but none are problem/explainer",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+
+          // User creates a lesson with wrong subfolder names (e.g., "code" instead of "problem")
+          // Lint should catch this and tell them they need problem/explainer/explainer.1
+          const tmpDir = yield* fs.makeTempDirectoryScoped();
+
+          // Create lesson with a non-standard subfolder
+          yield* fs.makeDirectory(
+            path.join(tmpDir, "01-basics", "01.01-intro", "code"),
+            { recursive: true }
+          );
+
+          const errors = yield* runLint({ cwd: tmpDir, root: tmpDir });
+
+          expect(errors).toHaveLength(1);
+          expect(errors[0]?.error).toBe(
+            "No problem, explainer, or explainer.1 folder found in the exercise."
+          );
+          expect(errors[0]?.lessonPath).toBe("01.01-intro");
+        }).pipe(
+          Effect.scoped,
+          Effect.provide(NodeFileSystem.layer),
+          Effect.provide(LessonParserService.Default)
+        )
+    );
   });
 });

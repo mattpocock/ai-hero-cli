@@ -242,3 +242,9 @@ test(lint): runLint reports error when lesson has no subfolders
 - lint.ts: 0% -> 32.22%
 - Refactored to export runLint() for testability, wrapped CLI in v8 ignore
 - Tests user creating malformed lesson without problem/solution dirs gets clear error
+
+test(lint): runLint reports error when lesson has wrong subfolder names
+- Coverage: 38.42% -> 38.88%
+- lint.ts: 32.22% -> 39.44%
+- Tests that lessons with non-standard subfolders (e.g., "code" instead of "problem") get clear error
+- Covers lines 99-112: folderForReadme check for problem/explainer/explainer.1
