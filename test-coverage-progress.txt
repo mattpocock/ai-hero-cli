@@ -295,3 +295,9 @@ test(lint): runLint reports error when lesson contains speaker-notes.md
 - lint.ts: 93.33% -> 96.11%
 - Tests that speaker-notes.md (internal presenter material) is caught during lint
 - Prevents exposing confidential speaker notes to course students
+
+test(lint): runLint reports error when reference lesson is not linked from any exercise
+- Coverage: 42.52% -> 42.77%
+- lint.ts: 96.11% -> 100%
+- Tests that lessons in "reference" section must be linked from other exercises
+- Catches orphaned reference content that users would never find

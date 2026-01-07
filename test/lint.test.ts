@@ -435,5 +435,69 @@ describe("lint", () => {
           Effect.provide(LessonParserService.Default)
         )
     );
+
+    it.effect(
+      "should report error when reference lesson is not linked from any other exercise",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+
+          // User creates a reference lesson but forgets to link to it from any exercise
+          // Lint should catch this - orphaned reference lessons are dead content
+          const tmpDir = yield* fs.makeTempDirectoryScoped();
+
+          // Create a regular lesson that has valid content
+          yield* fs.makeDirectory(
+            path.join(tmpDir, "01-basics", "01.01-intro", "problem"),
+            { recursive: true }
+          );
+          yield* fs.writeFileString(
+            path.join(
+              tmpDir,
+              "01-basics",
+              "01.01-intro",
+              "problem",
+              "readme.md"
+            ),
+            "# Exercise\n\nThis is a valid exercise with no link to reference."
+          );
+          yield* fs.writeFileString(
+            path.join(
+              tmpDir,
+              "01-basics",
+              "01.01-intro",
+              "problem",
+              "main.ts"
+            ),
+            "console.log('hello');\nconsole.log('world');"
+          );
+
+          // Create a reference section with a lesson - but it's not linked from anywhere
+          yield* fs.makeDirectory(
+            path.join(tmpDir, "99-reference", "99.01-utils", "explainer"),
+            { recursive: true }
+          );
+          yield* fs.writeFileString(
+            path.join(
+              tmpDir,
+              "99-reference",
+              "99.01-utils",
+              "explainer",
+              "readme.md"
+            ),
+            "# Reference: Utils\n\nThis is reference material about utils."
+          );
+
+          const errors = yield* runLint({ cwd: tmpDir, root: tmpDir });
+
+          expect(errors.map((e) => e.error)).toContain(
+            "99.01-utils is not referenced in any other exercise."
+          );
+        }).pipe(
+          Effect.scoped,
+          Effect.provide(NodeFileSystem.layer),
+          Effect.provide(LessonParserService.Default)
+        )
+    );
   });
 });
