@@ -172,3 +172,10 @@ config: exclude non-testable files from coverage in vitest.config.ts
 - Excluded: Cli.ts (entry point), layer.ts (DI), internal/* (CLI orchestration), git-service.ts (mocked), prompt-service.ts (UI wrappers)
 - All excluded files are integration/UI layers with no isolated business logic
 - All testable user-facing commands now at 100% coverage
+
+test(rename): internal rename command renumbers lessons to proper sequential format
+- Coverage: 29.34% -> 31.08%
+- rename.ts: 0% -> 97.5%
+- Refactored to export runRename() for testability, wrapped CLI in v8 ignore
+- Tests user workflow: lessons with gaps (1,3,5) get renumbered to (01,02,03)
+- Remaining uncovered line 26: sort comparator never called with single section
