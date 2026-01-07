@@ -66,4 +66,27 @@ describe("update-cvm", () => {
       expect(result.deleted).toHaveLength(0);
     });
   });
+
+  describe("PRD: CVM parses git diff to identify deleted lessons", () => {
+    it("should extract deleted lesson paths from git diff --summary output", () => {
+      // User deletes lesson files and commits
+      // CVM needs to know which lessons were removed to clean up its database
+      const gitDiffOutput = `
+ delete mode 100644 exercises/2-advanced/4-async/problem/main.ts
+ delete mode 100644 exercises/2-advanced/4-async/problem/readme.md
+ delete mode 100644 exercises/2-advanced/4-async/solution/main.ts
+      `;
+
+      const result = getChangedFiles(gitDiffOutput);
+
+      // Should identify the lesson path (section/lesson) for deleted files
+      expect(result.deleted).toContain("2-advanced/4-async");
+      // Should dedupe multiple files in same lesson
+      expect(
+        result.deleted.filter((p) => p === "2-advanced/4-async")
+      ).toHaveLength(1);
+      expect(result.created).toHaveLength(0);
+      expect(Object.keys(result.renamed)).toHaveLength(0);
+    });
+  });
 });

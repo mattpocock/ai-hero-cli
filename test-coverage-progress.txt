@@ -198,3 +198,9 @@ test(update-cvm): getChangedFiles parses renamed lessons from git diff output
 - update-cvm.ts: 47.84% -> 55.37%
 - Tests parsing "rename" lines with {old => new} format to track lesson renames
 - Critical for CVM - renamed lessons preserve metadata instead of delete/recreate
+
+test(update-cvm): getChangedFiles parses deleted lessons from git diff output
+- Coverage: 34.57% (unchanged - deleted parsing already covered by branch)
+- Branch coverage: 91.15% -> 91.22%
+- Tests parsing "delete mode" lines from git diff --summary to extract deleted lesson paths
+- Critical for CVM syncing - identifies removed lessons when user commits
