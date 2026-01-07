@@ -77,5 +77,35 @@ describe("lint", () => {
           Effect.provide(LessonParserService.Default)
         )
     );
+
+    it.effect(
+      "should report error when lesson problem folder is missing readme.md",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+
+          // User creates a lesson with problem folder but forgets to add readme.md
+          // Lint should catch this - every lesson needs instructions for users
+          const tmpDir = yield* fs.makeTempDirectoryScoped();
+
+          // Create lesson with problem folder but no readme.md
+          yield* fs.makeDirectory(
+            path.join(tmpDir, "01-basics", "01.01-intro", "problem"),
+            { recursive: true }
+          );
+
+          const errors = yield* runLint({ cwd: tmpDir, root: tmpDir });
+
+          // Should report missing readme.md and missing main.ts
+          expect(errors).toHaveLength(2);
+          expect(errors.map((e) => e.error)).toContain(
+            "readme.md file not found in the exercise."
+          );
+        }).pipe(
+          Effect.scoped,
+          Effect.provide(NodeFileSystem.layer),
+          Effect.provide(LessonParserService.Default)
+        )
+    );
   });
 });
