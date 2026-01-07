@@ -277,3 +277,9 @@ test(lint): runLint reports error when readme.md contains broken relative link
 - lint.ts: 82.22% -> 89.44%
 - Tests that relative links (e.g., `./missing-file.ts`) are validated against filesystem
 - Users with broken relative documentation links get clear error before publishing
+
+test(lint): runLint reports error when main.ts has only one line
+- Coverage: 42.09% -> 42.27%
+- lint.ts: 89.44% -> 92.22%
+- Tests that 1-line main.ts files trigger error suggesting readme-only exercise
+- Users creating trivial main.ts files get guidance to use readme-only lessons instead

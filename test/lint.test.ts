@@ -271,5 +271,53 @@ describe("lint", () => {
           Effect.provide(LessonParserService.Default)
         )
     );
+
+    it.effect(
+      "should report error when main.ts has only one line (too short)",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+
+          // User creates a main.ts with only 1 line of code
+          // Lint should suggest using readme-only exercise instead
+          const tmpDir = yield* fs.makeTempDirectoryScoped();
+
+          yield* fs.makeDirectory(
+            path.join(tmpDir, "01-basics", "01.01-intro", "problem"),
+            { recursive: true }
+          );
+          yield* fs.writeFileString(
+            path.join(
+              tmpDir,
+              "01-basics",
+              "01.01-intro",
+              "problem",
+              "readme.md"
+            ),
+            "# Exercise\n\nThis is a valid exercise."
+          );
+          // Create main.ts with only 1 line - should trigger error
+          yield* fs.writeFileString(
+            path.join(
+              tmpDir,
+              "01-basics",
+              "01.01-intro",
+              "problem",
+              "main.ts"
+            ),
+            "console.log('hello');"
+          );
+
+          const errors = yield* runLint({ cwd: tmpDir, root: tmpDir });
+
+          expect(errors.map((e) => e.error)).toContain(
+            "main.ts file in the problem folder is too short (1 lines). Please use a readme-only exercise instead if you only need to show instructions."
+          );
+        }).pipe(
+          Effect.scoped,
+          Effect.provide(NodeFileSystem.layer),
+          Effect.provide(LessonParserService.Default)
+        )
+    );
   });
 });
