@@ -260,3 +260,8 @@ test(lint): runLint reports error when readme.md exists but is empty
 - lint.ts: 62.77% -> 67.22%
 - Tests that lessons with whitespace-only readme.md get "readme.md file is empty" error
 - Covers lines 128-135: readme content read and empty check
+test(lint): runLint reports error when readme.md contains pnpm run exercise command
+- Coverage: 40.66% -> 40.91%
+- lint.ts: 67.22% -> 71.11%
+- Tests that outdated instructions with `pnpm run exercise` are caught
+- Users with deprecated command syntax in readme get clear error message

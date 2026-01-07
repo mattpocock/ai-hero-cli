@@ -137,5 +137,42 @@ describe("lint", () => {
         Effect.provide(LessonParserService.Default)
       )
     );
+
+    it.effect(
+      "should report error when readme.md contains pnpm run exercise command",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+
+          // User has outdated instructions with pnpm run exercise command
+          // Lint should catch this - these commands are deprecated
+          const tmpDir = yield* fs.makeTempDirectoryScoped();
+
+          yield* fs.makeDirectory(
+            path.join(tmpDir, "01-basics", "01.01-intro", "problem"),
+            { recursive: true }
+          );
+          yield* fs.writeFileString(
+            path.join(
+              tmpDir,
+              "01-basics",
+              "01.01-intro",
+              "problem",
+              "readme.md"
+            ),
+            "# Exercise\n\nRun `pnpm run exercise 1` to start."
+          );
+
+          const errors = yield* runLint({ cwd: tmpDir, root: tmpDir });
+
+          expect(errors.map((e) => e.error)).toContain(
+            "readme.md file contains a pnpm run exercise command. Please remove it."
+          );
+        }).pipe(
+          Effect.scoped,
+          Effect.provide(NodeFileSystem.layer),
+          Effect.provide(LessonParserService.Default)
+        )
+    );
   });
 });
