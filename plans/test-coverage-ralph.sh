@@ -6,7 +6,7 @@ if [ -z "$1" ]; then
 fi
 
 for ((i=1; i<=$1; i++)); do
-  result=$(docker sandbox run claude -p "@.claude/skills/what-to-test/SKILL.md @test-coverage-progress.txt \
+  result=$(docker sandbox run claude -p "@plans/test-coverage-plan.md @.claude/skills/what-to-test/SKILL.md @test-coverage-progress.txt \
 PROCESS: \
 1. Run pnpm coverage to see which files have low coverage. \
 2. Read the uncovered lines and identify the most important USER-FACING FEATURE that lacks tests. \
