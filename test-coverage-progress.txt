@@ -192,3 +192,9 @@ test(update-cvm): getChangedFiles parses git diff output to identify created les
 - Exported getChangedFiles for testability
 - Tests parsing "create mode" lines from git diff --summary to extract lesson paths
 - Critical for CVM syncing - identifies new lessons when user commits
+
+test(update-cvm): getChangedFiles parses renamed lessons from git diff output
+- Coverage: 34.1% -> 34.57%
+- update-cvm.ts: 47.84% -> 55.37%
+- Tests parsing "rename" lines with {old => new} format to track lesson renames
+- Critical for CVM - renamed lessons preserve metadata instead of delete/recreate

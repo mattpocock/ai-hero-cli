@@ -46,4 +46,24 @@ describe("update-cvm", () => {
       expect(Object.keys(result.renamed)).toHaveLength(0);
     });
   });
+
+  describe("PRD: CVM parses git diff to identify renamed lessons", () => {
+    it("should track renamed lessons so CVM can update references instead of delete/create", () => {
+      // User renames a lesson (e.g., renumbering from 2 to 3)
+      // CVM needs to know it was renamed to preserve metadata, not treat as delete + create
+      const gitDiffOutput = `
+ rename exercises/1-basics/{2-variables => 3-variables}/problem/main.ts (100%)
+ rename exercises/1-basics/{2-variables => 3-variables}/solution/main.ts (95%)
+      `;
+
+      const result = getChangedFiles(gitDiffOutput);
+
+      // Should map old path to new path for renamed lessons
+      expect(result.renamed).toEqual({
+        "1-basics/2-variables": "1-basics/3-variables",
+      });
+      expect(result.created).toHaveLength(0);
+      expect(result.deleted).toHaveLength(0);
+    });
+  });
 });
