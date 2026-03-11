@@ -153,13 +153,3 @@ export class RebaseConflictError extends Data.TaggedError(
   message: string;
 }> {}
 
-/**
- * Error thrown when a commit has no parent.
- * This occurs when trying to get the parent of the initial commit
- * in a repository, as it has no parent by definition.
- */
-export class NoParentCommitError extends Data.TaggedError(
-  "NoParentCommitError"
-)<{
-  commitSha: string;
-}> {}

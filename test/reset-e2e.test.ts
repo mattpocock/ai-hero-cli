@@ -5,11 +5,7 @@ import { Effect, Layer, Option } from "effect";
 import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import {
-  InvalidBranchOperationError,
-  InvalidOptionsError,
-  runReset,
-} from "../src/reset.js";
+import { runReset } from "../src/reset.js";
 import {
   PromptCancelledError,
   PromptService,
@@ -93,8 +89,6 @@ describe("reset (e2e)", () => {
           const result = yield* runReset({
             branch: "live-run-through",
             lessonId: Option.none(),
-            problem: false,
-            solution: false,
             demo: false,
             upstream: "/tmp/dummy-upstream",
           }).pipe(
@@ -135,8 +129,6 @@ describe("reset (e2e)", () => {
           const result = yield* runReset({
             branch: "live-run-through",
             lessonId: Option.some("99.99.99"),
-            problem: false,
-            solution: false,
             demo: false,
             upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
@@ -151,156 +143,19 @@ describe("reset (e2e)", () => {
     );
   });
 
-  describe("conflicting flags", () => {
+  describe("interactive reset", () => {
     it.effect(
-      "should fail with InvalidOptionsError when both --problem and --solution are provided",
+      "should reset directly to the selected commit",
       () =>
         Effect.gen(function* () {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("live-run-through", [
               commit("01.01.01 Arrays intro", {
-                "src/01.ts": "// arrays",
-              }),
-            ])
-            .withWorkingBranch("my-branch", {
-              from: "live-run-through",
-              atCommit: 0,
-            })
-            .build();
-
-          cleanup = repo.cleanup;
-
-          const mockPromptService =
-            fromPartial<PromptService>({});
-
-          const result = yield* runReset({
-            branch: "live-run-through",
-            lessonId: Option.some("01.01.01"),
-            problem: true,
-            solution: true,
-            demo: false,
-            upstream: getBareRepoPath(repo.workingDir),
-          }).pipe(
-            Effect.provide(
-              makeLayer(repo.workingDir, mockPromptService)
-            ),
-            Effect.flip
-          );
-
-          expect(result._tag).toBe("InvalidOptionsError");
-          expect(
-            (result as InvalidOptionsError).message
-          ).toBe(
-            "Cannot use both --problem and --solution flags"
-          );
-        })
-    );
-
-    it.effect(
-      "should fail with InvalidOptionsError when --demo is used with --problem",
-      () =>
-        Effect.gen(function* () {
-          const repo = createTestRepo()
-            .withRemote("upstream")
-            .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
-                "src/01.ts": "// arrays",
-              }),
-            ])
-            .withWorkingBranch("my-branch", {
-              from: "live-run-through",
-              atCommit: 0,
-            })
-            .build();
-
-          cleanup = repo.cleanup;
-
-          const mockPromptService =
-            fromPartial<PromptService>({});
-
-          const result = yield* runReset({
-            branch: "live-run-through",
-            lessonId: Option.some("01.01.01"),
-            problem: true,
-            solution: false,
-            demo: true,
-            upstream: getBareRepoPath(repo.workingDir),
-          }).pipe(
-            Effect.provide(
-              makeLayer(repo.workingDir, mockPromptService)
-            ),
-            Effect.flip
-          );
-
-          expect(result._tag).toBe("InvalidOptionsError");
-          expect(
-            (result as InvalidOptionsError).message
-          ).toBe(
-            "Cannot use --demo with --problem or --solution flags"
-          );
-        })
-    );
-
-    it.effect(
-      "should fail with InvalidOptionsError when --demo is used with --solution",
-      () =>
-        Effect.gen(function* () {
-          const repo = createTestRepo()
-            .withRemote("upstream")
-            .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
-                "src/01.ts": "// arrays",
-              }),
-            ])
-            .withWorkingBranch("my-branch", {
-              from: "live-run-through",
-              atCommit: 0,
-            })
-            .build();
-
-          cleanup = repo.cleanup;
-
-          const mockPromptService =
-            fromPartial<PromptService>({});
-
-          const result = yield* runReset({
-            branch: "live-run-through",
-            lessonId: Option.some("01.01.01"),
-            problem: false,
-            solution: true,
-            demo: true,
-            upstream: getBareRepoPath(repo.workingDir),
-          }).pipe(
-            Effect.provide(
-              makeLayer(repo.workingDir, mockPromptService)
-            ),
-            Effect.flip
-          );
-
-          expect(result._tag).toBe("InvalidOptionsError");
-          expect(
-            (result as InvalidOptionsError).message
-          ).toBe(
-            "Cannot use --demo with --problem or --solution flags"
-          );
-        })
-    );
-  });
-
-  describe("interactive reset to solution state", () => {
-    it.effect(
-      "should reset to solution commit and verify file contents",
-      () =>
-        Effect.gen(function* () {
-          const repo = createTestRepo()
-            .withRemote("upstream")
-            .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
-                "src/01.ts": "// problem state",
+                "src/01.ts": "// arrays intro",
               }),
               commit("01.01.02 Arrays solution", {
-                "src/01.ts": "// solution state",
+                "src/01.ts": "// arrays solution",
               }),
             ])
             .withWorkingBranch("my-branch", {
@@ -318,11 +173,6 @@ describe("reset (e2e)", () => {
                 return "01.01.02";
               }
             ),
-            selectProblemOrSolution: Effect.fn(
-              "selectProblemOrSolution"
-            )(function* () {
-              return "solution" as const;
-            }),
             selectResetAction: Effect.fn("selectResetAction")(
               function* () {
                 return "reset-current" as const;
@@ -333,8 +183,6 @@ describe("reset (e2e)", () => {
           yield* runReset({
             branch: "live-run-through",
             lessonId: Option.none(),
-            problem: false,
-            solution: false,
             demo: false,
             upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
@@ -343,12 +191,12 @@ describe("reset (e2e)", () => {
             )
           );
 
-          // Verify file contents match the solution commit
+          // Verify file contents match the selected commit directly
           const content = fs.readFileSync(
             `${repo.workingDir}/src/01.ts`,
             "utf-8"
           );
-          expect(content).toBe("// solution state");
+          expect(content).toBe("// arrays solution");
 
           // Still on my-branch
           const currentBranch = git(
@@ -361,84 +209,19 @@ describe("reset (e2e)", () => {
     );
   });
 
-  describe("reset to problem state (parent commit)", () => {
+  describe("reset with specific lesson ID", () => {
     it.effect(
-      "should reset to parent commit and verify file contents match problem state",
+      "should reset to the exact commit for the given lesson ID",
       () =>
         Effect.gen(function* () {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("live-run-through", [
               commit("01.01.01 Arrays intro", {
-                "src/01.ts": "// problem state",
+                "src/01.ts": "// arrays intro",
               }),
-              commit("01.01.02 Arrays solution", {
-                "src/01.ts": "// solution state",
-              }),
-            ])
-            .withWorkingBranch("my-branch", {
-              from: "live-run-through",
-              atCommit: 0,
-            })
-            .build();
-
-          cleanup = repo.cleanup;
-          configureGitUser(repo.workingDir);
-
-          const mockPromptService = fromPartial<PromptService>({
-            selectLessonCommit: Effect.fn("selectLessonCommit")(
-              function* () {
-                return "01.01.02";
-              }
-            ),
-            selectProblemOrSolution: Effect.fn(
-              "selectProblemOrSolution"
-            )(function* () {
-              return "problem" as const;
-            }),
-            selectResetAction: Effect.fn("selectResetAction")(
-              function* () {
-                return "reset-current" as const;
-              }
-            ),
-          });
-
-          yield* runReset({
-            branch: "live-run-through",
-            lessonId: Option.none(),
-            problem: false,
-            solution: false,
-            demo: false,
-            upstream: getBareRepoPath(repo.workingDir),
-          }).pipe(
-            Effect.provide(
-              makeLayer(repo.workingDir, mockPromptService)
-            )
-          );
-
-          // Verify file contents match the problem state (parent commit)
-          const content = fs.readFileSync(
-            `${repo.workingDir}/src/01.ts`,
-            "utf-8"
-          );
-          expect(content).toBe("// problem state");
-        })
-    );
-  });
-
-  describe("--solution flag shortcut", () => {
-    it.effect(
-      "should skip state selection and reset to solution commit",
-      () =>
-        Effect.gen(function* () {
-          const repo = createTestRepo()
-            .withRemote("upstream")
-            .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
-                "src/01.ts": "// problem",
-              }),
-              commit("01.01.02 Arrays solution", {
-                "src/01.ts": "// solution",
+              commit("01.01.02 Arrays continued", {
+                "src/01.ts": "// arrays continued",
               }),
             ])
             .withWorkingBranch("my-branch", {
@@ -460,9 +243,7 @@ describe("reset (e2e)", () => {
 
           yield* runReset({
             branch: "live-run-through",
-            lessonId: Option.some("01.01.02"),
-            problem: false,
-            solution: true,
+            lessonId: Option.some("01.01.01"),
             demo: false,
             upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
@@ -475,78 +256,24 @@ describe("reset (e2e)", () => {
             `${repo.workingDir}/src/01.ts`,
             "utf-8"
           );
-          expect(content).toBe("// solution");
-        })
-    );
-  });
-
-  describe("--problem flag shortcut", () => {
-    it.effect(
-      "should skip state selection and reset to parent commit",
-      () =>
-        Effect.gen(function* () {
-          const repo = createTestRepo()
-            .withRemote("upstream")
-            .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
-                "src/01.ts": "// problem",
-              }),
-              commit("01.01.02 Arrays solution", {
-                "src/01.ts": "// solution",
-              }),
-            ])
-            .withWorkingBranch("my-branch", {
-              from: "live-run-through",
-              atCommit: 0,
-            })
-            .build();
-
-          cleanup = repo.cleanup;
-          configureGitUser(repo.workingDir);
-
-          const mockPromptService = fromPartial<PromptService>({
-            selectResetAction: Effect.fn("selectResetAction")(
-              function* () {
-                return "reset-current" as const;
-              }
-            ),
-          });
-
-          yield* runReset({
-            branch: "live-run-through",
-            lessonId: Option.some("01.01.02"),
-            problem: true,
-            solution: false,
-            demo: false,
-            upstream: getBareRepoPath(repo.workingDir),
-          }).pipe(
-            Effect.provide(
-              makeLayer(repo.workingDir, mockPromptService)
-            )
-          );
-
-          const content = fs.readFileSync(
-            `${repo.workingDir}/src/01.ts`,
-            "utf-8"
-          );
-          expect(content).toBe("// problem");
+          expect(content).toBe("// arrays intro");
         })
     );
   });
 
   describe("create new branch from lesson", () => {
     it.effect(
-      "should create new branch at solution commit",
+      "should create new branch at the selected commit",
       () =>
         Effect.gen(function* () {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("live-run-through", [
               commit("01.01.01 Arrays intro", {
-                "src/01.ts": "// problem",
+                "src/01.ts": "// arrays intro",
               }),
               commit("01.01.02 Arrays solution", {
-                "src/01.ts": "// solution",
+                "src/01.ts": "// arrays solution",
               }),
             ])
             .withWorkingBranch("my-branch", {
@@ -564,11 +291,6 @@ describe("reset (e2e)", () => {
                 return "01.01.02";
               }
             ),
-            selectProblemOrSolution: Effect.fn(
-              "selectProblemOrSolution"
-            )(function* () {
-              return "solution" as const;
-            }),
             selectResetAction: Effect.fn("selectResetAction")(
               function* () {
                 return "create-branch" as const;
@@ -584,8 +306,6 @@ describe("reset (e2e)", () => {
           yield* runReset({
             branch: "live-run-through",
             lessonId: Option.none(),
-            problem: false,
-            solution: false,
             demo: false,
             upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
@@ -602,86 +322,12 @@ describe("reset (e2e)", () => {
           );
           expect(currentBranch).toBe("matt/lesson-work");
 
-          // File contents should match solution
+          // File contents should match selected commit
           const content = fs.readFileSync(
             `${repo.workingDir}/src/01.ts`,
             "utf-8"
           );
-          expect(content).toBe("// solution");
-        })
-    );
-
-    it.effect(
-      "should create new branch at problem state (parent commit)",
-      () =>
-        Effect.gen(function* () {
-          const repo = createTestRepo()
-            .withRemote("upstream")
-            .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
-                "src/01.ts": "// problem",
-              }),
-              commit("01.01.02 Arrays solution", {
-                "src/01.ts": "// solution",
-              }),
-            ])
-            .withWorkingBranch("my-branch", {
-              from: "live-run-through",
-              atCommit: 0,
-            })
-            .build();
-
-          cleanup = repo.cleanup;
-          configureGitUser(repo.workingDir);
-
-          const mockPromptService = fromPartial<PromptService>({
-            selectLessonCommit: Effect.fn("selectLessonCommit")(
-              function* () {
-                return "01.01.02";
-              }
-            ),
-            selectProblemOrSolution: Effect.fn(
-              "selectProblemOrSolution"
-            )(function* () {
-              return "problem" as const;
-            }),
-            selectResetAction: Effect.fn("selectResetAction")(
-              function* () {
-                return "create-branch" as const;
-              }
-            ),
-            inputBranchName: Effect.fn("inputBranchName")(
-              function* () {
-                return "matt/problem-work";
-              }
-            ),
-          });
-
-          yield* runReset({
-            branch: "live-run-through",
-            lessonId: Option.none(),
-            problem: false,
-            solution: false,
-            demo: false,
-            upstream: getBareRepoPath(repo.workingDir),
-          }).pipe(
-            Effect.provide(
-              makeLayer(repo.workingDir, mockPromptService)
-            )
-          );
-
-          const currentBranch = git(
-            repo.workingDir,
-            "branch",
-            "--show-current"
-          );
-          expect(currentBranch).toBe("matt/problem-work");
-
-          const content = fs.readFileSync(
-            `${repo.workingDir}/src/01.ts`,
-            "utf-8"
-          );
-          expect(content).toBe("// problem");
+          expect(content).toBe("// arrays solution");
         })
     );
   });
@@ -725,11 +371,6 @@ describe("reset (e2e)", () => {
                 return "01.01.02";
               }
             ),
-            selectProblemOrSolution: Effect.fn(
-              "selectProblemOrSolution"
-            )(function* () {
-              return "solution" as const;
-            }),
             inputBranchName: Effect.fn("inputBranchName")(
               function* () {
                 return "matt/lesson-work";
@@ -740,8 +381,6 @@ describe("reset (e2e)", () => {
           yield* runReset({
             branch: "live-run-through",
             lessonId: Option.none(),
-            problem: false,
-            solution: false,
             demo: false,
             upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
@@ -758,82 +397,12 @@ describe("reset (e2e)", () => {
           );
           expect(currentAfter).toBe("matt/lesson-work");
 
-          // File should match solution
+          // File should match selected commit
           const content = fs.readFileSync(
             `${repo.workingDir}/src/01.ts`,
             "utf-8"
           );
           expect(content).toBe("// solution");
-        })
-    );
-
-    it.effect(
-      "should create branch at parent commit when on main and problem state selected",
-      () =>
-        Effect.gen(function* () {
-          const repo = createTestRepo()
-            .withRemote("upstream")
-            .withBranch("main", [
-              commit("00.00.01 Base setup", {
-                "src/base.ts": "// base",
-              }),
-            ])
-            .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
-                "src/01.ts": "// problem",
-              }),
-              commit("01.01.02 Arrays solution", {
-                "src/01.ts": "// solution",
-              }),
-            ])
-            .build();
-
-          cleanup = repo.cleanup;
-          configureGitUser(repo.workingDir);
-
-          const mockPromptService = fromPartial<PromptService>({
-            selectLessonCommit: Effect.fn("selectLessonCommit")(
-              function* () {
-                return "01.01.02";
-              }
-            ),
-            selectProblemOrSolution: Effect.fn(
-              "selectProblemOrSolution"
-            )(function* () {
-              return "problem" as const;
-            }),
-            inputBranchName: Effect.fn("inputBranchName")(
-              function* () {
-                return "matt/problem-work";
-              }
-            ),
-          });
-
-          yield* runReset({
-            branch: "live-run-through",
-            lessonId: Option.none(),
-            problem: false,
-            solution: false,
-            demo: false,
-            upstream: getBareRepoPath(repo.workingDir),
-          }).pipe(
-            Effect.provide(
-              makeLayer(repo.workingDir, mockPromptService)
-            )
-          );
-
-          const currentBranch = git(
-            repo.workingDir,
-            "branch",
-            "--show-current"
-          );
-          expect(currentBranch).toBe("matt/problem-work");
-
-          const content = fs.readFileSync(
-            `${repo.workingDir}/src/01.ts`,
-            "utf-8"
-          );
-          expect(content).toBe("// problem");
         })
     );
   });
@@ -874,11 +443,6 @@ describe("reset (e2e)", () => {
                 return "01.01.02";
               }
             ),
-            selectProblemOrSolution: Effect.fn(
-              "selectProblemOrSolution"
-            )(function* () {
-              return "solution" as const;
-            }),
             selectResetAction: Effect.fn("selectResetAction")(
               function* () {
                 return "reset-current" as const;
@@ -894,8 +458,6 @@ describe("reset (e2e)", () => {
           yield* runReset({
             branch: "live-run-through",
             lessonId: Option.none(),
-            problem: false,
-            solution: false,
             demo: false,
             upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
@@ -948,11 +510,6 @@ describe("reset (e2e)", () => {
                 return "01.01.02";
               }
             ),
-            selectProblemOrSolution: Effect.fn(
-              "selectProblemOrSolution"
-            )(function* () {
-              return "solution" as const;
-            }),
             selectResetAction: Effect.fn("selectResetAction")(
               function* () {
                 return "reset-current" as const;
@@ -970,8 +527,6 @@ describe("reset (e2e)", () => {
           const result = yield* runReset({
             branch: "live-run-through",
             lessonId: Option.none(),
-            problem: false,
-            solution: false,
             demo: false,
             upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
@@ -1028,8 +583,6 @@ describe("reset (e2e)", () => {
           yield* runReset({
             branch: "live-run-through",
             lessonId: Option.none(),
-            problem: false,
-            solution: false,
             demo: true,
             upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
@@ -1097,8 +650,6 @@ describe("reset (e2e)", () => {
           const result = yield* runReset({
             branch: "live-run-through",
             lessonId: Option.none(),
-            problem: false,
-            solution: false,
             demo: false,
             upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
@@ -1135,11 +686,6 @@ describe("reset (e2e)", () => {
           configureGitUser(repo.workingDir);
 
           const mockPromptService = fromPartial<PromptService>({
-            selectProblemOrSolution: Effect.fn(
-              "selectProblemOrSolution"
-            )(function* () {
-              return "solution" as const;
-            }),
             selectResetAction: Effect.fn("selectResetAction")(
               function* () {
                 return "reset-current" as const;
@@ -1150,8 +696,6 @@ describe("reset (e2e)", () => {
           yield* runReset({
             branch: "live-run-through",
             lessonId: Option.some("1.1.1"),
-            problem: false,
-            solution: false,
             demo: false,
             upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
@@ -1189,11 +733,6 @@ describe("reset (e2e)", () => {
           configureGitUser(repo.workingDir);
 
           const mockPromptService = fromPartial<PromptService>({
-            selectProblemOrSolution: Effect.fn(
-              "selectProblemOrSolution"
-            )(function* () {
-              return "solution" as const;
-            }),
             selectResetAction: Effect.fn("selectResetAction")(
               function* () {
                 return "reset-current" as const;
@@ -1204,8 +743,6 @@ describe("reset (e2e)", () => {
           yield* runReset({
             branch: "live-run-through",
             lessonId: Option.some("1-2-3"),
-            problem: false,
-            solution: false,
             demo: false,
             upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
@@ -1252,11 +789,6 @@ describe("reset (e2e)", () => {
                 return "01.01.01";
               }
             ),
-            selectProblemOrSolution: Effect.fn(
-              "selectProblemOrSolution"
-            )(function* () {
-              return "solution" as const;
-            }),
             selectResetAction: Effect.fn("selectResetAction")(
               function* () {
                 return "reset-current" as const;
@@ -1267,8 +799,6 @@ describe("reset (e2e)", () => {
           const result = yield* runReset({
             branch: "live-run-through",
             lessonId: Option.none(),
-            problem: false,
-            solution: false,
             demo: false,
             upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
@@ -1319,11 +849,6 @@ describe("reset (e2e)", () => {
                 return "01.01.01";
               }
             ),
-            selectProblemOrSolution: Effect.fn(
-              "selectProblemOrSolution"
-            )(function* () {
-              return "solution" as const;
-            }),
             inputBranchName: Effect.fn("inputBranchName")(
               function* () {
                 return "existing-branch";
@@ -1334,8 +859,6 @@ describe("reset (e2e)", () => {
           const result = yield* runReset({
             branch: "live-run-through",
             lessonId: Option.none(),
-            problem: false,
-            solution: false,
             demo: false,
             upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
@@ -1348,109 +871,6 @@ describe("reset (e2e)", () => {
           expect(result._tag).toBe(
             "FailedToCreateBranchError"
           );
-        })
-    );
-  });
-
-  describe("root commit with no parent", () => {
-    it.effect(
-      "should fail when requesting problem state for root commit",
-      () =>
-        Effect.gen(function* () {
-          // Create repo where lesson commit IS the root commit
-          // We need the first lesson commit to have no parent
-          // The builder always creates an initial .gitkeep commit,
-          // so we use the first lesson commit directly via --problem
-          // which calls getParentCommit on it.
-          // Actually, the lesson commit is NOT the root commit (there's .gitkeep before it).
-          // Instead, we need to test that getParentCommit of the .gitkeep commit fails.
-          // But the lesson commit always has .gitkeep as parent.
-          // So we test the .gitkeep commit as the "lesson" by using the initial commit
-          // as a "lesson-like" commit. Actually, the simplest way is to create a repo
-          // with a single branch and use a lesson at index 0. The parent of lesson commit 0
-          // is the initial .gitkeep commit, which does have a parent (it IS the root).
-          // getParentCommit of the .gitkeep initial commit would fail.
-          // However, the lesson at index 0 has .gitkeep as its parent - which is fine.
-          //
-          // The real scenario: user asks for --problem on the very first lesson commit.
-          // The parent is the initial .gitkeep commit, which is valid.
-          // To get NoParentCommitError, we need a commit whose parent doesn't exist.
-          // That means we need the root commit to be a lesson commit.
-          //
-          // Let's create a bare repo, then a working repo without the builder
-          // to have full control.
-          const tmpDir = fs.mkdtempSync("/tmp/root-commit-");
-          cleanup = () =>
-            fs.rmSync(tmpDir, {
-              recursive: true,
-              force: true,
-            });
-
-          const bareDir = `${tmpDir}/bare.git`;
-          const workDir = `${tmpDir}/work`;
-          fs.mkdirSync(bareDir);
-          fs.mkdirSync(workDir);
-
-          git(bareDir, "init", "--bare");
-          git(workDir, "init");
-          git(workDir, "remote", "add", "upstream", bareDir);
-          configureGitUser(workDir);
-
-          // Create a single root commit that is a lesson commit
-          fs.mkdirSync(`${workDir}/src`, { recursive: true });
-          fs.writeFileSync(
-            `${workDir}/src/01.ts`,
-            "// root lesson"
-          );
-          git(workDir, "add", ".");
-          git(
-            workDir,
-            "commit",
-            "-m",
-            "01.01.01 Root lesson"
-          );
-          git(workDir, "branch", "-M", "live-run-through");
-          git(
-            workDir,
-            "push",
-            "upstream",
-            "live-run-through"
-          );
-
-          // Create working branch
-          git(
-            workDir,
-            "checkout",
-            "-b",
-            "my-branch"
-          );
-
-          const mockPromptService = fromPartial<PromptService>({
-            selectResetAction: Effect.fn("selectResetAction")(
-              function* () {
-                return "reset-current" as const;
-              }
-            ),
-          });
-
-          const result = yield* runReset({
-            branch: "live-run-through",
-            lessonId: Option.some("01.01.01"),
-            problem: true,
-            solution: false,
-            demo: false,
-            upstream: bareDir,
-          }).pipe(
-            Effect.provide(
-              makeLayer(workDir, mockPromptService)
-            ),
-            Effect.flip
-          );
-
-          // Real e2e: getParentCommit on root commit fails
-          expect(
-            ["NoParentCommitError", "FailedToResetError"]
-          ).toContain(result._tag);
         })
     );
   });
@@ -1487,11 +907,6 @@ describe("reset (e2e)", () => {
                 return "02.01.01";
               }
             ),
-            selectProblemOrSolution: Effect.fn(
-              "selectProblemOrSolution"
-            )(function* () {
-              return "solution" as const;
-            }),
             selectResetAction: Effect.fn("selectResetAction")(
               function* () {
                 return "reset-current" as const;
@@ -1502,8 +917,6 @@ describe("reset (e2e)", () => {
           yield* runReset({
             branch: "custom-lessons",
             lessonId: Option.none(),
-            problem: false,
-            solution: false,
             demo: false,
             upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
@@ -1558,11 +971,6 @@ describe("reset (e2e)", () => {
           configureGitUser(repo.workingDir);
 
           const mockPromptService = fromPartial<PromptService>({
-            selectProblemOrSolution: Effect.fn(
-              "selectProblemOrSolution"
-            )(function* () {
-              return "solution" as const;
-            }),
             selectResetAction: Effect.fn("selectResetAction")(
               function* () {
                 return "reset-current" as const;
@@ -1573,8 +981,6 @@ describe("reset (e2e)", () => {
           yield* runReset({
             branch: "custom-lessons",
             lessonId: Option.some("03.01.02"),
-            problem: false,
-            solution: false,
             demo: false,
             upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
@@ -1618,8 +1024,6 @@ describe("reset (e2e)", () => {
           const result = yield* runReset({
             branch: "live-run-through",
             lessonId: Option.some("invalid-id"),
-            problem: false,
-            solution: false,
             demo: false,
             upstream: getBareRepoPath(repo.workingDir),
           }).pipe(

@@ -5,10 +5,7 @@ import {
 } from "@effect/cli";
 import type { Option } from "effect";
 import { Console, Data, Effect } from "effect";
-import {
-  getParentCommit,
-  selectLessonCommit,
-} from "./commit-utils.js";
+import { selectLessonCommit } from "./commit-utils.js";
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "./constants.js";
 import { GitService, GitServiceConfig } from "./git-service.js";
 import { cwdOption } from "./options.js";
@@ -16,12 +13,6 @@ import { PromptService } from "./prompt-service.js";
 
 export class InvalidBranchOperationError extends Data.TaggedError(
   "InvalidBranchOperationError"
-)<{
-  message: string;
-}> {}
-
-export class InvalidOptionsError extends Data.TaggedError(
-  "InvalidOptionsError"
 )<{
   message: string;
 }> {}
@@ -34,14 +25,10 @@ export const runReset = ({
   branch,
   demo,
   lessonId,
-  problem,
-  solution,
   upstream,
 }: {
   branch: string;
   lessonId: Option.Option<string>;
-  problem: boolean;
-  solution: boolean;
   demo: boolean;
   upstream: string;
 }) =>
@@ -68,43 +55,7 @@ export const runReset = ({
         excludeCurrentBranch: false,
       });
 
-    // Determine which commit to use based on problem/solution state
-    let commitToUse = targetCommit.sha;
-    let stateDescription = "final code";
-
-    // Check for conflicting flags
-    if (problem && solution) {
-      return yield* new InvalidOptionsError({
-        message:
-          "Cannot use both --problem and --solution flags",
-      });
-    }
-
-    if (demo && (problem || solution)) {
-      return yield* new InvalidOptionsError({
-        message:
-          "Cannot use --demo with --problem or --solution flags",
-      });
-    }
-
-    // If neither flag is provided, prompt user (unless demo mode)
-    if (!problem && !solution && !demo) {
-      const state =
-        yield* promptService.selectProblemOrSolution();
-
-      if (state === "problem") {
-        commitToUse = yield* getParentCommit({
-          commitSha: targetCommit.sha,
-        });
-        stateDescription = "problem state";
-      }
-    } else if (problem) {
-      commitToUse = yield* getParentCommit({
-        commitSha: targetCommit.sha,
-      });
-      stateDescription = "problem state";
-    }
-    // If solution flag is set, commitToUse stays as targetCommit.sha
+    const commitToUse = targetCommit.sha;
 
     const currentBranch = yield* git.getCurrentBranch();
 
@@ -138,7 +89,7 @@ export const runReset = ({
       );
 
       yield* Console.log(
-        `Creating branch ${branchName} from ${commitToUse} (${stateDescription})...`
+        `Creating branch ${branchName} from ${selectedLessonId}...`
       );
 
       yield* git.checkoutNewBranchAt(branchName, commitToUse);
@@ -166,20 +117,20 @@ export const runReset = ({
 
     // Reset to target commit
     yield* Console.log(
-      `Resetting to ${commitToUse} (${stateDescription})...`
+      `Resetting to ${selectedLessonId}...`
     );
 
     if (demo) {
       yield* git.applyAsUnstagedChanges(commitToUse);
 
       yield* Console.log(
-        `✓ Demo mode: Reset to lesson ${selectedLessonId} with unstaged changes`
+        `✓ Demo mode: Reset to ${selectedLessonId} with unstaged changes`
       );
     } else {
       yield* git.resetHard(commitToUse);
 
       yield* Console.log(
-        `✓ Reset to lesson ${selectedLessonId} (${stateDescription})`
+        `✓ Reset to ${selectedLessonId}`
       );
     }
   });
@@ -196,18 +147,6 @@ export const reset = CLICommand.make(
       ),
       Options.withDefault(DEFAULT_PROJECT_TARGET_BRANCH)
     ),
-    problem: Options.boolean("problem").pipe(
-      Options.withAlias("p"),
-      Options.withDescription(
-        "Reset to problem state (start the exercise)"
-      )
-    ),
-    solution: Options.boolean("solution").pipe(
-      Options.withAlias("s"),
-      Options.withDescription(
-        "Reset to solution state (final code)"
-      )
-    ),
     demo: Options.boolean("demo").pipe(Options.withAlias("d")),
     upstream: Options.text("upstream").pipe(
       Options.withDescription(
@@ -217,8 +156,8 @@ export const reset = CLICommand.make(
     cwd: cwdOption,
   },
   /* v8 ignore start - CLI error handlers are presentation logic */
-  ({ branch, cwd, demo, lessonId, problem, solution, upstream }) =>
-    runReset({ branch, lessonId, problem, solution, demo, upstream }).pipe(
+  ({ branch, cwd, demo, lessonId, upstream }) =>
+    runReset({ branch, lessonId, demo, upstream }).pipe(
       Effect.provideService(
         GitServiceConfig,
         GitServiceConfig.of({
@@ -226,14 +165,6 @@ export const reset = CLICommand.make(
         })
       ),
       Effect.catchTags({
-        NoParentCommitError: (error) => {
-          return Effect.gen(function* () {
-            yield* Console.error(
-              `Error: Commit ${error.commitSha} has no parent commit. Repository may be in an invalid state.`
-            );
-            process.exitCode = 1;
-          });
-        },
         NotAGitRepoError: (error) => {
           return Effect.gen(function* () {
             yield* Console.error(`Error: ${error.message}`);

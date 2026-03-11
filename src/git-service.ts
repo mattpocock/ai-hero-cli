@@ -12,7 +12,6 @@ export {
   FailedToTrackBranchError,
   InvalidRefError,
   MergeConflictError,
-  NoParentCommitError,
   NotAGitRepoError,
   RebaseConflictError,
 } from "./git-service/errors.js";

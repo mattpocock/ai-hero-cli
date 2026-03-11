@@ -33,7 +33,7 @@ const createMockPromptService = () => {
     confirmSaveToTargetBranch: notImplemented,
     confirmForcePush: notImplemented,
     selectCherryPickConflictAction: notImplemented,
-    selectProblemOrSolution: notImplemented,
+
     selectResetAction: notImplemented,
     confirmResetWithUncommittedChanges: notImplemented,
     inputBranchName: notImplemented,
@@ -223,9 +223,7 @@ describe("exercise", () => {
             selectCherryPickConflictAction: () => {
               throw new Error("Should not be called");
             },
-            selectProblemOrSolution: () => {
-              throw new Error("Should not be called");
-            },
+
             selectResetAction: () => {
               throw new Error("Should not be called");
             },
@@ -346,9 +344,7 @@ describe("exercise", () => {
             selectCherryPickConflictAction: () => {
               throw new Error("Should not be called");
             },
-            selectProblemOrSolution: () => {
-              throw new Error("Should not be called");
-            },
+
             selectResetAction: () => {
               throw new Error("Should not be called");
             },
@@ -460,9 +456,7 @@ describe("exercise", () => {
             selectCherryPickConflictAction: () => {
               throw new Error("Should not be called");
             },
-            selectProblemOrSolution: () => {
-              throw new Error("Should not be called");
-            },
+
             selectResetAction: () => {
               throw new Error("Should not be called");
             },
@@ -583,9 +577,7 @@ describe("exercise", () => {
             selectCherryPickConflictAction: () => {
               throw new Error("Should not be called");
             },
-            selectProblemOrSolution: () => {
-              throw new Error("Should not be called");
-            },
+
             selectResetAction: () => {
               throw new Error("Should not be called");
             },
@@ -712,9 +704,7 @@ describe("exercise", () => {
             selectCherryPickConflictAction: () => {
               throw new Error("Should not be called");
             },
-            selectProblemOrSolution: () => {
-              throw new Error("Should not be called");
-            },
+
             selectResetAction: () => {
               throw new Error("Should not be called");
             },
@@ -822,9 +812,7 @@ describe("exercise", () => {
             selectCherryPickConflictAction: () => {
               throw new Error("Should not be called");
             },
-            selectProblemOrSolution: () => {
-              throw new Error("Should not be called");
-            },
+
             selectResetAction: () => {
               throw new Error("Should not be called");
             },
@@ -944,9 +932,7 @@ describe("exercise", () => {
             selectCherryPickConflictAction: () => {
               throw new Error("Should not be called");
             },
-            selectProblemOrSolution: () => {
-              throw new Error("Should not be called");
-            },
+
             selectResetAction: () => {
               throw new Error("Should not be called");
             },

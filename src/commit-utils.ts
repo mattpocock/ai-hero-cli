@@ -1,8 +1,6 @@
 import { Console, Data, Effect, Option } from "effect";
-import { GitService, NoParentCommitError } from "./git-service.js";
+import { GitService } from "./git-service.js";
 import { PromptService } from "./prompt-service.js";
-
-export { NoParentCommitError };
 
 /**
  * Normalizes a lesson ID to the standard format (e.g., "1.1.1" -> "01.01.01").
@@ -180,12 +178,3 @@ export const selectLessonCommit = ({
     };
   });
 
-/**
- * Get the parent commit of a given commit SHA.
- * Throws NoParentCommitError if the commit has no parent.
- */
-export const getParentCommit = ({ commitSha }: { commitSha: string }) =>
-  Effect.gen(function* () {
-    const gitService = yield* GitService;
-    return yield* gitService.getParentCommit(commitSha);
-  });

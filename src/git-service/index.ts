@@ -19,7 +19,6 @@ export {
   FailedToTrackBranchError,
   InvalidRefError,
   MergeConflictError,
-  NoParentCommitError,
   NotAGitRepoError,
   RebaseConflictError,
 } from "./errors.js";

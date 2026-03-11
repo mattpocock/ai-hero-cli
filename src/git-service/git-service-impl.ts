@@ -16,7 +16,6 @@ import {
   FailedToTrackBranchError,
   InvalidRefError,
   MergeConflictError,
-  NoParentCommitError,
   NotAGitRepoError,
   RebaseConflictError,
 } from "./errors.js";
@@ -327,24 +326,6 @@ export const makeGitService = Effect.gen(function* () {
             branch,
             "--oneline"
           );
-        }),
-
-        getParentCommit: Effect.fn("getParentCommit")(function* (
-          sha: string
-        ) {
-          const parentSha = yield* runCommandWithString(
-            "git",
-            "rev-parse",
-            `${sha}^`
-          ).pipe(
-            Effect.catchAll(() =>
-              Effect.fail(
-                new NoParentCommitError({ commitSha: sha })
-              )
-            )
-          );
-
-          return parentSha;
         }),
 
         checkoutNewBranchAt: Effect.fn("checkoutNewBranchAt")(
