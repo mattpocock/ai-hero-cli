@@ -32,7 +32,7 @@ Explore the repo.
 
 # IMPLEMENTATION
 
-Where possible, use a red-green refactor loop.
+Where possible, use a red-green refactor loop:
 
 ## RED: Write a single failing test
 

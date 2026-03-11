@@ -26,7 +26,8 @@
       "Bash(npx tsc:*)",
       "Bash(which tsgo:*)",
       "Bash(pnpm add:*)",
-      "Bash(npx tsgo:*)"
+      "Bash(npx tsgo:*)",
+      "Bash(gh issue create *)"
     ],
     "deny": [],
     "ask": []
