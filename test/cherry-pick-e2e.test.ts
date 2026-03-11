@@ -4,6 +4,7 @@ import { fromPartial } from "@total-typescript/shoehorn";
 import { Effect, Layer, Option } from "effect";
 import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
+import * as path from "node:path";
 import {
   InvalidBranchOperationError,
   runCherryPick,
@@ -37,6 +38,9 @@ const git = (cwd: string, ...args: Array<string>) =>
   })
     .toString()
     .trim();
+
+const getBareRepoPath = (workingDir: string) =>
+  path.resolve(workingDir, "..", "bare.git");
 
 /** Configure git user in the repo so @effect/platform Command can create commits */
 const configureGitUser = (cwd: string) => {
@@ -109,6 +113,7 @@ describe("cherry-pick (e2e)", () => {
           yield* runCherryPick({
             branch: "live-run-through",
             lessonId: Option.none(),
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -162,6 +167,7 @@ describe("cherry-pick (e2e)", () => {
           yield* runCherryPick({
             branch: "live-run-through",
             lessonId: Option.some("01.02.01"),
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -343,6 +349,7 @@ describe("cherry-pick (e2e)", () => {
           const result = yield* runCherryPick({
             branch: "live-run-through",
             lessonId: Option.some("99.99.99"),
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -404,6 +411,7 @@ describe("cherry-pick (e2e)", () => {
           yield* runCherryPick({
             branch: "live-run-through",
             lessonId: Option.none(),
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -443,6 +451,7 @@ describe("cherry-pick (e2e)", () => {
           const result = yield* runCherryPick({
             branch: "live-run-through",
             lessonId: Option.none(),
+            upstream: "https://example.com/repo.git",
           }).pipe(
             Effect.provide(
               makeLayer(tmpDir, mockPromptService)
@@ -493,6 +502,7 @@ describe("cherry-pick (e2e)", () => {
           const result = yield* runCherryPick({
             branch: "live-run-through",
             lessonId: Option.none(),
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -555,6 +565,7 @@ describe("cherry-pick (e2e)", () => {
           const result = yield* runCherryPick({
             branch: "live-run-through",
             lessonId: Option.none(),
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -605,6 +616,7 @@ describe("cherry-pick (e2e)", () => {
           const result = yield* runCherryPick({
             branch: "live-run-through",
             lessonId: Option.none(),
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -654,6 +666,7 @@ describe("cherry-pick (e2e)", () => {
           yield* runCherryPick({
             branch: "custom-lessons",
             lessonId: Option.none(),
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -711,6 +724,7 @@ describe("cherry-pick (e2e)", () => {
           yield* runCherryPick({
             branch: "custom-lessons",
             lessonId: Option.some("03.01.02"),
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -760,6 +774,7 @@ describe("cherry-pick (e2e)", () => {
           const result = yield* runCherryPick({
             branch: "live-run-through",
             lessonId: Option.none(),
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -820,6 +835,7 @@ describe("cherry-pick (e2e)", () => {
           const result = yield* runCherryPick({
             branch: "live-run-through",
             lessonId: Option.none(),
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)

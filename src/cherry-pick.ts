@@ -24,9 +24,11 @@ export class InvalidBranchOperationError extends Data.TaggedError(
 export const runCherryPick = ({
   branch,
   lessonId,
+  upstream,
 }: {
   branch: string;
   lessonId: Option.Option<string>;
+  upstream: string;
 }) =>
   Effect.gen(function* () {
     const git = yield* GitService;
@@ -34,6 +36,9 @@ export const runCherryPick = ({
 
     // Validate git repository
     yield* git.ensureIsGitRepo();
+
+    // Set up upstream remote
+    yield* git.setUpstreamRemote(upstream);
 
     yield* git.ensureUpstreamBranchConnected({
       targetBranch: branch,
@@ -98,11 +103,16 @@ export const cherryPick = CLICommand.make(
       ),
       Options.withDefault(DEFAULT_PROJECT_TARGET_BRANCH)
     ),
+    upstream: Options.text("upstream").pipe(
+      Options.withDescription(
+        "Git URL or local path to the upstream exercise repo"
+      )
+    ),
     cwd: cwdOption,
   },
   /* v8 ignore start - CLI error handlers are presentation logic */
-  ({ branch, cwd, lessonId }) =>
-    runCherryPick({ branch, lessonId }).pipe(
+  ({ branch, cwd, lessonId, upstream }) =>
+    runCherryPick({ branch, lessonId, upstream }).pipe(
       Effect.provideService(
         GitServiceConfig,
         GitServiceConfig.of({
