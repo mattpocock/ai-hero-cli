@@ -8,5 +8,5 @@ import { layerLive } from "./layer.js";
 run(process.argv).pipe(
   Effect.provide(layerLive),
   Effect.scoped,
-  NodeRuntime.runMain({}) as any
+  NodeRuntime.runMain({}),
 );

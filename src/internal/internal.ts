@@ -17,15 +17,15 @@ const upgradePackages = CLICommand.make(
   {
     cwd: Options.text("cwd").pipe(
       Options.withDescription(
-        "The directory to run the upgrade command in"
+        "The directory to run the upgrade command in",
       ),
-      Options.withDefault(process.cwd())
+      Options.withDefault(process.cwd()),
     ),
     verbose: Options.boolean("verbose").pipe(
       Options.withDescription(
-        "Whether or not to pipe the output of the upgrade command to the terminal"
+        "Whether or not to pipe the output of the upgrade command to the terminal",
       ),
-      Options.withDefault(false)
+      Options.withDefault(false),
     ),
   },
   ({ cwd, verbose }) =>
@@ -40,7 +40,7 @@ const upgradePackages = CLICommand.make(
         "@modelcontextprotocol/sdk@latest",
         "ai-hero-cli@latest",
         "evalite@beta",
-        "vitest@latest"
+        "vitest@latest",
       ).pipe(
         verbose
           ? Command.stdout("inherit")
@@ -48,7 +48,7 @@ const upgradePackages = CLICommand.make(
         verbose
           ? Command.stderr("inherit")
           : Command.stderr("pipe"),
-        Command.workingDirectory(cwd)
+        Command.workingDirectory(cwd),
       );
 
       const exitCode = yield* Command.exitCode(updateCommand);
@@ -57,15 +57,15 @@ const upgradePackages = CLICommand.make(
         yield* Console.log("Successfully upgraded");
       } else {
         yield* Console.error(
-          "Failed to upgrade. Please try again."
+          "Failed to upgrade. Please try again.",
         );
       }
-    })
+    }),
 ).pipe(
-  CLICommand.withDescription("Upgrade AI SDK and MCP packages")
+  CLICommand.withDescription("Upgrade AI SDK and MCP packages"),
 );
 
-export const internal: any = CLICommand.make("internal").pipe(
+export const internal = CLICommand.make("internal").pipe(
   CLICommand.withSubcommands([
     upgradePackages,
     updateCVM,
@@ -79,5 +79,5 @@ export const internal: any = CLICommand.make("internal").pipe(
     walkThrough,
     init,
   ]),
-  CLICommand.withDescription("Internal commands for AI Hero")
+  CLICommand.withDescription("Internal commands for AI Hero"),
 );

@@ -5,6 +5,9 @@
     "types": ["node"],
     "tsBuildInfoFile": ".tsbuildinfo/src.tsbuildinfo",
     "rootDir": "src",
-    "noEmit": true
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false
   }
 }
