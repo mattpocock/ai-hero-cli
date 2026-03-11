@@ -1,9 +1,7 @@
 export {
   GitService,
   GitServiceConfig,
-  UpstreamPatternsConfig,
   defaultGitServiceConfigLayer,
-  defaultUpstreamPatternsConfigLayer,
   makeGitService,
 } from "./git-service-impl.js";
 
@@ -22,7 +20,6 @@ export {
   InvalidRefError,
   MergeConflictError,
   NoParentCommitError,
-  NoUpstreamFoundError,
   NotAGitRepoError,
   RebaseConflictError,
 } from "./errors.js";

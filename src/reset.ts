@@ -230,12 +230,6 @@ export const reset = CLICommand.make(
             process.exitCode = 1;
           });
         },
-        NoUpstreamFoundError: (error) => {
-          return Effect.gen(function* () {
-            yield* Console.error(`Error: ${error.message}`);
-            process.exitCode = 1;
-          });
-        },
         CommitNotFoundError: (error) => {
           return Effect.gen(function* () {
             yield* Console.error(

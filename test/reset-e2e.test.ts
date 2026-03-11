@@ -16,7 +16,6 @@ import {
 import {
   GitService,
   GitServiceConfig,
-  UpstreamPatternsConfig,
   makeGitService,
 } from "../src/git-service.js";
 import {
@@ -62,10 +61,7 @@ describe("reset (e2e)", () => {
   ) => {
     const deps = Layer.mergeAll(
       NodeFileSystem.layer,
-      Layer.succeed(GitServiceConfig, { cwd: workingDir }),
-      Layer.succeed(UpstreamPatternsConfig, {
-        patterns: ["bare.git"],
-      })
+      Layer.succeed(GitServiceConfig, { cwd: workingDir })
     );
 
     return Layer.mergeAll(
@@ -103,61 +99,6 @@ describe("reset (e2e)", () => {
           );
 
           expect(result._tag).toBe("NotAGitRepoError");
-        })
-    );
-  });
-
-  describe("no upstream", () => {
-    it.effect(
-      "should fail with NoUpstreamFoundError when no remote matches patterns",
-      () =>
-        Effect.gen(function* () {
-          const repo = createTestRepo()
-            .withRemote("upstream")
-            .withBranch("live-run-through", [
-              commit("01.01.01 Lesson", {
-                "src/01.ts": "// content",
-              }),
-            ])
-            .withWorkingBranch("my-branch", {
-              from: "live-run-through",
-              atCommit: 0,
-            })
-            .build();
-
-          cleanup = repo.cleanup;
-
-          const mockPromptService =
-            fromPartial<PromptService>({});
-
-          // Use patterns that don't match
-          const deps = Layer.mergeAll(
-            NodeFileSystem.layer,
-            Layer.succeed(GitServiceConfig, {
-              cwd: repo.workingDir,
-            }),
-            Layer.succeed(UpstreamPatternsConfig, {
-              patterns: ["github.com/nonexistent"],
-            })
-          );
-
-          const layer = Layer.mergeAll(
-            Layer.effect(GitService, makeGitService).pipe(
-              Layer.provide(deps)
-            ),
-            Layer.succeed(PromptService, mockPromptService),
-            NodeContext.layer
-          );
-
-          const result = yield* runReset({
-            branch: "live-run-through",
-            lessonId: Option.none(),
-            problem: false,
-            solution: false,
-            demo: false,
-          }).pipe(Effect.provide(layer), Effect.flip);
-
-          expect(result._tag).toBe("NoUpstreamFoundError");
         })
     );
   });

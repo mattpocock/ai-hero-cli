@@ -1,4 +1,4 @@
-import { Command as CLICommand } from "@effect/cli";
+import { Command as CLICommand, Options } from "@effect/cli";
 import { Console, Data, Effect } from "effect";
 import { GitService, GitServiceConfig } from "./git-service.js";
 import { cwdOption } from "./options.js";
@@ -18,7 +18,7 @@ export class UncommittedChangesError extends Data.TaggedError(
 /**
  * Core pull logic, extracted for testability.
  */
-export const runPull = () =>
+export const runPull = (opts: { upstream: string }) =>
   Effect.gen(function* () {
     const git = yield* GitService;
 
@@ -44,21 +44,21 @@ export const runPull = () =>
       });
     }
 
-    // Detect upstream remote
-    const { remoteName } = yield* git.detectUpstreamRemote();
+    // Set up upstream remote
+    yield* git.setUpstreamRemote(opts.upstream);
 
     // Fetch main from upstream
-    yield* Console.log(`Fetching main from ${remoteName}...`);
-    yield* git.fetch(remoteName, "main");
+    yield* Console.log("Fetching main from upstream...");
+    yield* git.fetch("upstream", "main");
 
     // Merge upstream/main into current branch
     yield* Console.log(
-      `Merging ${remoteName}/main into ${currentBranch}...`
+      `Merging upstream/main into ${currentBranch}...`
     );
-    yield* git.merge(`${remoteName}/main`);
+    yield* git.merge("upstream/main");
 
     yield* Console.log(
-      `\n✓ Successfully merged ${remoteName}/main into ${currentBranch}`
+      `\n✓ Successfully merged upstream/main into ${currentBranch}`
     );
   });
 
@@ -66,10 +66,15 @@ export const pull = CLICommand.make(
   "pull",
   {
     cwd: cwdOption,
+    upstream: Options.text("upstream").pipe(
+      Options.withDescription(
+        "Git URL or local path to the upstream exercise repo"
+      )
+    ),
   },
   /* v8 ignore start - CLI error handlers are presentation logic */
-  ({ cwd }) =>
-    runPull().pipe(
+  ({ cwd, upstream }) =>
+    runPull({ upstream }).pipe(
       Effect.provideService(
         GitServiceConfig,
         GitServiceConfig.of({
@@ -88,12 +93,6 @@ export const pull = CLICommand.make(
           });
         },
         NotAGitRepoError: (error) => {
-          return Effect.gen(function* () {
-            yield* Console.error(`Error: ${error.message}`);
-            process.exitCode = 1;
-          });
-        },
-        NoUpstreamFoundError: (error) => {
           return Effect.gen(function* () {
             yield* Console.error(`Error: ${error.message}`);
             process.exitCode = 1;

@@ -21,12 +21,6 @@ export class FailedToCreateBranchError extends Data.TaggedError(
   message: string;
 }> {}
 
-export class NoUpstreamFoundError extends Data.TaggedError(
-  "NoUpstreamFoundError"
-)<{
-  message: string;
-}> {}
-
 export class FailedToDeleteBranchError extends Data.TaggedError(
   "FailedToDeleteBranchError"
 )<{

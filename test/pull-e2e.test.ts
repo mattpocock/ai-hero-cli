@@ -4,10 +4,10 @@ import { afterEach, describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
+import * as path from "node:path";
 import {
   GitService,
   GitServiceConfig,
-  UpstreamPatternsConfig,
   makeGitService,
 } from "../src/git-service.js";
 import { runPull } from "../src/pull.js";
@@ -46,10 +46,7 @@ describe("pull (e2e)", () => {
   const makeLayer = (workingDir: string) => {
     const deps = Layer.mergeAll(
       NodeFileSystem.layer,
-      Layer.succeed(GitServiceConfig, { cwd: workingDir }),
-      Layer.succeed(UpstreamPatternsConfig, {
-        patterns: ["bare.git"],
-      })
+      Layer.succeed(GitServiceConfig, { cwd: workingDir })
     );
 
     return Layer.mergeAll(
@@ -60,13 +57,17 @@ describe("pull (e2e)", () => {
     );
   };
 
+  /** Get the bare repo path from a working directory */
+  const getBareRepoPath = (workingDir: string) =>
+    path.resolve(workingDir, "..", "bare.git");
+
   /** Push a new commit to the bare remote's main branch */
   const pushToUpstream = (
     workingDir: string,
     files: Record<string, string>,
     message: string
   ) => {
-    const bareDir = `${workingDir}/../bare.git`;
+    const bareDir = getBareRepoPath(workingDir);
     const tempCloneDir = `${workingDir}/../temp-push`;
     fs.mkdirSync(tempCloneDir);
     git(tempCloneDir, "clone", bareDir, ".");
@@ -111,9 +112,9 @@ describe("pull (e2e)", () => {
             "01.01 - Arrays (solution)"
           );
 
-          yield* runPull().pipe(
-            Effect.provide(makeLayer(repo.workingDir))
-          );
+          yield* runPull({
+            upstream: getBareRepoPath(repo.workingDir),
+          }).pipe(Effect.provide(makeLayer(repo.workingDir)));
 
           // File should have the updated content
           const content = fs.readFileSync(
@@ -159,7 +160,9 @@ describe("pull (e2e)", () => {
             "// modified"
           );
 
-          const result = yield* runPull().pipe(
+          const result = yield* runPull({
+            upstream: getBareRepoPath(repo.workingDir),
+          }).pipe(
             Effect.provide(makeLayer(repo.workingDir)),
             Effect.flip
           );
@@ -185,7 +188,9 @@ describe("pull (e2e)", () => {
 
           cleanup = repo.cleanup;
 
-          const result = yield* runPull().pipe(
+          const result = yield* runPull({
+            upstream: getBareRepoPath(repo.workingDir),
+          }).pipe(
             Effect.provide(makeLayer(repo.workingDir)),
             Effect.flip
           );
@@ -235,7 +240,9 @@ describe("pull (e2e)", () => {
             "upstream conflicting change"
           );
 
-          const result = yield* runPull().pipe(
+          const result = yield* runPull({
+            upstream: getBareRepoPath(repo.workingDir),
+          }).pipe(
             Effect.provide(makeLayer(repo.workingDir)),
             Effect.flip
           );
@@ -245,9 +252,9 @@ describe("pull (e2e)", () => {
     );
   });
 
-  describe("upstream detection", () => {
+  describe("upstream remote setup", () => {
     it.effect(
-      "should detect upstream remote from real git remote -v output",
+      "should create upstream remote if it does not exist",
       () =>
         Effect.gen(function* () {
           const repo = createTestRepo()
@@ -265,14 +272,10 @@ describe("pull (e2e)", () => {
 
           cleanup = repo.cleanup;
 
-          // Add a second remote that doesn't match patterns
-          git(
-            repo.workingDir,
-            "remote",
-            "add",
-            "origin",
-            "/tmp/nonexistent-repo.git"
-          );
+          const bareRepoPath = getBareRepoPath(repo.workingDir);
+
+          // Remove the existing upstream remote so setUpstreamRemote has to create it
+          git(repo.workingDir, "remote", "remove", "upstream");
 
           // Push a new commit to upstream so the pull has something to merge
           pushToUpstream(
@@ -281,7 +284,7 @@ describe("pull (e2e)", () => {
             "new file"
           );
 
-          yield* runPull().pipe(
+          yield* runPull({ upstream: bareRepoPath }).pipe(
             Effect.provide(makeLayer(repo.workingDir))
           );
 
@@ -291,11 +294,20 @@ describe("pull (e2e)", () => {
               `${repo.workingDir}/new-file.ts`
             )
           ).toBe(true);
+
+          // Verify the remote was created with the correct URL
+          const remotes = git(
+            repo.workingDir,
+            "remote",
+            "-v"
+          );
+          expect(remotes).toContain("upstream");
+          expect(remotes).toContain(bareRepoPath);
         })
     );
 
     it.effect(
-      "should fail with NoUpstreamFoundError when no remote matches patterns",
+      "should update upstream remote URL if it already exists with a different URL",
       () =>
         Effect.gen(function* () {
           const repo = createTestRepo()
@@ -313,30 +325,42 @@ describe("pull (e2e)", () => {
 
           cleanup = repo.cleanup;
 
-          // Use patterns that don't match the bare.git path
-          const deps = Layer.mergeAll(
-            NodeFileSystem.layer,
-            Layer.succeed(GitServiceConfig, {
-              cwd: repo.workingDir,
-            }),
-            Layer.succeed(UpstreamPatternsConfig, {
-              patterns: ["github.com/nonexistent"],
-            })
+          const bareRepoPath = getBareRepoPath(repo.workingDir);
+
+          // Set a wrong URL first
+          git(
+            repo.workingDir,
+            "remote",
+            "set-url",
+            "upstream",
+            "/tmp/wrong-url.git"
           );
 
-          const layer = Layer.mergeAll(
-            Layer.effect(GitService, makeGitService).pipe(
-              Layer.provide(deps)
-            ),
-            NodeContext.layer
+          // Push a new commit so the pull has something to merge
+          pushToUpstream(
+            repo.workingDir,
+            { "new-file.ts": "// new" },
+            "new file"
           );
 
-          const result = yield* runPull().pipe(
-            Effect.provide(layer),
-            Effect.flip
+          yield* runPull({ upstream: bareRepoPath }).pipe(
+            Effect.provide(makeLayer(repo.workingDir))
           );
 
-          expect(result._tag).toBe("NoUpstreamFoundError");
+          // Verify pull succeeded (file was merged)
+          expect(
+            fs.existsSync(
+              `${repo.workingDir}/new-file.ts`
+            )
+          ).toBe(true);
+
+          // Verify remote URL was updated
+          const remotes = git(
+            repo.workingDir,
+            "remote",
+            "-v"
+          );
+          expect(remotes).toContain(bareRepoPath);
         })
     );
   });

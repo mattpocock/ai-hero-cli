@@ -17,24 +17,9 @@ import {
   InvalidRefError,
   MergeConflictError,
   NoParentCommitError,
-  NoUpstreamFoundError,
   NotAGitRepoError,
   RebaseConflictError,
 } from "./errors.js";
-
-export class UpstreamPatternsConfig extends Context.Tag(
-  "UpstreamPatternsConfig"
-)<
-  UpstreamPatternsConfig,
-  { readonly patterns: ReadonlyArray<string> }
->() {}
-
-export const defaultUpstreamPatternsConfigLayer = Layer.succeed(
-  UpstreamPatternsConfig,
-  UpstreamPatternsConfig.of({
-    patterns: ["mattpocock", "ai-hero-dev", "total-typescript"],
-  })
-);
 
 export class GitServiceConfig extends Context.Tag(
   "GitServiceConfig"
@@ -59,7 +44,6 @@ const mapExitCode = <E>(
 
 export const makeGitService = Effect.gen(function* () {
   const config = yield* GitServiceConfig;
-      const upstreamConfig = yield* UpstreamPatternsConfig;
       const fs = yield* FileSystem.FileSystem;
 
       const runCommandWithString = Effect.fn(
@@ -82,43 +66,6 @@ export const makeGitService = Effect.gen(function* () {
           Command.stderr("inherit")
         );
         return yield* Command.exitCode(command);
-      });
-
-      const detectUpstreamRemote = Effect.fn(
-        "detectUpstreamRemote"
-      )(function* () {
-        const remotes = yield* runCommandWithString(
-          "git",
-          "remote",
-          "-v"
-        );
-
-        for (const line of remotes.split("\n")) {
-          const match = line.match(/^(\S+)\s+(\S+)/);
-          if (match) {
-            const remoteName = match[1].trim();
-            const url = match[2].trim();
-            if (
-              upstreamConfig.patterns.some((pattern) =>
-                url.includes(pattern)
-              )
-            ) {
-              return { remoteName, url };
-            }
-          }
-        }
-
-        return yield* Effect.fail(
-          new NoUpstreamFoundError({
-            message: `No valid upstream remote found.
-Looking for repos from usernames: ${upstreamConfig.patterns.join(
-              ", "
-            )}
-
-Add upstream remote:
-  git remote add upstream https://github.com/<username>/<repo>.git`,
-          })
-        );
       });
 
       const resetHard = Effect.fn("resetHard")(function* (
@@ -528,12 +475,10 @@ Add upstream remote:
         )(function* (opts: { targetBranch: string }) {
           const { targetBranch } = opts;
 
-          const { remoteName } = yield* detectUpstreamRemote();
-
           const fetchExitCode = yield* runCommandWithExitCode(
             "git",
             "fetch",
-            remoteName,
+            "upstream",
             targetBranch
           );
 
@@ -560,7 +505,7 @@ Add upstream remote:
               "branch",
               "--track",
               targetBranch,
-              `${remoteName}/${targetBranch}`
+              `upstream/${targetBranch}`
             );
 
           if (trackBranchExitCode !== 0) {
@@ -583,7 +528,29 @@ Add upstream remote:
             return currentBranch;
           }
         ),
-        detectUpstreamRemote,
+        setUpstreamRemote: Effect.fn("setUpstreamRemote")(
+          function* (url: string) {
+            // Try set-url first (works if remote already exists)
+            const setUrlExitCode = yield* runCommandWithExitCode(
+              "git",
+              "remote",
+              "set-url",
+              "upstream",
+              url
+            );
+
+            if (setUrlExitCode !== 0) {
+              // Remote doesn't exist yet, add it
+              yield* runCommandWithExitCode(
+                "git",
+                "remote",
+                "add",
+                "upstream",
+                url
+              );
+            }
+          }
+        ),
       };
     });
 
@@ -594,7 +561,6 @@ export class GitService extends Effect.Service<GitService>()(
     dependencies: [
       NodeFileSystem.layer,
       defaultGitServiceConfigLayer,
-      defaultUpstreamPatternsConfigLayer,
     ],
   }
 ) {}
