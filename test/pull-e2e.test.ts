@@ -364,4 +364,75 @@ describe("pull (e2e)", () => {
         })
     );
   });
+
+  describe("unrelated histories", () => {
+    it.effect(
+      "should succeed when local repo has unrelated history to upstream",
+      () =>
+        Effect.gen(function* () {
+          // Create an upstream repo with some commits
+          const upstreamRepo = createTestRepo()
+            .withRemote("upstream")
+            .withBranch("main", [
+              commit("01.01 - Arrays (problem)", {
+                "src/01.ts": "// problem",
+              }),
+              commit("01.01 - Arrays (solution)", {
+                "src/01.ts": "// solution",
+              }),
+            ])
+            .build();
+
+          const bareRepoPath = getBareRepoPath(
+            upstreamRepo.workingDir
+          );
+
+          // Create a completely separate repo (simulating: clone, rm -rf .git, git init)
+          const localTmpDir = `${upstreamRepo.workingDir}/../local-unrelated`;
+          fs.mkdirSync(localTmpDir);
+          git(localTmpDir, "init");
+          fs.writeFileSync(
+            `${localTmpDir}/README.md`,
+            "# My project"
+          );
+          git(localTmpDir, "add", ".");
+          git(localTmpDir, "commit", "-m", "Initial commit");
+          git(localTmpDir, "checkout", "-b", "my-branch");
+
+          cleanup = () => {
+            upstreamRepo.cleanup();
+            fs.rmSync(localTmpDir, {
+              recursive: true,
+              force: true,
+            });
+          };
+
+          yield* runPull({
+            upstream: bareRepoPath,
+          }).pipe(Effect.provide(makeLayer(localTmpDir)));
+
+          // File from upstream should be present
+          const content = fs.readFileSync(
+            `${localTmpDir}/src/01.ts`,
+            "utf-8"
+          );
+          expect(content).toBe("// solution");
+
+          // Local file should still be present
+          const readme = fs.readFileSync(
+            `${localTmpDir}/README.md`,
+            "utf-8"
+          );
+          expect(readme).toBe("# My project");
+
+          // Still on my-branch
+          const currentBranch = git(
+            localTmpDir,
+            "branch",
+            "--show-current"
+          );
+          expect(currentBranch).toBe("my-branch");
+        })
+    );
+  });
 });

@@ -395,7 +395,8 @@ export const makeGitService = Effect.gen(function* () {
           const exitCode = yield* runCommandWithExitCode(
             "git",
             "merge",
-            ref
+            ref,
+            "--allow-unrelated-histories"
           );
 
           yield* mapExitCode(
