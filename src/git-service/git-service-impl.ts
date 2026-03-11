@@ -22,11 +22,19 @@ import {
   RebaseConflictError,
 } from "./errors.js";
 
-const VALID_UPSTREAM_PATTERNS = [
-  "mattpocock",
-  "ai-hero-dev",
-  "total-typescript",
-];
+export class UpstreamPatternsConfig extends Context.Tag(
+  "UpstreamPatternsConfig"
+)<
+  UpstreamPatternsConfig,
+  { readonly patterns: ReadonlyArray<string> }
+>() {}
+
+export const defaultUpstreamPatternsConfigLayer = Layer.succeed(
+  UpstreamPatternsConfig,
+  UpstreamPatternsConfig.of({
+    patterns: ["mattpocock", "ai-hero-dev", "total-typescript"],
+  })
+);
 
 export class GitServiceConfig extends Context.Tag(
   "GitServiceConfig"
@@ -54,6 +62,7 @@ export class GitService extends Effect.Service<GitService>()(
   {
     effect: Effect.gen(function* () {
       const config = yield* GitServiceConfig;
+      const upstreamConfig = yield* UpstreamPatternsConfig;
       const fs = yield* FileSystem.FileSystem;
 
       const runCommandWithString = Effect.fn(
@@ -93,7 +102,7 @@ export class GitService extends Effect.Service<GitService>()(
             const remoteName = match[1].trim();
             const url = match[2].trim();
             if (
-              VALID_UPSTREAM_PATTERNS.some((pattern) =>
+              upstreamConfig.patterns.some((pattern) =>
                 url.includes(pattern)
               )
             ) {
@@ -105,7 +114,7 @@ export class GitService extends Effect.Service<GitService>()(
         return yield* Effect.fail(
           new NoUpstreamFoundError({
             message: `No valid upstream remote found.
-Looking for repos from usernames: ${VALID_UPSTREAM_PATTERNS.join(
+Looking for repos from usernames: ${upstreamConfig.patterns.join(
               ", "
             )}
 
@@ -583,6 +592,7 @@ Add upstream remote:
     dependencies: [
       NodeFileSystem.layer,
       defaultGitServiceConfigLayer,
+      defaultUpstreamPatternsConfigLayer,
     ],
   }
 ) {}

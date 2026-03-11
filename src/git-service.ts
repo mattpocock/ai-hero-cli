@@ -21,5 +21,7 @@ export {
 export {
   GitService,
   GitServiceConfig,
+  UpstreamPatternsConfig,
   defaultGitServiceConfigLayer,
+  defaultUpstreamPatternsConfigLayer,
 } from "./git-service/git-service-impl.js";
