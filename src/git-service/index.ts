@@ -4,6 +4,7 @@ export {
   UpstreamPatternsConfig,
   defaultGitServiceConfigLayer,
   defaultUpstreamPatternsConfigLayer,
+  makeGitService,
 } from "./git-service-impl.js";
 
 export {

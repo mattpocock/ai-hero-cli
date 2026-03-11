@@ -57,11 +57,8 @@ const mapExitCode = <E>(
   return Effect.void;
 };
 
-export class GitService extends Effect.Service<GitService>()(
-  "GitService",
-  {
-    effect: Effect.gen(function* () {
-      const config = yield* GitServiceConfig;
+export const makeGitService = Effect.gen(function* () {
+  const config = yield* GitServiceConfig;
       const upstreamConfig = yield* UpstreamPatternsConfig;
       const fs = yield* FileSystem.FileSystem;
 
@@ -588,7 +585,12 @@ Add upstream remote:
         ),
         detectUpstreamRemote,
       };
-    }),
+    });
+
+export class GitService extends Effect.Service<GitService>()(
+  "GitService",
+  {
+    effect: makeGitService,
     dependencies: [
       NodeFileSystem.layer,
       defaultGitServiceConfigLayer,
