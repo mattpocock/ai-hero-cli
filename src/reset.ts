@@ -164,21 +164,15 @@ export const runReset = ({
       `Resetting to ${commitToUse} (${stateDescription})...`
     );
 
-    yield* git.resetHard(commitToUse);
-
-    // Demo mode: undo commit and unstage changes
     if (demo) {
-      yield* Console.log(
-        "Undoing commit and unstaging changes..."
-      );
-
-      yield* git.resetHead();
-      yield* git.restoreStaged();
+      yield* git.applyAsUnstagedChanges(commitToUse);
 
       yield* Console.log(
         `✓ Demo mode: Reset to lesson ${selectedLessonId} with unstaged changes`
       );
     } else {
+      yield* git.resetHard(commitToUse);
+
       yield* Console.log(
         `✓ Reset to lesson ${selectedLessonId} (${stateDescription})`
       );

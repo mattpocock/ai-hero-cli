@@ -42,8 +42,7 @@ const applyDemoReset = (commitSha: string) =>
 
     yield* Console.log(`\nResetting to ${commitSha}...`);
 
-    // Hard reset to commit
-    yield* git.resetHard(commitSha).pipe(
+    yield* git.applyAsUnstagedChanges(commitSha).pipe(
       Effect.catchTag("FailedToResetError", () => {
         process.exitCode = 1;
         return Effect.fail(
@@ -54,14 +53,6 @@ const applyDemoReset = (commitSha: string) =>
         );
       })
     );
-
-    // Undo commit (move HEAD back, keep changes)
-    yield* Console.log("Undoing commit...");
-    yield* git.resetHead();
-
-    // Unstage all changes
-    yield* Console.log("Unstaging changes...");
-    yield* git.restoreStaged();
 
     yield* Console.log(
       "✓ Commit applied with unstaged changes\n"

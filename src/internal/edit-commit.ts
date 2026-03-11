@@ -152,7 +152,7 @@ export const editCommit = CLICommand.make(
       );
 
       const resetResult = yield* gitService
-        .resetHard(targetSha)
+        .applyAsUnstagedChanges(targetSha)
         .pipe(
           Effect.map(() => ({ failed: false as const })),
           Effect.catchTag("FailedToResetError", () =>
@@ -165,14 +165,6 @@ export const editCommit = CLICommand.make(
         process.exitCode = 1;
         return;
       }
-
-      // Demo mode: undo commit and unstage changes
-      yield* Console.log(
-        "Undoing commit and unstaging changes..."
-      );
-
-      yield* gitService.resetHead();
-      yield* gitService.restoreStaged();
 
       yield* Console.log(
         "✓ Reset complete with unstaged changes"

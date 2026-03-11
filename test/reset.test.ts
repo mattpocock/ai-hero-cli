@@ -1369,9 +1369,7 @@ def5678 01.02.02 Setup base structure`;
       "should skip prompts, reset to solution, then undo commit and unstage changes",
       () =>
         Effect.gen(function* () {
-          let resetHardCalledWith: string | undefined;
-          let resetHeadCalled = false;
-          let restoreStagedCalled = false;
+          let applyAsUnstagedChangesCalledWith: string | undefined;
           let selectProblemOrSolutionCalled = false;
           let selectResetActionCalled = false;
           let getUncommittedChangesCalled = false;
@@ -1401,19 +1399,11 @@ def5678 01.02.02 Setup base structure`;
                 statusOutput: " M src/index.ts",
               };
             }),
-            resetHard: Effect.fn("resetHard")(function* (
-              sha: string
-            ) {
-              resetHardCalledWith = sha;
+            applyAsUnstagedChanges: Effect.fn(
+              "applyAsUnstagedChanges"
+            )(function* (sha: string) {
+              applyAsUnstagedChangesCalledWith = sha;
             }),
-            resetHead: Effect.fn("resetHead")(function* () {
-              resetHeadCalled = true;
-            }),
-            restoreStaged: Effect.fn("restoreStaged")(
-              function* () {
-                restoreStagedCalled = true;
-              }
-            ),
           });
 
           const mockPromptService = fromPartial<PromptService>({
@@ -1464,11 +1454,8 @@ def5678 01.02.02 Setup base structure`;
           expect(selectResetActionCalled).toBe(false);
           // Verify uncommitted changes check was skipped
           expect(getUncommittedChangesCalled).toBe(false);
-          // Verify reset to solution commit
-          expect(resetHardCalledWith).toBe("abc1234");
-          // Verify demo mode operations: undo commit and unstage
-          expect(resetHeadCalled).toBe(true);
-          expect(restoreStagedCalled).toBe(true);
+          // Verify applyAsUnstagedChanges was called with solution commit
+          expect(applyAsUnstagedChangesCalledWith).toBe("abc1234");
         })
     );
   });

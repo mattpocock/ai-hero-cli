@@ -1,4 +1,10 @@
 export {
+  GitService,
+  GitServiceConfig,
+  defaultGitServiceConfigLayer,
+} from "./git-service-impl.js";
+
+export {
   CherryPickConflictError,
   FailedToCheckoutError,
   FailedToCommitError,
@@ -16,10 +22,4 @@ export {
   NoUpstreamFoundError,
   NotAGitRepoError,
   RebaseConflictError,
-} from "./git-service/errors.js";
-
-export {
-  GitService,
-  GitServiceConfig,
-  defaultGitServiceConfigLayer,
-} from "./git-service/git-service-impl.js";
+} from "./errors.js";
