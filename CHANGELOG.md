@@ -1,5 +1,12 @@
 # ai-hero-cli
 
+## 0.3.0
+
+### Minor Changes
+
+- 9a90250: Added a new --upstream flag, required for reset, cherry-pick and pull, to target a specific remote
+- 9a90250: Removed the --problem and --solution flags from reset and cherry-pick
+
 ## 0.2.15
 
 ### Patch Changes
