@@ -329,7 +329,7 @@ describe("exercise", () => {
             "# Lesson 2"
           );
 
-          const lessonsVisited: number[] = [];
+          const lessonsVisited: Array<number> = [];
 
           const mockPromptService = Layer.succeed(PromptService, {
             confirmReadyToCommit: () => {
@@ -561,7 +561,7 @@ describe("exercise", () => {
             "# Lesson 3"
           );
 
-          const lessonsVisited: number[] = [];
+          const lessonsVisited: Array<number> = [];
           let selectExerciseCalled = false;
 
           const mockPromptService = Layer.succeed(PromptService, {
@@ -590,11 +590,11 @@ describe("exercise", () => {
             selectLessonCommit: () => {
               throw new Error("Should not be called");
             },
-            selectExercise: (lessons: unknown[], _prompt: string) => {
+            selectExercise: (lessons: Array<unknown>, _prompt: string) => {
               selectExerciseCalled = true;
               // User sees all 3 lessons and picks lesson 3
               expect(Array.isArray(lessons)).toBe(true);
-              expect((lessons as { num: number }[]).length).toBe(3);
+              expect((lessons as Array<{ num: number }>).length).toBe(3);
               // Return lesson 3's number
               return Effect.succeed(3);
             },
@@ -689,7 +689,7 @@ describe("exercise", () => {
           );
 
           let selectSubfolderCalled = false;
-          let subfoldersPassed: string[] = [];
+          let subfoldersPassed: Array<string> = [];
 
           const mockPromptService = Layer.succeed(PromptService, {
             confirmReadyToCommit: () => {
@@ -726,7 +726,7 @@ describe("exercise", () => {
             selectWalkThroughAction: () => {
               throw new Error("Should not be called");
             },
-            selectSubfolder: (subfolders: string[]) => {
+            selectSubfolder: (subfolders: Array<string>) => {
               selectSubfolderCalled = true;
               subfoldersPassed = subfolders;
               // User selects the "problem" subfolder (index 0)
@@ -797,7 +797,7 @@ describe("exercise", () => {
             "# Solution"
           );
 
-          const subfoldersVisited: string[] = [];
+          const subfoldersVisited: Array<string> = [];
 
           const mockPromptService = Layer.succeed(PromptService, {
             confirmReadyToCommit: () => {
@@ -917,7 +917,7 @@ describe("exercise", () => {
             "# Lesson 2"
           );
 
-          const lessonsVisited: number[] = [];
+          const lessonsVisited: Array<number> = [];
 
           const mockPromptService = Layer.succeed(PromptService, {
             confirmReadyToCommit: () => {

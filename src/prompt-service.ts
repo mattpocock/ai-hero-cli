@@ -71,7 +71,7 @@ const normalizeExerciseNumber = (str: string): Array<string> => {
 export class PromptService extends Effect.Service<PromptService>()(
   "PromptService",
   {
-    // eslint-disable-next-line require-yield
+     
     effect: Effect.gen(function* () {
       /**
        * Prompts user to confirm ready to commit changes.

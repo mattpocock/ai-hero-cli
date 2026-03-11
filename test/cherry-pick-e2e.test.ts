@@ -1,14 +1,14 @@
-import { NodeContext, NodeFileSystem } from "@effect/platform-node";
+import {
+  NodeContext,
+  NodeFileSystem,
+} from "@effect/platform-node";
 import { afterEach, describe, expect, it } from "@effect/vitest";
 import { fromPartial } from "@total-typescript/shoehorn";
 import { Effect, Layer, Option } from "effect";
 import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import {
-  InvalidBranchOperationError,
-  runCherryPick,
-} from "../src/cherry-pick.js";
+import { runCherryPick } from "../src/cherry-pick.js";
 import {
   PromptCancelledError,
   PromptService,
@@ -62,19 +62,19 @@ describe("cherry-pick (e2e)", () => {
 
   const makeLayer = (
     workingDir: string,
-    promptService: PromptService
+    promptService: PromptService,
   ) => {
     const deps = Layer.mergeAll(
       NodeFileSystem.layer,
-      Layer.succeed(GitServiceConfig, { cwd: workingDir })
+      Layer.succeed(GitServiceConfig, { cwd: workingDir }),
     );
 
     return Layer.mergeAll(
       Layer.effect(GitService, makeGitService).pipe(
-        Layer.provide(deps)
+        Layer.provide(deps),
       ),
       Layer.succeed(PromptService, promptService),
-      NodeContext.layer
+      NodeContext.layer,
     );
   };
 
@@ -106,7 +106,7 @@ describe("cherry-pick (e2e)", () => {
             selectLessonCommit: Effect.fn("selectLessonCommit")(
               function* () {
                 return "01.01.02";
-              }
+              },
             ),
           });
 
@@ -116,14 +116,14 @@ describe("cherry-pick (e2e)", () => {
             upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
-              makeLayer(repo.workingDir, mockPromptService)
-            )
+              makeLayer(repo.workingDir, mockPromptService),
+            ),
           );
 
           // Verify the cherry-picked file exists
           const content = fs.readFileSync(
             `${repo.workingDir}/src/02.ts`,
-            "utf-8"
+            "utf-8",
           );
           expect(content).toBe("// arrays advanced");
 
@@ -131,10 +131,10 @@ describe("cherry-pick (e2e)", () => {
           const currentBranch = git(
             repo.workingDir,
             "branch",
-            "--show-current"
+            "--show-current",
           );
           expect(currentBranch).toBe("my-branch");
-        })
+        }),
     );
   });
 
@@ -162,7 +162,9 @@ describe("cherry-pick (e2e)", () => {
           cleanup = repo.cleanup;
           configureGitUser(repo.workingDir);
 
-          const mockPromptService = fromPartial<PromptService>({});
+          const mockPromptService = fromPartial<PromptService>(
+            {},
+          );
 
           yield* runCherryPick({
             branch: "live-run-through",
@@ -170,17 +172,17 @@ describe("cherry-pick (e2e)", () => {
             upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
-              makeLayer(repo.workingDir, mockPromptService)
-            )
+              makeLayer(repo.workingDir, mockPromptService),
+            ),
           );
 
           // Verify the cherry-picked file exists
           const content = fs.readFileSync(
             `${repo.workingDir}/src/02.ts`,
-            "utf-8"
+            "utf-8",
           );
           expect(content).toBe("// objects");
-        })
+        }),
     );
   });
 
@@ -216,7 +218,7 @@ describe("cherry-pick (e2e)", () => {
             repo.workingDir,
             "log",
             "live-run-through",
-            "--oneline"
+            "--oneline",
           );
           const sha01_01_02 = log
             .split("\n")
@@ -237,11 +239,11 @@ describe("cherry-pick (e2e)", () => {
                   lessonId: string;
                   message: string;
                 }>,
-                _promptMessage: string
+                _promptMessage: string,
               ) {
                 capturedCommits = commits;
                 return "01.02.01";
-              }
+              },
             ),
           });
 
@@ -252,19 +254,19 @@ describe("cherry-pick (e2e)", () => {
             excludeCurrentBranch: true,
           }).pipe(
             Effect.provide(
-              makeLayer(repo.workingDir, mockPromptService)
-            )
+              makeLayer(repo.workingDir, mockPromptService),
+            ),
           );
 
           // 01.01.01 is from the fork point, 01.01.02 was cherry-picked
           // Both should be excluded
           const lessonIds = capturedCommits.map(
-            (c) => c.lessonId
+            (c) => c.lessonId,
           );
           expect(lessonIds).not.toContain("01.01.01");
           expect(lessonIds).not.toContain("01.01.02");
           expect(lessonIds).toContain("01.02.01");
-        })
+        }),
     );
   });
 
@@ -295,7 +297,7 @@ describe("cherry-pick (e2e)", () => {
             selectLessonCommit: Effect.fn("selectLessonCommit")(
               function* () {
                 return "01.01.01";
-              }
+              },
             ),
           });
 
@@ -310,17 +312,15 @@ describe("cherry-pick (e2e)", () => {
             excludeCurrentBranch: false,
           }).pipe(
             Effect.provide(
-              makeLayer(repo.workingDir, mockPromptService)
-            )
+              makeLayer(repo.workingDir, mockPromptService),
+            ),
           );
 
           // Code takes matchingCommits[length-1], which is the last in
           // git log output (oldest). With real git, this is "First version".
-          expect(result.commit.message).toBe(
-            "First version"
-          );
+          expect(result.commit.message).toBe("First version");
           expect(result.lessonId).toBe("01.01.01");
-        })
+        }),
     );
   });
 
@@ -344,7 +344,9 @@ describe("cherry-pick (e2e)", () => {
 
           cleanup = repo.cleanup;
 
-          const mockPromptService = fromPartial<PromptService>({});
+          const mockPromptService = fromPartial<PromptService>(
+            {},
+          );
 
           const result = yield* runCherryPick({
             branch: "live-run-through",
@@ -352,13 +354,13 @@ describe("cherry-pick (e2e)", () => {
             upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
-              makeLayer(repo.workingDir, mockPromptService)
+              makeLayer(repo.workingDir, mockPromptService),
             ),
-            Effect.flip
+            Effect.flip,
           );
 
           expect(result._tag).toBe("CommitNotFoundError");
-        })
+        }),
     );
   });
 
@@ -391,7 +393,7 @@ describe("cherry-pick (e2e)", () => {
           const currentBefore = git(
             repo.workingDir,
             "branch",
-            "--show-current"
+            "--show-current",
           );
           expect(currentBefore).toBe("main");
 
@@ -399,12 +401,12 @@ describe("cherry-pick (e2e)", () => {
             selectLessonCommit: Effect.fn("selectLessonCommit")(
               function* () {
                 return "01.01.02";
-              }
+              },
             ),
             inputBranchName: Effect.fn("inputBranchName")(
               function* () {
                 return "matt/feature-work";
-              }
+              },
             ),
           });
 
@@ -414,25 +416,25 @@ describe("cherry-pick (e2e)", () => {
             upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
-              makeLayer(repo.workingDir, mockPromptService)
-            )
+              makeLayer(repo.workingDir, mockPromptService),
+            ),
           );
 
           // Should now be on the new branch
           const currentAfter = git(
             repo.workingDir,
             "branch",
-            "--show-current"
+            "--show-current",
           );
           expect(currentAfter).toBe("matt/feature-work");
 
           // Cherry-picked file should exist
           const content = fs.readFileSync(
             `${repo.workingDir}/src/02.ts`,
-            "utf-8"
+            "utf-8",
           );
           expect(content).toBe("// arrays advanced");
-        })
+        }),
     );
   });
 
@@ -445,22 +447,21 @@ describe("cherry-pick (e2e)", () => {
           cleanup = () =>
             fs.rmSync(tmpDir, { recursive: true, force: true });
 
-          const mockPromptService =
-            fromPartial<PromptService>({});
+          const mockPromptService = fromPartial<PromptService>(
+            {},
+          );
 
           const result = yield* runCherryPick({
             branch: "live-run-through",
             lessonId: Option.none(),
             upstream: "https://example.com/repo.git",
           }).pipe(
-            Effect.provide(
-              makeLayer(tmpDir, mockPromptService)
-            ),
-            Effect.flip
+            Effect.provide(makeLayer(tmpDir, mockPromptService)),
+            Effect.flip,
           );
 
           expect(result._tag).toBe("NotAGitRepoError");
-        })
+        }),
     );
   });
 
@@ -485,17 +486,13 @@ describe("cherry-pick (e2e)", () => {
           cleanup = repo.cleanup;
 
           // We're already on live-run-through after build
-          git(
-            repo.workingDir,
-            "checkout",
-            "live-run-through"
-          );
+          git(repo.workingDir, "checkout", "live-run-through");
 
           const mockPromptService = fromPartial<PromptService>({
             selectLessonCommit: Effect.fn("selectLessonCommit")(
               function* () {
                 return "01.01.01";
-              }
+              },
             ),
           });
 
@@ -505,15 +502,15 @@ describe("cherry-pick (e2e)", () => {
             upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
-              makeLayer(repo.workingDir, mockPromptService)
+              makeLayer(repo.workingDir, mockPromptService),
             ),
-            Effect.flip
+            Effect.flip,
           );
 
           // Command fails because ensureUpstreamBranchConnected can't
           // delete the current branch and re-track it
           expect(result._tag).toBe("FailedToTrackBranchError");
-        })
+        }),
     );
   });
 
@@ -544,21 +541,21 @@ describe("cherry-pick (e2e)", () => {
           // Make a conflicting local change to the same file
           fs.writeFileSync(
             `${repo.workingDir}/src/01.ts`,
-            "// conflicting local change"
+            "// conflicting local change",
           );
           git(repo.workingDir, "add", ".");
           git(
             repo.workingDir,
             "commit",
             "-m",
-            "local conflicting change"
+            "local conflicting change",
           );
 
           const mockPromptService = fromPartial<PromptService>({
             selectLessonCommit: Effect.fn("selectLessonCommit")(
               function* () {
                 return "01.01.02";
-              }
+              },
             ),
           });
 
@@ -568,13 +565,13 @@ describe("cherry-pick (e2e)", () => {
             upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
-              makeLayer(repo.workingDir, mockPromptService)
+              makeLayer(repo.workingDir, mockPromptService),
             ),
-            Effect.flip
+            Effect.flip,
           );
 
           expect(result._tag).toBe("CherryPickConflictError");
-        })
+        }),
     );
   });
 
@@ -607,9 +604,9 @@ describe("cherry-pick (e2e)", () => {
             selectLessonCommit: Effect.fn("selectLessonCommit")(
               function* () {
                 return yield* Effect.fail(
-                  new PromptCancelledError()
+                  new PromptCancelledError(),
                 );
-              }
+              },
             ),
           });
 
@@ -619,13 +616,13 @@ describe("cherry-pick (e2e)", () => {
             upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
-              makeLayer(repo.workingDir, mockPromptService)
+              makeLayer(repo.workingDir, mockPromptService),
             ),
-            Effect.flip
+            Effect.flip,
           );
 
           expect(result).toBeInstanceOf(PromptCancelledError);
-        })
+        }),
     );
   });
 
@@ -659,7 +656,7 @@ describe("cherry-pick (e2e)", () => {
             selectLessonCommit: Effect.fn("selectLessonCommit")(
               function* () {
                 return "02.01.01";
-              }
+              },
             ),
           });
 
@@ -669,14 +666,14 @@ describe("cherry-pick (e2e)", () => {
             upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
-              makeLayer(repo.workingDir, mockPromptService)
-            )
+              makeLayer(repo.workingDir, mockPromptService),
+            ),
           );
 
           // Verify the cherry-picked file from custom branch exists
           const content = fs.readFileSync(
             `${repo.workingDir}/src/custom.ts`,
-            "utf-8"
+            "utf-8",
           );
           expect(content).toBe("// custom content");
 
@@ -684,10 +681,10 @@ describe("cherry-pick (e2e)", () => {
           const currentBranch = git(
             repo.workingDir,
             "branch",
-            "--show-current"
+            "--show-current",
           );
           expect(currentBranch).toBe("my-branch");
-        })
+        }),
     );
 
     it.effect(
@@ -718,8 +715,9 @@ describe("cherry-pick (e2e)", () => {
           cleanup = repo.cleanup;
           configureGitUser(repo.workingDir);
 
-          const mockPromptService =
-            fromPartial<PromptService>({});
+          const mockPromptService = fromPartial<PromptService>(
+            {},
+          );
 
           yield* runCherryPick({
             branch: "custom-lessons",
@@ -727,16 +725,16 @@ describe("cherry-pick (e2e)", () => {
             upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
-              makeLayer(repo.workingDir, mockPromptService)
-            )
+              makeLayer(repo.workingDir, mockPromptService),
+            ),
           );
 
           const content = fs.readFileSync(
             `${repo.workingDir}/src/second.ts`,
-            "utf-8"
+            "utf-8",
           );
           expect(content).toBe("// second");
-        })
+        }),
     );
   });
 
@@ -767,7 +765,7 @@ describe("cherry-pick (e2e)", () => {
             selectLessonCommit: Effect.fn("selectLessonCommit")(
               function* () {
                 throw new Error("should not be called");
-              }
+              },
             ),
           });
 
@@ -777,13 +775,13 @@ describe("cherry-pick (e2e)", () => {
             upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
-              makeLayer(repo.workingDir, mockPromptService)
+              makeLayer(repo.workingDir, mockPromptService),
             ),
-            Effect.flip
+            Effect.flip,
           );
 
           expect(result._tag).toBe("CommitNotFoundError");
-        })
+        }),
     );
   });
 
@@ -813,22 +811,18 @@ describe("cherry-pick (e2e)", () => {
           configureGitUser(repo.workingDir);
 
           // Create a branch that will conflict with the name
-          git(
-            repo.workingDir,
-            "branch",
-            "existing-branch"
-          );
+          git(repo.workingDir, "branch", "existing-branch");
 
           const mockPromptService = fromPartial<PromptService>({
             selectLessonCommit: Effect.fn("selectLessonCommit")(
               function* () {
                 return "01.01.02";
-              }
+              },
             ),
             inputBranchName: Effect.fn("inputBranchName")(
               function* () {
                 return "existing-branch";
-              }
+              },
             ),
           });
 
@@ -838,15 +832,13 @@ describe("cherry-pick (e2e)", () => {
             upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
-              makeLayer(repo.workingDir, mockPromptService)
+              makeLayer(repo.workingDir, mockPromptService),
             ),
-            Effect.flip
+            Effect.flip,
           );
 
-          expect(result._tag).toBe(
-            "FailedToCreateBranchError"
-          );
-        })
+          expect(result._tag).toBe("FailedToCreateBranchError");
+        }),
     );
   });
 });

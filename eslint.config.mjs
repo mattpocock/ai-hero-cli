@@ -25,7 +25,7 @@ export default [
   ...compat.extends(
     "eslint:recommended",
     "plugin:@typescript-eslint/eslint-recommended",
-    "plugin:@typescript-eslint/recommended"
+    "plugin:@typescript-eslint/recommended",
   ),
   {
     plugins: {
@@ -60,6 +60,7 @@ export default [
       "object-shorthand": "error",
       "prefer-destructuring": "off",
       "sort-imports": "off",
+      "require-yield": "off",
 
       "no-restricted-syntax": [
         "error",
