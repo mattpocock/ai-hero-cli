@@ -2,4 +2,4 @@
 set -e
 
 pnpm run build
-(cd ../cohort-002-project && node ../ai-hero-cli/dist/bin.cjs reset --branch live-run-through)
+(cd ../cohort-003-project && node ../ai-hero-cli/dist/bin.cjs reset --branch live-run-through --upstream https://github.com/ai-hero-dev/cohort-003-project.git)

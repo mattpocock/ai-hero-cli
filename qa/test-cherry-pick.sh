@@ -3,7 +3,7 @@ set -e
 
 pnpm run build
 cd ../../throwaway
-rm -rf cohort-002-project
-git clone git@github.com:ai-hero-dev/cohort-002-project.git
-cd cohort-002-project
-node ../../ai/ai-hero-cli/dist/bin.cjs cherry-pick --branch live-run-through
+rm -rf cohort-003-project
+git clone git@github.com:ai-hero-dev/cohort-003-project.git
+cd cohort-003-project
+node ../../ai/ai-hero-cli/dist/bin.cjs cherry-pick --branch live-run-through --upstream https://github.com/ai-hero-dev/cohort-003-project.git
