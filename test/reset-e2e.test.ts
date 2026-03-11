@@ -4,6 +4,7 @@ import { fromPartial } from "@total-typescript/shoehorn";
 import { Effect, Layer, Option } from "effect";
 import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
+import * as path from "node:path";
 import {
   InvalidBranchOperationError,
   InvalidOptionsError,
@@ -42,6 +43,10 @@ const configureGitUser = (cwd: string) => {
   git(cwd, "config", "user.name", "Test");
   git(cwd, "config", "user.email", "test@test.com");
 };
+
+/** Get the bare repo path from a working directory */
+const getBareRepoPath = (workingDir: string) =>
+  path.resolve(workingDir, "..", "bare.git");
 
 /**
  * E2E tests for the reset command using real local Git repositories.
@@ -91,6 +96,7 @@ describe("reset (e2e)", () => {
             problem: false,
             solution: false,
             demo: false,
+            upstream: "/tmp/dummy-upstream",
           }).pipe(
             Effect.provide(
               makeLayer(tmpDir, mockPromptService)
@@ -132,6 +138,7 @@ describe("reset (e2e)", () => {
             problem: false,
             solution: false,
             demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -173,6 +180,7 @@ describe("reset (e2e)", () => {
             problem: true,
             solution: true,
             demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -217,6 +225,7 @@ describe("reset (e2e)", () => {
             problem: true,
             solution: false,
             demo: true,
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -261,6 +270,7 @@ describe("reset (e2e)", () => {
             problem: false,
             solution: true,
             demo: true,
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -326,6 +336,7 @@ describe("reset (e2e)", () => {
             problem: false,
             solution: false,
             demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -398,6 +409,7 @@ describe("reset (e2e)", () => {
             problem: false,
             solution: false,
             demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -452,6 +464,7 @@ describe("reset (e2e)", () => {
             problem: false,
             solution: true,
             demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -505,6 +518,7 @@ describe("reset (e2e)", () => {
             problem: true,
             solution: false,
             demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -573,6 +587,7 @@ describe("reset (e2e)", () => {
             problem: false,
             solution: false,
             demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -648,6 +663,7 @@ describe("reset (e2e)", () => {
             problem: false,
             solution: false,
             demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -727,6 +743,7 @@ describe("reset (e2e)", () => {
             problem: false,
             solution: false,
             demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -798,6 +815,7 @@ describe("reset (e2e)", () => {
             problem: false,
             solution: false,
             demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -879,6 +897,7 @@ describe("reset (e2e)", () => {
             problem: false,
             solution: false,
             demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -954,6 +973,7 @@ describe("reset (e2e)", () => {
             problem: false,
             solution: false,
             demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -1011,6 +1031,7 @@ describe("reset (e2e)", () => {
             problem: false,
             solution: false,
             demo: true,
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -1079,6 +1100,7 @@ describe("reset (e2e)", () => {
             problem: false,
             solution: false,
             demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -1131,6 +1153,7 @@ describe("reset (e2e)", () => {
             problem: false,
             solution: false,
             demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -1184,6 +1207,7 @@ describe("reset (e2e)", () => {
             problem: false,
             solution: false,
             demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -1246,6 +1270,7 @@ describe("reset (e2e)", () => {
             problem: false,
             solution: false,
             demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -1312,6 +1337,7 @@ describe("reset (e2e)", () => {
             problem: false,
             solution: false,
             demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -1413,6 +1439,7 @@ describe("reset (e2e)", () => {
             problem: true,
             solution: false,
             demo: false,
+            upstream: bareDir,
           }).pipe(
             Effect.provide(
               makeLayer(workDir, mockPromptService)
@@ -1478,6 +1505,7 @@ describe("reset (e2e)", () => {
             problem: false,
             solution: false,
             demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -1548,6 +1576,7 @@ describe("reset (e2e)", () => {
             problem: false,
             solution: false,
             demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)
@@ -1592,6 +1621,7 @@ describe("reset (e2e)", () => {
             problem: false,
             solution: false,
             demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
               makeLayer(repo.workingDir, mockPromptService)

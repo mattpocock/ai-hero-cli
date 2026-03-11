@@ -36,12 +36,14 @@ export const runReset = ({
   lessonId,
   problem,
   solution,
+  upstream,
 }: {
   branch: string;
   lessonId: Option.Option<string>;
   problem: boolean;
   solution: boolean;
   demo: boolean;
+  upstream: string;
 }) =>
   Effect.gen(function* () {
     const git = yield* GitService;
@@ -49,6 +51,9 @@ export const runReset = ({
 
     // Validate git repository
     yield* git.ensureIsGitRepo();
+
+    // Set up upstream remote
+    yield* git.setUpstreamRemote(upstream);
 
     yield* git.ensureUpstreamBranchConnected({
       targetBranch: branch,
@@ -204,11 +209,16 @@ export const reset = CLICommand.make(
       )
     ),
     demo: Options.boolean("demo").pipe(Options.withAlias("d")),
+    upstream: Options.text("upstream").pipe(
+      Options.withDescription(
+        "Git URL or local path to the upstream exercise repo"
+      )
+    ),
     cwd: cwdOption,
   },
   /* v8 ignore start - CLI error handlers are presentation logic */
-  ({ branch, cwd, demo, lessonId, problem, solution }) =>
-    runReset({ branch, lessonId, problem, solution, demo }).pipe(
+  ({ branch, cwd, demo, lessonId, problem, solution, upstream }) =>
+    runReset({ branch, lessonId, problem, solution, demo, upstream }).pipe(
       Effect.provideService(
         GitServiceConfig,
         GitServiceConfig.of({
