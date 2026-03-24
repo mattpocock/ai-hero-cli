@@ -480,22 +480,25 @@ export class PromptService extends Effect.Service<PromptService>()(
       const selectSubfolder = Effect.fn("selectSubfolder")(
         function* (subfolders: Array<string>) {
           const { subfolderIndex } = yield* runPrompt<{
-            subfolderIndex: number;
+            subfolderIndex: string;
           }>(() =>
             prompt([
               {
                 type: "autocomplete",
                 name: "subfolderIndex",
                 message: "Select a subfolder",
-                choices: subfolders.map((subfolder, index) => ({
+                choices: subfolders.map((subfolder) => ({
                   title: subfolder,
-                  value: index,
+                  // Use subfolder name as value instead of numeric index
+                  // to avoid prompts library treating 0 as falsy and
+                  // returning the title string instead (GitHub issue #42)
+                  value: subfolder,
                 })),
               },
             ])
           );
 
-          return subfolderIndex;
+          return subfolders.indexOf(subfolderIndex);
         }
       );
 
