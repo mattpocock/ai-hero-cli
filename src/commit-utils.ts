@@ -72,6 +72,7 @@ const parseCommits = (
 export const selectLessonCommit = ({
   branch,
   excludeCurrentBranch,
+  extraChoices,
   lessonId,
   promptMessage,
 }: {
@@ -79,6 +80,7 @@ export const selectLessonCommit = ({
   lessonId: Option.Option<string>;
   promptMessage: string;
   excludeCurrentBranch: boolean;
+  extraChoices?: Array<{ lessonId: string; message: string }>;
 }) =>
   Effect.gen(function* () {
     const gitService = yield* GitService;
@@ -143,14 +145,30 @@ export const selectLessonCommit = ({
         return a.lessonId!.localeCompare(b.lessonId!);
       });
 
-      // Prompt user to select a commit
-      selectedLessonId = yield* promptService.selectLessonCommit(
-        sortedCommits.map((commit) => ({
+      const choices = [
+        ...(extraChoices ?? []),
+        ...sortedCommits.map((commit) => ({
           lessonId: commit.lessonId!,
           message: commit.message,
         })),
+      ];
+
+      // Prompt user to select a commit
+      selectedLessonId = yield* promptService.selectLessonCommit(
+        choices,
         promptMessage
       );
+    }
+
+    // Check if an extra choice was selected (not a real commit)
+    const isExtraChoice = extraChoices?.some(
+      (c) => c.lessonId === selectedLessonId
+    );
+    if (isExtraChoice) {
+      return {
+        commit: { sha: "", message: "", lessonId: null },
+        lessonId: selectedLessonId,
+      };
     }
 
     const matchingCommits = commits.filter(

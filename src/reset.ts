@@ -3,8 +3,7 @@ import {
   Command as CLICommand,
   Options,
 } from "@effect/cli";
-import type { Option } from "effect";
-import { Console, Data, Effect } from "effect";
+import { Console, Data, Effect, Option } from "effect";
 import { selectLessonCommit } from "./commit-utils.js";
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "./constants.js";
 import { GitService, GitServiceConfig } from "./git-service.js";
@@ -46,18 +45,50 @@ export const runReset = ({
       targetBranch: branch,
     });
 
-    const { commit: targetCommit, lessonId: selectedLessonId } =
-      yield* selectLessonCommit({
+    // Determine if this is a "reset to main" operation
+    const isExplicitMain =
+      Option.isSome(lessonId) && lessonId.value === "main";
+
+    let commitToUse: string;
+    let selectedLessonId: string;
+
+    if (isExplicitMain) {
+      yield* git.fetch("upstream", "main");
+      commitToUse = yield* git.revParse("upstream/main");
+      selectedLessonId = "main";
+    } else {
+      const result = yield* selectLessonCommit({
         branch,
         lessonId,
         promptMessage:
           "Which lesson do you want to reset to? (type to search)",
         excludeCurrentBranch: false,
+        extraChoices: [
+          { lessonId: "main", message: "Reset to upstream/main" },
+        ],
       });
 
-    const commitToUse = targetCommit.sha;
+      if (result.lessonId === "main") {
+        yield* git.fetch("upstream", "main");
+        commitToUse = yield* git.revParse("upstream/main");
+        selectedLessonId = "main";
+      } else {
+        commitToUse = result.commit.sha;
+        selectedLessonId = result.lessonId;
+      }
+    }
+
+    const isResetToMain = selectedLessonId === "main";
 
     const currentBranch = yield* git.getCurrentBranch();
+
+    // Cannot reset to main while on main
+    if (isResetToMain && currentBranch === "main") {
+      return yield* new InvalidBranchOperationError({
+        message:
+          "Cannot reset to main while on the main branch. Create a new branch first.",
+      });
+    }
 
     // Prompt for action (skip in demo mode)
     let action: "reset-current" | "create-branch";

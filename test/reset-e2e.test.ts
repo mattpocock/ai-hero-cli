@@ -1037,4 +1037,305 @@ describe("reset (e2e)", () => {
         })
     );
   });
+
+  describe("reset to main", () => {
+    it.effect(
+      "should reset current branch to upstream/main when lessonId is 'main'",
+      () =>
+        Effect.gen(function* () {
+          const repo = createTestRepo()
+            .withRemote("upstream")
+            .withBranch("main", [
+              commit("00.00.01 Base setup", {
+                "src/base.ts": "// base setup",
+              }),
+            ])
+            .withBranch("live-run-through", [
+              commit("01.01.01 Arrays intro", {
+                "src/01.ts": "// arrays",
+              }),
+            ])
+            .withWorkingBranch("my-branch", {
+              from: "live-run-through",
+              atCommit: 0,
+            })
+            .build();
+
+          cleanup = repo.cleanup;
+          configureGitUser(repo.workingDir);
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectResetAction: Effect.fn("selectResetAction")(
+              function* () {
+                return "reset-current" as const;
+              }
+            ),
+          });
+
+          yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.some("main"),
+            demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
+          }).pipe(
+            Effect.provide(
+              makeLayer(repo.workingDir, mockPromptService)
+            )
+          );
+
+          // Verify file contents match upstream/main
+          const content = fs.readFileSync(
+            `${repo.workingDir}/src/base.ts`,
+            "utf-8"
+          );
+          expect(content).toBe("// base setup");
+
+          // Still on my-branch
+          const currentBranch = git(
+            repo.workingDir,
+            "branch",
+            "--show-current"
+          );
+          expect(currentBranch).toBe("my-branch");
+        })
+    );
+
+    it.effect(
+      "should fail with InvalidBranchOperationError when on main branch",
+      () =>
+        Effect.gen(function* () {
+          const repo = createTestRepo()
+            .withRemote("upstream")
+            .withBranch("main", [
+              commit("00.00.01 Base setup", {
+                "src/base.ts": "// base setup",
+              }),
+            ])
+            .withBranch("live-run-through", [
+              commit("01.01.01 Arrays intro", {
+                "src/01.ts": "// arrays",
+              }),
+            ])
+            .build();
+
+          cleanup = repo.cleanup;
+
+          // We're on main after build (no working branch specified)
+          const currentBefore = git(
+            repo.workingDir,
+            "branch",
+            "--show-current"
+          );
+          expect(currentBefore).toBe("main");
+
+          const mockPromptService =
+            fromPartial<PromptService>({});
+
+          const result = yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.some("main"),
+            demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
+          }).pipe(
+            Effect.provide(
+              makeLayer(repo.workingDir, mockPromptService)
+            ),
+            Effect.flip
+          );
+
+          expect(result._tag).toBe(
+            "InvalidBranchOperationError"
+          );
+        })
+    );
+
+    it.effect(
+      "should reset to upstream/main when 'main' is selected interactively",
+      () =>
+        Effect.gen(function* () {
+          const repo = createTestRepo()
+            .withRemote("upstream")
+            .withBranch("main", [
+              commit("00.00.01 Base setup", {
+                "src/base.ts": "// base setup",
+              }),
+            ])
+            .withBranch("live-run-through", [
+              commit("01.01.01 Arrays intro", {
+                "src/01.ts": "// arrays",
+              }),
+            ])
+            .withWorkingBranch("my-branch", {
+              from: "live-run-through",
+              atCommit: 0,
+            })
+            .build();
+
+          cleanup = repo.cleanup;
+          configureGitUser(repo.workingDir);
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectLessonCommit: Effect.fn("selectLessonCommit")(
+              function* () {
+                return "main";
+              }
+            ),
+            selectResetAction: Effect.fn("selectResetAction")(
+              function* () {
+                return "reset-current" as const;
+              }
+            ),
+          });
+
+          yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.none(),
+            demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
+          }).pipe(
+            Effect.provide(
+              makeLayer(repo.workingDir, mockPromptService)
+            )
+          );
+
+          // Verify file contents match upstream/main
+          const content = fs.readFileSync(
+            `${repo.workingDir}/src/base.ts`,
+            "utf-8"
+          );
+          expect(content).toBe("// base setup");
+
+          // Still on my-branch
+          const currentBranch = git(
+            repo.workingDir,
+            "branch",
+            "--show-current"
+          );
+          expect(currentBranch).toBe("my-branch");
+        })
+    );
+
+    it.effect(
+      "should apply upstream/main as unstaged changes in demo mode",
+      () =>
+        Effect.gen(function* () {
+          const repo = createTestRepo()
+            .withRemote("upstream")
+            .withBranch("main", [
+              commit("00.00.01 Base setup", {
+                "src/base.ts": "// base setup",
+              }),
+            ])
+            .withBranch("live-run-through", [
+              commit("01.01.01 Arrays intro", {
+                "src/01.ts": "// arrays",
+              }),
+            ])
+            .withWorkingBranch("my-branch", {
+              from: "live-run-through",
+              atCommit: 0,
+            })
+            .build();
+
+          cleanup = repo.cleanup;
+          configureGitUser(repo.workingDir);
+
+          const mockPromptService =
+            fromPartial<PromptService>({});
+
+          yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.some("main"),
+            demo: true,
+            upstream: getBareRepoPath(repo.workingDir),
+          }).pipe(
+            Effect.provide(
+              makeLayer(repo.workingDir, mockPromptService)
+            )
+          );
+
+          // Verify file has main content
+          const content = fs.readFileSync(
+            `${repo.workingDir}/src/base.ts`,
+            "utf-8"
+          );
+          expect(content).toBe("// base setup");
+
+          // Verify changes are unstaged
+          const status = git(
+            repo.workingDir,
+            "status",
+            "--porcelain"
+          );
+          // May show as "?? src/" (untracked dir) or individual files
+          expect(status).toContain("src/");
+        })
+    );
+
+    it.effect(
+      "should create new branch at upstream/main when create-branch is selected",
+      () =>
+        Effect.gen(function* () {
+          const repo = createTestRepo()
+            .withRemote("upstream")
+            .withBranch("main", [
+              commit("00.00.01 Base setup", {
+                "src/base.ts": "// base setup",
+              }),
+            ])
+            .withBranch("live-run-through", [
+              commit("01.01.01 Arrays intro", {
+                "src/01.ts": "// arrays",
+              }),
+            ])
+            .withWorkingBranch("my-branch", {
+              from: "live-run-through",
+              atCommit: 0,
+            })
+            .build();
+
+          cleanup = repo.cleanup;
+          configureGitUser(repo.workingDir);
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectResetAction: Effect.fn("selectResetAction")(
+              function* () {
+                return "create-branch" as const;
+              }
+            ),
+            inputBranchName: Effect.fn("inputBranchName")(
+              function* () {
+                return "fresh-start";
+              }
+            ),
+          });
+
+          yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.some("main"),
+            demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
+          }).pipe(
+            Effect.provide(
+              makeLayer(repo.workingDir, mockPromptService)
+            )
+          );
+
+          // Should be on new branch
+          const currentBranch = git(
+            repo.workingDir,
+            "branch",
+            "--show-current"
+          );
+          expect(currentBranch).toBe("fresh-start");
+
+          // File contents should match upstream/main
+          const content = fs.readFileSync(
+            `${repo.workingDir}/src/base.ts`,
+            "utf-8"
+          );
+          expect(content).toBe("// base setup");
+        })
+    );
+  });
 });
