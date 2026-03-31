@@ -10,4 +10,5 @@ rm -rf .git
 git init
 git add .
 git commit -m "Initial commit"
+git checkout -b my-dev-branch
 node ../../ai/ai-hero-cli/dist/bin.cjs reset --branch live-run-through --upstream https://github.com/ai-hero-dev/cohort-003-project.git
