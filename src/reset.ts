@@ -64,7 +64,7 @@ export const runReset = ({
           "Which lesson do you want to reset to? (type to search)",
         excludeCurrentBranch: false,
         extraChoices: [
-          { lessonId: "main", message: "Reset to upstream/main" },
+          { lessonId: "main", message: "Reset to the starting point" },
         ],
       });
 
