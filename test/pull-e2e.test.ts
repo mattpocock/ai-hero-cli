@@ -171,34 +171,6 @@ describe("pull (e2e)", () => {
     );
   });
 
-  describe("on main branch", () => {
-    it.effect(
-      "should fail with InvalidBranchOperationError when current branch is main",
-      () =>
-        Effect.gen(function* () {
-          const repo = createTestRepo()
-            .withRemote("upstream")
-            .withBranch("main", [
-              commit("01.01 - Lesson", {
-                "src/01.ts": "// content",
-              }),
-            ])
-            .build();
-
-          cleanup = repo.cleanup;
-
-          const result = yield* runPull({
-            upstream: getBareRepoPath(repo.workingDir),
-          }).pipe(
-            Effect.provide(makeLayer(repo.workingDir)),
-            Effect.flip
-          );
-
-          expect(result._tag).toBe("InvalidBranchOperationError");
-        })
-    );
-  });
-
   describe("merge conflict", () => {
     it.effect(
       "should fail with MergeConflictError when upstream changes conflict with local",

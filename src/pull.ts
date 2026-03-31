@@ -2,6 +2,7 @@ import { Command as CLICommand, Options } from "@effect/cli";
 import { Console, Data, Effect } from "effect";
 import { GitService, GitServiceConfig } from "./git-service.js";
 import { cwdOption } from "./options.js";
+import { PromptService } from "./prompt-service.js";
 
 export class InvalidBranchOperationError extends Data.TaggedError(
   "InvalidBranchOperationError"
@@ -25,13 +26,18 @@ export const runPull = (opts: { upstream: string }) =>
     // Validate git repository
     yield* git.ensureIsGitRepo();
 
-    // Get current branch (cannot be main)
-    const currentBranch = yield* git.getCurrentBranch();
-    if (currentBranch === "main") {
-      return yield* new InvalidBranchOperationError({
-        message:
-          "Cannot pull when on main branch. Switch to a working branch first.",
-      });
+    // Get current branch
+    let workingBranch = yield* git.getCurrentBranch();
+    if (workingBranch === "main") {
+      const promptService = yield* PromptService;
+      yield* Console.log(
+        "You're on the main branch. To avoid losing work, create a dev branch to pull upstream changes into."
+      );
+      const branchName = yield* promptService.inputBranchName(
+        "working"
+      );
+      yield* git.checkoutNewBranch(branchName);
+      workingBranch = branchName;
     }
 
     // Check for uncommitted changes
@@ -53,12 +59,12 @@ export const runPull = (opts: { upstream: string }) =>
 
     // Merge upstream/main into current branch
     yield* Console.log(
-      `Merging upstream/main into ${currentBranch}...`
+      `Merging upstream/main into ${workingBranch}...`
     );
     yield* git.merge("upstream/main");
 
     yield* Console.log(
-      `\n✓ Successfully merged upstream/main into ${currentBranch}`
+      `\n✓ Successfully merged upstream/main into ${workingBranch}`
     );
   });
 
@@ -115,6 +121,17 @@ export const pull = CLICommand.make(
             yield* Console.log(
               "\nMerge conflicts detected. Resolve conflicts and commit."
             );
+            process.exitCode = 1;
+          });
+        },
+        PromptCancelledError: () => {
+          return Effect.gen(function* () {
+            yield* Console.log("\nPull cancelled.");
+          });
+        },
+        FailedToCreateBranchError: (error) => {
+          return Effect.gen(function* () {
+            yield* Console.error(`Error: ${error.message}`);
             process.exitCode = 1;
           });
         },
