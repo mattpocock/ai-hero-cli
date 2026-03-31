@@ -1,5 +1,12 @@
 # ai-hero-cli
 
+## 0.4.0
+
+### Minor Changes
+
+- f3bfb2d: When running `pnpm pull` on the main branch, prompt the user to create a dev branch instead of erroring. The pull then proceeds on the new branch.
+- e073dc7: Add "reset to main" feature to reset current branch to upstream/main. Run `pnpm reset main` or select "main" from the interactive prompt.
+
 ## 0.3.1
 
 ### Patch Changes
