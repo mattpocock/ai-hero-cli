@@ -39,13 +39,17 @@
     "tabWidth": 2
   },
   "devDependencies": {
+    "@ai-hero/sandcastle": "^0.4.7",
     "@changesets/changelog-github": "^0.5.1",
     "@changesets/cli": "^2.29.7",
     "@effect/cli": "latest",
+    "@effect/cluster": "^0.58.0",
     "@effect/eslint-plugin": "^0.3.2",
     "@effect/language-service": "latest",
     "@effect/platform": "latest",
     "@effect/platform-node": "latest",
+    "@effect/rpc": "^0.75.0",
+    "@effect/sql": "^0.51.0",
     "@effect/vitest": "latest",
     "@eslint/compat": "1.1.1",
     "@eslint/eslintrc": "3.1.0",
