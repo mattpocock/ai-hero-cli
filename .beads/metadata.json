@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "ai_hero_cli",
+  "project_id": "c0b82c1a-260c-4a88-9630-6bc98fb9e0e5"
+}

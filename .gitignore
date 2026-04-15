@@ -13,3 +13,8 @@ dist/
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
