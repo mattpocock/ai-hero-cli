@@ -121,72 +121,51 @@ for (
   // Promise.allSettled means one failing pipeline doesn't cancel the others.
   // -------------------------------------------------------------------------
 
-  // Simple semaphore for concurrency limiting
-  let running = 0;
-  const waiting: Array<() => void> = [];
-  const acquire = (): Promise<void> => {
-    if (running < MAX_CONCURRENCY) {
-      running++;
-      return Promise.resolve();
-    }
-    return new Promise<void>((resolve) => {
-      waiting.push(() => {
-        running++;
-        resolve();
-      });
-    });
-  };
-  const release = () => {
-    running--;
-    const next = waiting.shift();
-    if (next) next();
-  };
-
   const settled = await Promise.allSettled(
     issues.map(async (issue) => {
-      await acquire();
-      try {
-        const sandbox = await sandcastle.createSandbox({
+      // Run the implementer
+      const implement = await sandcastle.run({
+        sandbox: docker({}),
+        copyToWorkspace,
+        name: "implementer",
+        branchStrategy: {
+          type: "branch",
           branch: issue.branch,
-          sandbox: docker(),
-          hooks,
+        },
+        throwOnDuplicateWorktree: false,
+        maxIterations: 100,
+        agent: sandcastle.claudeCode("claude-opus-4-6"),
+        promptFile: "./.sandcastle/implement-prompt.md",
+        hooks,
+        promptArgs: {
+          TASK_ID: issue.id,
+          ISSUE_TITLE: issue.title,
+          BRANCH: issue.branch,
+        },
+      });
+
+      // Only review if the implementer produced commits
+      if (implement.commits.length > 0) {
+        await sandcastle.run({
+          sandbox: docker({}),
           copyToWorkspace,
+          name: "reviewer",
+          maxIterations: 1,
+          hooks,
+          agent: sandcastle.claudeCode("claude-opus-4-6"),
+          promptFile: "./.sandcastle/review-prompt.md",
+          promptArgs: {
+            BRANCH: issue.branch,
+          },
+          throwOnDuplicateWorktree: false,
+          branchStrategy: {
+            type: "branch",
+            branch: issue.branch,
+          },
         });
-
-        try {
-          // Run the implementer
-          const implement = await sandbox.run({
-            name: "implementer",
-            maxIterations: 100,
-            agent: sandcastle.claudeCode("claude-opus-4-6"),
-            promptFile: "./.sandcastle/implement-prompt.md",
-            promptArgs: {
-              TASK_ID: issue.id,
-              ISSUE_TITLE: issue.title,
-              BRANCH: issue.branch,
-            },
-          });
-
-          // Only review if the implementer produced commits
-          if (implement.commits.length > 0) {
-            await sandbox.run({
-              name: "reviewer",
-              maxIterations: 1,
-              agent: sandcastle.claudeCode("claude-opus-4-6"),
-              promptFile: "./.sandcastle/review-prompt.md",
-              promptArgs: {
-                BRANCH: issue.branch,
-              },
-            });
-          }
-
-          return implement;
-        } finally {
-          await sandbox.close();
-        }
-      } finally {
-        release();
       }
+
+      return implement;
     }),
   );
 
