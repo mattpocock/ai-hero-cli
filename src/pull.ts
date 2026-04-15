@@ -1,15 +1,12 @@
 import { Command as CLICommand, Options } from "@effect/cli";
 import { Console, Data, Effect } from "effect";
-import { DEFAULT_PROJECT_TARGET_BRANCH } from "./constants.js";
+import {
+  ensureNotOnProtectedBranch,
+  InvalidBranchOperationError,
+} from "./errors.js";
 import { GitService, GitServiceConfig } from "./git-service.js";
 import { cwdOption } from "./options.js";
 import { PromptService } from "./prompt-service.js";
-
-export class InvalidBranchOperationError extends Data.TaggedError(
-  "InvalidBranchOperationError"
-)<{
-  message: string;
-}> {}
 
 export class UncommittedChangesError extends Data.TaggedError(
   "UncommittedChangesError"
@@ -27,13 +24,7 @@ export const runPull = (opts: { upstream: string }) =>
     // Validate git repository
     yield* git.ensureIsGitRepo();
 
-    // Get current branch
-    let workingBranch = yield* git.getCurrentBranch();
-    if (workingBranch === DEFAULT_PROJECT_TARGET_BRANCH) {
-      return yield* new InvalidBranchOperationError({
-        message: `Cannot run pull while on the "${DEFAULT_PROJECT_TARGET_BRANCH}" branch. This branch contains exercise data and should not be modified. Switch to a working branch first.`,
-      });
-    }
+    let workingBranch = yield* ensureNotOnProtectedBranch("pull");
     if (workingBranch === "main") {
       const promptService = yield* PromptService;
       yield* Console.log(

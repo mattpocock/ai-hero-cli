@@ -3,18 +3,16 @@ import {
   Command as CLICommand,
   Options,
 } from "@effect/cli";
-import { Console, Data, Effect, Option } from "effect";
+import { Console, Effect, Option } from "effect";
 import { selectLessonCommit } from "./commit-utils.js";
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "./constants.js";
+import {
+  ensureNotOnProtectedBranch,
+  InvalidBranchOperationError,
+} from "./errors.js";
 import { GitService, GitServiceConfig } from "./git-service.js";
 import { cwdOption } from "./options.js";
 import { PromptService } from "./prompt-service.js";
-
-export class InvalidBranchOperationError extends Data.TaggedError(
-  "InvalidBranchOperationError"
-)<{
-  message: string;
-}> {}
 
 /**
  * Core reset logic, extracted for testability.
@@ -38,13 +36,7 @@ export const runReset = ({
     // Validate git repository
     yield* git.ensureIsGitRepo();
 
-    // Check for protected branch early (before any branch manipulation)
-    const currentBranch = yield* git.getCurrentBranch();
-    if (currentBranch === DEFAULT_PROJECT_TARGET_BRANCH) {
-      return yield* new InvalidBranchOperationError({
-        message: `Cannot run reset while on the "${DEFAULT_PROJECT_TARGET_BRANCH}" branch. This branch contains exercise data and should not be modified. Switch to a working branch first.`,
-      });
-    }
+    const currentBranch = yield* ensureNotOnProtectedBranch("reset");
 
     // Set up upstream remote
     yield* git.setUpstreamRemote(upstream);

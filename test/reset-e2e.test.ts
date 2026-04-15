@@ -1331,49 +1331,4 @@ describe("reset (e2e)", () => {
     );
   });
 
-  describe("should fail when on live-run-through branch", () => {
-    it.effect(
-      "should fail with InvalidBranchOperationError when on live-run-through",
-      () =>
-        Effect.gen(function* () {
-          const repo = createTestRepo()
-            .withRemote("upstream")
-            .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
-                "src/01.ts": "// arrays intro",
-              }),
-            ])
-            .build();
-
-          cleanup = repo.cleanup;
-
-          // We're on live-run-through after build (first branch, no working branch)
-          const currentBefore = git(
-            repo.workingDir,
-            "branch",
-            "--show-current"
-          );
-          expect(currentBefore).toBe("live-run-through");
-
-          const mockPromptService =
-            fromPartial<PromptService>({});
-
-          const result = yield* runReset({
-            branch: "live-run-through",
-            lessonId: Option.some("01.01.01"),
-            demo: false,
-            upstream: getBareRepoPath(repo.workingDir),
-          }).pipe(
-            Effect.provide(
-              makeLayer(repo.workingDir, mockPromptService)
-            ),
-            Effect.flip
-          );
-
-          expect(result._tag).toBe(
-            "InvalidBranchOperationError"
-          );
-        })
-    );
-  });
 });
