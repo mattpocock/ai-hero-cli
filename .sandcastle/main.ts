@@ -123,9 +123,18 @@ for (
 
   const settled = await Promise.allSettled(
     issues.map(async (issue) => {
+      const sandbox = docker({
+        mounts: [
+          {
+            hostPath: ".beads",
+            sandboxPath: "/home/agent/workspace/.beads",
+          },
+        ],
+      });
+
       // Run the implementer
       const implement = await sandcastle.run({
-        sandbox: docker({}),
+        sandbox,
         copyToWorkspace,
         name: "implementer",
         branchStrategy: {
@@ -147,7 +156,7 @@ for (
       // Only review if the implementer produced commits
       if (implement.commits.length > 0) {
         await sandcastle.run({
-          sandbox: docker({}),
+          sandbox,
           copyToWorkspace,
           name: "reviewer",
           maxIterations: 1,
