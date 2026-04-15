@@ -70,7 +70,6 @@ for (
   // -------------------------------------------------------------------------
   const plan = await sandcastle.run({
     hooks,
-    copyToWorkspace,
     sandbox: docker(),
     // One iteration is enough: the planner just needs to read and reason,
     // not write code.
@@ -237,7 +236,6 @@ for (
   // -------------------------------------------------------------------------
   await sandcastle.run({
     hooks,
-    copyToWorkspace,
     sandbox: docker(),
     name: "merger",
     agent: sandcastle.claudeCode("claude-opus-4-6"),
