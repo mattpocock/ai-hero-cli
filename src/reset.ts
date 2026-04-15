@@ -3,18 +3,16 @@ import {
   Command as CLICommand,
   Options,
 } from "@effect/cli";
-import { Console, Data, Effect, Option } from "effect";
+import { Console, Effect, Option } from "effect";
 import { selectLessonCommit } from "./commit-utils.js";
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "./constants.js";
+import {
+  ensureNotOnProtectedBranch,
+  InvalidBranchOperationError,
+} from "./errors.js";
 import { GitService, GitServiceConfig } from "./git-service.js";
 import { cwdOption } from "./options.js";
 import { PromptService } from "./prompt-service.js";
-
-export class InvalidBranchOperationError extends Data.TaggedError(
-  "InvalidBranchOperationError"
-)<{
-  message: string;
-}> {}
 
 /**
  * Core reset logic, extracted for testability.
@@ -37,6 +35,8 @@ export const runReset = ({
 
     // Validate git repository
     yield* git.ensureIsGitRepo();
+
+    const currentBranch = yield* ensureNotOnProtectedBranch("reset");
 
     // Set up upstream remote
     yield* git.setUpstreamRemote(upstream);
@@ -79,8 +79,6 @@ export const runReset = ({
     }
 
     const isResetToMain = selectedLessonId === "main";
-
-    const currentBranch = yield* git.getCurrentBranch();
 
     // Cannot reset to main while on main
     if (isResetToMain && currentBranch === "main") {

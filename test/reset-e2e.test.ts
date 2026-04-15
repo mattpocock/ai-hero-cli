@@ -762,7 +762,7 @@ describe("reset (e2e)", () => {
 
   describe("reset when already on target branch", () => {
     it.effect(
-      "should fail when on target branch and ensureUpstreamBranchConnected cannot track",
+      "should fail with InvalidBranchOperationError when on live-run-through",
       () =>
         Effect.gen(function* () {
           const repo = createTestRepo()
@@ -783,22 +783,12 @@ describe("reset (e2e)", () => {
             "live-run-through"
           );
 
-          const mockPromptService = fromPartial<PromptService>({
-            selectLessonCommit: Effect.fn("selectLessonCommit")(
-              function* () {
-                return "01.01.01";
-              }
-            ),
-            selectResetAction: Effect.fn("selectResetAction")(
-              function* () {
-                return "reset-current" as const;
-              }
-            ),
-          });
+          const mockPromptService =
+            fromPartial<PromptService>({});
 
           const result = yield* runReset({
             branch: "live-run-through",
-            lessonId: Option.none(),
+            lessonId: Option.some("01.01.01"),
             demo: false,
             upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
@@ -808,8 +798,10 @@ describe("reset (e2e)", () => {
             Effect.flip
           );
 
-          // ensureUpstreamBranchConnected can't delete the current branch
-          expect(result._tag).toBe("FailedToTrackBranchError");
+          // Early branch protection catches this before ensureUpstreamBranchConnected
+          expect(result._tag).toBe(
+            "InvalidBranchOperationError"
+          );
         })
     );
   });
@@ -1338,4 +1330,5 @@ describe("reset (e2e)", () => {
         })
     );
   });
+
 });

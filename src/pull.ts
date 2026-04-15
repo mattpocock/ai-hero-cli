@@ -1,14 +1,12 @@
 import { Command as CLICommand, Options } from "@effect/cli";
 import { Console, Data, Effect } from "effect";
+import {
+  ensureNotOnProtectedBranch,
+  InvalidBranchOperationError,
+} from "./errors.js";
 import { GitService, GitServiceConfig } from "./git-service.js";
 import { cwdOption } from "./options.js";
 import { PromptService } from "./prompt-service.js";
-
-export class InvalidBranchOperationError extends Data.TaggedError(
-  "InvalidBranchOperationError"
-)<{
-  message: string;
-}> {}
 
 export class UncommittedChangesError extends Data.TaggedError(
   "UncommittedChangesError"
@@ -26,8 +24,7 @@ export const runPull = (opts: { upstream: string }) =>
     // Validate git repository
     yield* git.ensureIsGitRepo();
 
-    // Get current branch
-    let workingBranch = yield* git.getCurrentBranch();
+    let workingBranch = yield* ensureNotOnProtectedBranch("pull");
     if (workingBranch === "main") {
       const promptService = yield* PromptService;
       yield* Console.log(

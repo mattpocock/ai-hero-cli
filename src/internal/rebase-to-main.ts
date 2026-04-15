@@ -1,6 +1,6 @@
 import { Command as CLICommand, Options } from "@effect/cli";
 import { Console, Effect } from "effect";
-import { InvalidBranchOperationError } from "../cherry-pick.js";
+import { InvalidBranchOperationError } from "../errors.js";
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "../constants.js";
 import {
   FailedToCheckoutError,

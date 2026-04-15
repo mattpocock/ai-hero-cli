@@ -4,18 +4,16 @@ import {
   Options,
 } from "@effect/cli";
 import type { Option } from "effect";
-import { Console, Data, Effect } from "effect";
+import { Console, Effect } from "effect";
 import { selectLessonCommit } from "./commit-utils.js";
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "./constants.js";
+import {
+  ensureNotOnProtectedBranch,
+  InvalidBranchOperationError,
+} from "./errors.js";
 import { GitService, GitServiceConfig } from "./git-service.js";
 import { cwdOption } from "./options.js";
 import { PromptService } from "./prompt-service.js";
-
-export class InvalidBranchOperationError extends Data.TaggedError(
-  "InvalidBranchOperationError"
-)<{
-  message: string;
-}> {}
 
 /**
  * Core cherry-pick logic, extracted for testability.
@@ -37,6 +35,8 @@ export const runCherryPick = ({
     // Validate git repository
     yield* git.ensureIsGitRepo();
 
+    const currentBranch = yield* ensureNotOnProtectedBranch("cherry-pick");
+
     // Set up upstream remote
     yield* git.setUpstreamRemote(upstream);
 
@@ -52,9 +52,6 @@ export const runCherryPick = ({
           "Which lesson do you want to cherry-pick? (type to search)",
         excludeCurrentBranch: true,
       });
-
-    // Get current branch name and validate
-    const currentBranch = yield* git.getCurrentBranch();
 
     // Check if current branch is the target branch
     if (currentBranch === branch) {
