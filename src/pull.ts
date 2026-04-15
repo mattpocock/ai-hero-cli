@@ -1,9 +1,6 @@
 import { Command as CLICommand, Options } from "@effect/cli";
 import { Console, Data, Effect } from "effect";
-import {
-  ensureNotOnProtectedBranch,
-  InvalidBranchOperationError,
-} from "./errors.js";
+import { ensureNotOnProtectedBranch } from "./errors.js";
 import { GitService, GitServiceConfig } from "./git-service.js";
 import { cwdOption } from "./options.js";
 import { PromptService } from "./prompt-service.js";
