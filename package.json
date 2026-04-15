@@ -30,7 +30,8 @@
     "coverage": "vitest run --coverage",
     "copy-package-json": "tsx scripts/copy-package-json.ts",
     "changeset-version": "changeset version && node scripts/version.mjs",
-    "changeset-publish": "pnpm build && changeset publish"
+    "changeset-publish": "pnpm build && changeset publish",
+    "sandcastle": "npx tsx .sandcastle/main.ts"
   },
   "prettier": {
     "printWidth": 65,
