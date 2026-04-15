@@ -36,9 +36,80 @@ const git = (cwd: string, ...args: Array<string>) =>
     .trim();
 
 /**
- * Integration tests for pull command on main branch.
+ * Integration tests for pull command.
  * Uses real GitService with mocked PromptService.
  */
+describe("pull on live-run-through branch", () => {
+  let cleanup: (() => void) | undefined;
+
+  afterEach(() => {
+    cleanup?.();
+    cleanup = undefined;
+  });
+
+  const getBareRepoPath = (workingDir: string) =>
+    path.resolve(workingDir, "..", "bare.git");
+
+  const makeLayer = (
+    workingDir: string,
+    promptService: PromptService
+  ) => {
+    const deps = Layer.mergeAll(
+      NodeFileSystem.layer,
+      Layer.succeed(GitServiceConfig, { cwd: workingDir })
+    );
+
+    return Layer.mergeAll(
+      Layer.effect(GitService, makeGitService).pipe(
+        Layer.provide(deps)
+      ),
+      Layer.succeed(PromptService, promptService),
+      NodeContext.layer
+    );
+  };
+
+  it.effect(
+    "should fail with InvalidBranchOperationError when on live-run-through",
+    () =>
+      Effect.gen(function* () {
+        const repo = createTestRepo()
+          .withRemote("upstream")
+          .withBranch("live-run-through", [
+            commit("01.01 - Lesson", {
+              "src/01.ts": "// original",
+            }),
+          ])
+          .build();
+
+        cleanup = repo.cleanup;
+
+        // We're on live-run-through after build (first branch, no working branch)
+        const currentBefore = git(
+          repo.workingDir,
+          "branch",
+          "--show-current"
+        );
+        expect(currentBefore).toBe("live-run-through");
+
+        const mockPromptService =
+          fromPartial<PromptService>({});
+
+        const result = yield* runPull({
+          upstream: getBareRepoPath(repo.workingDir),
+        }).pipe(
+          Effect.provide(
+            makeLayer(repo.workingDir, mockPromptService)
+          ),
+          Effect.flip
+        );
+
+        expect(result._tag).toBe(
+          "InvalidBranchOperationError"
+        );
+      })
+  );
+});
+
 describe("pull on main branch", () => {
   let cleanup: (() => void) | undefined;
 

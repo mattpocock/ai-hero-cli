@@ -37,6 +37,14 @@ export const runCherryPick = ({
     // Validate git repository
     yield* git.ensureIsGitRepo();
 
+    // Check for protected branch early (before any branch manipulation)
+    const currentBranch = yield* git.getCurrentBranch();
+    if (currentBranch === DEFAULT_PROJECT_TARGET_BRANCH) {
+      return yield* new InvalidBranchOperationError({
+        message: `Cannot run cherry-pick while on the "${DEFAULT_PROJECT_TARGET_BRANCH}" branch. This branch contains exercise data and should not be modified. Switch to a working branch first.`,
+      });
+    }
+
     // Set up upstream remote
     yield* git.setUpstreamRemote(upstream);
 
@@ -52,9 +60,6 @@ export const runCherryPick = ({
           "Which lesson do you want to cherry-pick? (type to search)",
         excludeCurrentBranch: true,
       });
-
-    // Get current branch name and validate
-    const currentBranch = yield* git.getCurrentBranch();
 
     // Check if current branch is the target branch
     if (currentBranch === branch) {

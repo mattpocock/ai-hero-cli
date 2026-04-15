@@ -38,6 +38,14 @@ export const runReset = ({
     // Validate git repository
     yield* git.ensureIsGitRepo();
 
+    // Check for protected branch early (before any branch manipulation)
+    const currentBranch = yield* git.getCurrentBranch();
+    if (currentBranch === DEFAULT_PROJECT_TARGET_BRANCH) {
+      return yield* new InvalidBranchOperationError({
+        message: `Cannot run reset while on the "${DEFAULT_PROJECT_TARGET_BRANCH}" branch. This branch contains exercise data and should not be modified. Switch to a working branch first.`,
+      });
+    }
+
     // Set up upstream remote
     yield* git.setUpstreamRemote(upstream);
 
@@ -79,8 +87,6 @@ export const runReset = ({
     }
 
     const isResetToMain = selectedLessonId === "main";
-
-    const currentBranch = yield* git.getCurrentBranch();
 
     // Cannot reset to main while on main
     if (isResetToMain && currentBranch === "main") {

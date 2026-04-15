@@ -467,13 +467,9 @@ describe("cherry-pick (e2e)", () => {
 
   describe("cherry-pick from same branch rejected", () => {
     it.effect(
-      "should fail when trying to cherry-pick from the branch you are on",
+      "should fail with InvalidBranchOperationError when on live-run-through",
       () =>
         Effect.gen(function* () {
-          // When on the target branch, ensureUpstreamBranchConnected cannot
-          // delete the current branch, causing FailedToTrackBranchError.
-          // This is the real e2e behavior — the command fails before reaching
-          // the InvalidBranchOperationError check.
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("live-run-through", [
@@ -486,19 +482,18 @@ describe("cherry-pick (e2e)", () => {
           cleanup = repo.cleanup;
 
           // We're already on live-run-through after build
-          git(repo.workingDir, "checkout", "live-run-through");
+          const currentBefore = git(
+            repo.workingDir,
+            "branch",
+            "--show-current",
+          );
+          expect(currentBefore).toBe("live-run-through");
 
-          const mockPromptService = fromPartial<PromptService>({
-            selectLessonCommit: Effect.fn("selectLessonCommit")(
-              function* () {
-                return "01.01.01";
-              },
-            ),
-          });
+          const mockPromptService = fromPartial<PromptService>({});
 
           const result = yield* runCherryPick({
             branch: "live-run-through",
-            lessonId: Option.none(),
+            lessonId: Option.some("01.01.01"),
             upstream: getBareRepoPath(repo.workingDir),
           }).pipe(
             Effect.provide(
@@ -507,9 +502,7 @@ describe("cherry-pick (e2e)", () => {
             Effect.flip,
           );
 
-          // Command fails because ensureUpstreamBranchConnected can't
-          // delete the current branch and re-track it
-          expect(result._tag).toBe("FailedToTrackBranchError");
+          expect(result._tag).toBe("InvalidBranchOperationError");
         }),
     );
   });
