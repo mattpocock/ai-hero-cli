@@ -1331,4 +1331,208 @@ describe("reset (e2e)", () => {
     );
   });
 
+  describe("upstream cleanup", () => {
+    it.effect(
+      "should clean up upstream remote and local branch when they did not exist before",
+      () =>
+        Effect.gen(function* () {
+          const repo = createTestRepo()
+            .withRemote("upstream")
+            .withBranch("live-run-through", [
+              commit("01.01.01 Arrays intro", {
+                "src/01.ts": "// arrays intro",
+              }),
+            ])
+            .withWorkingBranch("my-branch", {
+              from: "live-run-through",
+              atCommit: 0,
+            })
+            .build();
+
+          cleanup = repo.cleanup;
+          configureGitUser(repo.workingDir);
+
+          const bareRepoPath = getBareRepoPath(repo.workingDir);
+
+          // Remove upstream remote and local live-run-through branch
+          // so the CLI has to create them
+          git(repo.workingDir, "remote", "remove", "upstream");
+          git(
+            repo.workingDir,
+            "branch",
+            "-D",
+            "live-run-through"
+          );
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectResetAction: Effect.fn("selectResetAction")(
+              function* () {
+                return "reset-current" as const;
+              }
+            ),
+          });
+
+          yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.some("01.01.01"),
+            demo: false,
+            upstream: bareRepoPath,
+          }).pipe(
+            Effect.provide(
+              makeLayer(repo.workingDir, mockPromptService)
+            )
+          );
+
+          // Verify the reset worked
+          const content = fs.readFileSync(
+            `${repo.workingDir}/src/01.ts`,
+            "utf-8"
+          );
+          expect(content).toBe("// arrays intro");
+
+          // Verify upstream remote was cleaned up
+          const remotes = git(
+            repo.workingDir,
+            "remote",
+            "-v"
+          );
+          expect(remotes).not.toContain("upstream");
+
+          // Verify local live-run-through branch was cleaned up
+          const branches = git(
+            repo.workingDir,
+            "branch",
+            "--list"
+          );
+          expect(branches).not.toContain("live-run-through");
+        })
+    );
+
+    it.effect(
+      "should preserve upstream remote and local branch when they existed before",
+      () =>
+        Effect.gen(function* () {
+          const repo = createTestRepo()
+            .withRemote("upstream")
+            .withBranch("live-run-through", [
+              commit("01.01.01 Arrays intro", {
+                "src/01.ts": "// arrays intro",
+              }),
+            ])
+            .withWorkingBranch("my-branch", {
+              from: "live-run-through",
+              atCommit: 0,
+            })
+            .build();
+
+          cleanup = repo.cleanup;
+          configureGitUser(repo.workingDir);
+
+          // upstream remote and live-run-through branch already exist
+          // from the test repo builder
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectResetAction: Effect.fn("selectResetAction")(
+              function* () {
+                return "reset-current" as const;
+              }
+            ),
+          });
+
+          yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.some("01.01.01"),
+            demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
+          }).pipe(
+            Effect.provide(
+              makeLayer(repo.workingDir, mockPromptService)
+            )
+          );
+
+          // Verify upstream remote is still present
+          const remotes = git(
+            repo.workingDir,
+            "remote",
+            "-v"
+          );
+          expect(remotes).toContain("upstream");
+
+          // Verify local live-run-through branch is still present
+          const branches = git(
+            repo.workingDir,
+            "branch",
+            "--list"
+          );
+          expect(branches).toContain("live-run-through");
+        })
+    );
+
+    it.effect(
+      "should clean up even when the command fails",
+      () =>
+        Effect.gen(function* () {
+          const repo = createTestRepo()
+            .withRemote("upstream")
+            .withBranch("live-run-through", [
+              commit("01.01.01 Arrays intro", {
+                "src/01.ts": "// arrays",
+              }),
+            ])
+            .withWorkingBranch("my-branch", {
+              from: "live-run-through",
+              atCommit: 0,
+            })
+            .build();
+
+          cleanup = repo.cleanup;
+
+          const bareRepoPath = getBareRepoPath(repo.workingDir);
+
+          // Remove upstream so the CLI creates it
+          git(repo.workingDir, "remote", "remove", "upstream");
+          git(
+            repo.workingDir,
+            "branch",
+            "-D",
+            "live-run-through"
+          );
+
+          const mockPromptService =
+            fromPartial<PromptService>({});
+
+          // Use a non-existent lesson ID to trigger CommitNotFoundError
+          const result = yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.some("99.99.99"),
+            demo: false,
+            upstream: bareRepoPath,
+          }).pipe(
+            Effect.provide(
+              makeLayer(repo.workingDir, mockPromptService)
+            ),
+            Effect.flip
+          );
+
+          expect(result._tag).toBe("CommitNotFoundError");
+
+          // Verify upstream remote was still cleaned up despite error
+          const remotes = git(
+            repo.workingDir,
+            "remote",
+            "-v"
+          );
+          expect(remotes).not.toContain("upstream");
+
+          // Verify local branch was still cleaned up despite error
+          const branches = git(
+            repo.workingDir,
+            "branch",
+            "--list"
+          );
+          expect(branches).not.toContain("live-run-through");
+        })
+    );
+  });
+
 });

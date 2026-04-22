@@ -225,7 +225,7 @@ describe("pull (e2e)", () => {
 
   describe("upstream remote setup", () => {
     it.effect(
-      "should create upstream remote if it does not exist",
+      "should create upstream remote temporarily and clean it up after pull",
       () =>
         Effect.gen(function* () {
           const repo = createTestRepo()
@@ -266,14 +266,13 @@ describe("pull (e2e)", () => {
             )
           ).toBe(true);
 
-          // Verify the remote was created with the correct URL
+          // Verify the remote was cleaned up (it didn't exist before)
           const remotes = git(
             repo.workingDir,
             "remote",
             "-v"
           );
-          expect(remotes).toContain("upstream");
-          expect(remotes).toContain(bareRepoPath);
+          expect(remotes).not.toContain("upstream");
         })
     );
 

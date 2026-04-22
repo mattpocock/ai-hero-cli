@@ -13,6 +13,7 @@ import {
 import { GitService, GitServiceConfig } from "./git-service.js";
 import { cwdOption } from "./options.js";
 import { PromptService } from "./prompt-service.js";
+import { withUpstreamCleanup } from "./upstream-cleanup.js";
 
 /**
  * Core reset logic, extracted for testability.
@@ -29,140 +30,143 @@ export const runReset = ({
   demo: boolean;
   upstream: string;
 }) =>
-  Effect.gen(function* () {
-    const git = yield* GitService;
-    const promptService = yield* PromptService;
+  withUpstreamCleanup(
+    { upstream, targetBranch: branch },
+    Effect.gen(function* () {
+      const git = yield* GitService;
+      const promptService = yield* PromptService;
 
-    // Validate git repository
-    yield* git.ensureIsGitRepo();
+      // Validate git repository
+      yield* git.ensureIsGitRepo();
 
-    const currentBranch = yield* ensureNotOnProtectedBranch("reset");
+      const currentBranch = yield* ensureNotOnProtectedBranch("reset");
 
-    // Set up upstream remote
-    yield* git.setUpstreamRemote(upstream);
+      // Set up upstream remote
+      yield* git.setUpstreamRemote(upstream);
 
-    yield* git.ensureUpstreamBranchConnected({
-      targetBranch: branch,
-    });
-
-    // Determine if this is a "reset to main" operation
-    const isExplicitMain =
-      Option.isSome(lessonId) && lessonId.value === "main";
-
-    let commitToUse: string;
-    let selectedLessonId: string;
-
-    if (isExplicitMain) {
-      yield* git.fetch("upstream", "main");
-      commitToUse = yield* git.revParse("upstream/main");
-      selectedLessonId = "main";
-    } else {
-      const result = yield* selectLessonCommit({
-        branch,
-        lessonId,
-        promptMessage:
-          "Which lesson do you want to reset to? (type to search)",
-        excludeCurrentBranch: false,
-        extraChoices: [
-          { lessonId: "main", message: "Reset to the starting point" },
-        ],
+      yield* git.ensureUpstreamBranchConnected({
+        targetBranch: branch,
       });
 
-      if (result.lessonId === "main") {
+      // Determine if this is a "reset to main" operation
+      const isExplicitMain =
+        Option.isSome(lessonId) && lessonId.value === "main";
+
+      let commitToUse: string;
+      let selectedLessonId: string;
+
+      if (isExplicitMain) {
         yield* git.fetch("upstream", "main");
         commitToUse = yield* git.revParse("upstream/main");
         selectedLessonId = "main";
       } else {
-        commitToUse = result.commit.sha;
-        selectedLessonId = result.lessonId;
+        const result = yield* selectLessonCommit({
+          branch,
+          lessonId,
+          promptMessage:
+            "Which lesson do you want to reset to? (type to search)",
+          excludeCurrentBranch: false,
+          extraChoices: [
+            { lessonId: "main", message: "Reset to the starting point" },
+          ],
+        });
+
+        if (result.lessonId === "main") {
+          yield* git.fetch("upstream", "main");
+          commitToUse = yield* git.revParse("upstream/main");
+          selectedLessonId = "main";
+        } else {
+          commitToUse = result.commit.sha;
+          selectedLessonId = result.lessonId;
+        }
       }
-    }
 
-    const isResetToMain = selectedLessonId === "main";
+      const isResetToMain = selectedLessonId === "main";
 
-    // Cannot reset to main while on main
-    if (isResetToMain && currentBranch === "main") {
-      return yield* new InvalidBranchOperationError({
-        message:
-          "Cannot reset to main while on the main branch. Create a new branch first.",
-      });
-    }
-
-    // Prompt for action (skip in demo mode)
-    let action: "reset-current" | "create-branch";
-    if (currentBranch === "main") {
-      yield* Console.log(
-        "You cannot reset the main branch. Creating a new branch..."
-      );
-      action = "create-branch";
-    } else if (demo) {
-      action = "reset-current";
-    } else {
-      action = yield* promptService.selectResetAction(
-        currentBranch
-      );
-    }
-
-    if (action === "reset-current") {
-      // Check if current branch is the target branch
-      if (currentBranch === branch) {
+      // Cannot reset to main while on main
+      if (isResetToMain && currentBranch === "main") {
         return yield* new InvalidBranchOperationError({
-          message: `Cannot reset current branch when on target branch "${branch}"`,
+          message:
+            "Cannot reset to main while on the main branch. Create a new branch first.",
         });
       }
-    }
 
-    if (action === "create-branch") {
-      const branchName = yield* promptService.inputBranchName(
-        "new"
-      );
-
-      yield* Console.log(
-        `Creating branch ${branchName} from ${selectedLessonId}...`
-      );
-
-      yield* git.checkoutNewBranchAt(branchName, commitToUse);
-
-      yield* Console.log(
-        `✓ Created and checked out branch: ${branchName}`
-      );
-      return;
-    }
-
-    // Reset current branch - check for unstaged changes (skip in demo mode)
-    if (!demo) {
-      const { hasUncommittedChanges, statusOutput } =
-        yield* git.getUncommittedChanges();
-
-      if (hasUncommittedChanges) {
+      // Prompt for action (skip in demo mode)
+      let action: "reset-current" | "create-branch";
+      if (currentBranch === "main") {
         yield* Console.log(
-          "\nWarning: You have uncommitted changes:"
+          "You cannot reset the main branch. Creating a new branch..."
         );
-        yield* Console.log(statusOutput);
-
-        yield* promptService.confirmResetWithUncommittedChanges();
+        action = "create-branch";
+      } else if (demo) {
+        action = "reset-current";
+      } else {
+        action = yield* promptService.selectResetAction(
+          currentBranch
+        );
       }
-    }
 
-    // Reset to target commit
-    yield* Console.log(
-      `Resetting to ${selectedLessonId}...`
-    );
+      if (action === "reset-current") {
+        // Check if current branch is the target branch
+        if (currentBranch === branch) {
+          return yield* new InvalidBranchOperationError({
+            message: `Cannot reset current branch when on target branch "${branch}"`,
+          });
+        }
+      }
 
-    if (demo) {
-      yield* git.applyAsUnstagedChanges(commitToUse);
+      if (action === "create-branch") {
+        const branchName = yield* promptService.inputBranchName(
+          "new"
+        );
 
+        yield* Console.log(
+          `Creating branch ${branchName} from ${selectedLessonId}...`
+        );
+
+        yield* git.checkoutNewBranchAt(branchName, commitToUse);
+
+        yield* Console.log(
+          `✓ Created and checked out branch: ${branchName}`
+        );
+        return;
+      }
+
+      // Reset current branch - check for unstaged changes (skip in demo mode)
+      if (!demo) {
+        const { hasUncommittedChanges, statusOutput } =
+          yield* git.getUncommittedChanges();
+
+        if (hasUncommittedChanges) {
+          yield* Console.log(
+            "\nWarning: You have uncommitted changes:"
+          );
+          yield* Console.log(statusOutput);
+
+          yield* promptService.confirmResetWithUncommittedChanges();
+        }
+      }
+
+      // Reset to target commit
       yield* Console.log(
-        `✓ Demo mode: Reset to ${selectedLessonId} with unstaged changes`
+        `Resetting to ${selectedLessonId}...`
       );
-    } else {
-      yield* git.resetHard(commitToUse);
 
-      yield* Console.log(
-        `✓ Reset to ${selectedLessonId}`
-      );
-    }
-  });
+      if (demo) {
+        yield* git.applyAsUnstagedChanges(commitToUse);
+
+        yield* Console.log(
+          `✓ Demo mode: Reset to ${selectedLessonId} with unstaged changes`
+        );
+      } else {
+        yield* git.resetHard(commitToUse);
+
+        yield* Console.log(
+          `✓ Reset to ${selectedLessonId}`
+        );
+      }
+    })
+  );
 
 export const reset = CLICommand.make(
   "reset",

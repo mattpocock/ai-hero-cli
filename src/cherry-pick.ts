@@ -14,6 +14,7 @@ import {
 import { GitService, GitServiceConfig } from "./git-service.js";
 import { cwdOption } from "./options.js";
 import { PromptService } from "./prompt-service.js";
+import { withUpstreamCleanup } from "./upstream-cleanup.js";
 
 /**
  * Core cherry-pick logic, extracted for testability.
@@ -28,65 +29,68 @@ export const runCherryPick = ({
   lessonId: Option.Option<string>;
   upstream: string;
 }) =>
-  Effect.gen(function* () {
-    const git = yield* GitService;
-    const promptService = yield* PromptService;
+  withUpstreamCleanup(
+    { upstream, targetBranch: branch },
+    Effect.gen(function* () {
+      const git = yield* GitService;
+      const promptService = yield* PromptService;
 
-    // Validate git repository
-    yield* git.ensureIsGitRepo();
+      // Validate git repository
+      yield* git.ensureIsGitRepo();
 
-    const currentBranch = yield* ensureNotOnProtectedBranch("cherry-pick");
+      const currentBranch = yield* ensureNotOnProtectedBranch("cherry-pick");
 
-    // Set up upstream remote
-    yield* git.setUpstreamRemote(upstream);
+      // Set up upstream remote
+      yield* git.setUpstreamRemote(upstream);
 
-    yield* git.ensureUpstreamBranchConnected({
-      targetBranch: branch,
-    });
-
-    const { commit: targetCommit, lessonId: selectedLessonId } =
-      yield* selectLessonCommit({
-        branch,
-        lessonId,
-        promptMessage:
-          "Which lesson do you want to cherry-pick? (type to search)",
-        excludeCurrentBranch: true,
+      yield* git.ensureUpstreamBranchConnected({
+        targetBranch: branch,
       });
 
-    // Check if current branch is the target branch
-    if (currentBranch === branch) {
-      return yield* new InvalidBranchOperationError({
-        message: `Cannot cherry-pick when on target branch "${branch}"`,
-      });
-    }
+      const { commit: targetCommit, lessonId: selectedLessonId } =
+        yield* selectLessonCommit({
+          branch,
+          lessonId,
+          promptMessage:
+            "Which lesson do you want to cherry-pick? (type to search)",
+          excludeCurrentBranch: true,
+        });
 
-    // Check if current branch is main
-    if (currentBranch === "main") {
+      // Check if current branch is the target branch
+      if (currentBranch === branch) {
+        return yield* new InvalidBranchOperationError({
+          message: `Cannot cherry-pick when on target branch "${branch}"`,
+        });
+      }
+
+      // Check if current branch is main
+      if (currentBranch === "main") {
+        yield* Console.log(
+          "You cannot cherry-pick onto the main branch."
+        );
+
+        const branchName = yield* promptService.inputBranchName(
+          "working"
+        );
+
+        yield* git.checkoutNewBranch(branchName);
+
+        yield* Console.log(
+          `✓ Created and switched to ${branchName}`
+        );
+      }
+
       yield* Console.log(
-        "You cannot cherry-pick onto the main branch."
+        `Cherry-picking ${targetCommit.sha} onto current branch...\n`
       );
 
-      const branchName = yield* promptService.inputBranchName(
-        "working"
-      );
-
-      yield* git.checkoutNewBranch(branchName);
+      yield* git.cherryPick(targetCommit.sha);
 
       yield* Console.log(
-        `✓ Created and switched to ${branchName}`
+        `\n✓ Successfully cherry-picked lesson ${selectedLessonId}`
       );
-    }
-
-    yield* Console.log(
-      `Cherry-picking ${targetCommit.sha} onto current branch...\n`
-    );
-
-    yield* git.cherryPick(targetCommit.sha);
-
-    yield* Console.log(
-      `\n✓ Successfully cherry-picked lesson ${selectedLessonId}`
-    );
-  });
+    })
+  );
 
 export const cherryPick = CLICommand.make(
   "cherry-pick",
