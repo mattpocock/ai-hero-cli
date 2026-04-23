@@ -12,7 +12,7 @@ export const withUpstreamCleanup = <A, E, R>(
     targetBranch?: string;
   },
   body: Effect.Effect<A, E, R>
-): Effect.Effect<A, E, R | GitService> =>
+) =>
   Effect.gen(function* () {
     const git = yield* GitService;
 
