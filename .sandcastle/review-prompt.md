@@ -2,6 +2,8 @@
 
 Review the code changes on branch `{{BRANCH}}` and improve code clarity, consistency, and maintainability while preserving exact functionality.
 
+Check the issue by calling `gh issue view {{ISSUE_NUMBER}}`
+
 # CONTEXT
 
 ## Branch diff

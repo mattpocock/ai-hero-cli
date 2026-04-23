@@ -1,8 +1,8 @@
 # TASK
 
-Fix issue {{TASK_ID}}: {{ISSUE_TITLE}}
+Fix issue {{ISSUE_NUMBER}}: {{ISSUE_TITLE}}
 
-Pull in the issue using `bd show {{TASK_ID}}`. If it has a parent PRD, pull that in too.
+Pull in the issue using `gh issue view {{ISSUE_NUMBER}}`. If it has a parent PRD, pull that in too.
 
 Only work on the issue specified.
 
