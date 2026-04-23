@@ -361,6 +361,13 @@ describe("pull (e2e)", () => {
           const localTmpDir = `${upstreamRepo.workingDir}/../local-unrelated`;
           fs.mkdirSync(localTmpDir);
           git(localTmpDir, "init");
+          git(localTmpDir, "config", "user.name", "Test");
+          git(
+            localTmpDir,
+            "config",
+            "user.email",
+            "test@test.com"
+          );
           fs.writeFileSync(
             `${localTmpDir}/README.md`,
             "# My project"
