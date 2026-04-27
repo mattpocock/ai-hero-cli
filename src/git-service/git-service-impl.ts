@@ -67,6 +67,16 @@ export const makeGitService = Effect.gen(function* () {
         return yield* Command.exitCode(command);
       });
 
+      const runCommandSilentExitCode = Effect.fn(
+        "runCommandSilentExitCode"
+      )(function* (...commandArgs: [string, ...Array<string>]) {
+        const cwd = config.cwd;
+        const command = Command.make(...commandArgs).pipe(
+          Command.workingDirectory(cwd)
+        );
+        return yield* Command.exitCode(command);
+      });
+
       const resetHard = Effect.fn("resetHard")(function* (
         sha: string
       ) {
@@ -533,6 +543,38 @@ export const makeGitService = Effect.gen(function* () {
             }
           }
         ),
+        hasRemote: Effect.fn("hasRemote")(function* (
+          name: string
+        ) {
+          const exitCode = yield* runCommandSilentExitCode(
+            "git",
+            "remote",
+            "get-url",
+            name
+          );
+          return exitCode === 0;
+        }),
+        removeRemote: Effect.fn("removeRemote")(function* (
+          name: string
+        ) {
+          yield* runCommandSilentExitCode(
+            "git",
+            "remote",
+            "remove",
+            name
+          );
+        }),
+        hasLocalBranch: Effect.fn("hasLocalBranch")(function* (
+          name: string
+        ) {
+          const exitCode = yield* runCommandSilentExitCode(
+            "git",
+            "rev-parse",
+            "--verify",
+            `refs/heads/${name}`
+          );
+          return exitCode === 0;
+        }),
       };
     });
 

@@ -4,6 +4,7 @@ import { ensureNotOnProtectedBranch } from "./errors.js";
 import { GitService, GitServiceConfig } from "./git-service.js";
 import { cwdOption } from "./options.js";
 import { PromptService } from "./prompt-service.js";
+import { withUpstreamCleanup } from "./upstream-cleanup.js";
 
 export class UncommittedChangesError extends Data.TaggedError(
   "UncommittedChangesError"
@@ -15,52 +16,55 @@ export class UncommittedChangesError extends Data.TaggedError(
  * Core pull logic, extracted for testability.
  */
 export const runPull = (opts: { upstream: string }) =>
-  Effect.gen(function* () {
-    const git = yield* GitService;
+  withUpstreamCleanup(
+    { upstream: opts.upstream },
+    Effect.gen(function* () {
+      const git = yield* GitService;
 
-    // Validate git repository
-    yield* git.ensureIsGitRepo();
+      // Validate git repository
+      yield* git.ensureIsGitRepo();
 
-    let workingBranch = yield* ensureNotOnProtectedBranch("pull");
-    if (workingBranch === "main") {
-      const promptService = yield* PromptService;
+      let workingBranch = yield* ensureNotOnProtectedBranch("pull");
+      if (workingBranch === "main") {
+        const promptService = yield* PromptService;
+        yield* Console.log(
+          "You're on the main branch. To avoid losing work, create a dev branch to pull upstream changes into."
+        );
+        const branchName = yield* promptService.inputBranchName(
+          "working"
+        );
+        yield* git.checkoutNewBranch(branchName);
+        workingBranch = branchName;
+      }
+
+      // Check for uncommitted changes
+      const { hasUncommittedChanges, statusOutput } =
+        yield* git.getUncommittedChanges();
+
+      if (hasUncommittedChanges) {
+        return yield* new UncommittedChangesError({
+          statusOutput,
+        });
+      }
+
+      // Set up upstream remote
+      yield* git.setUpstreamRemote(opts.upstream);
+
+      // Fetch main from upstream
+      yield* Console.log("Fetching main from upstream...");
+      yield* git.fetch("upstream", "main");
+
+      // Merge upstream/main into current branch
       yield* Console.log(
-        "You're on the main branch. To avoid losing work, create a dev branch to pull upstream changes into."
+        `Merging upstream/main into ${workingBranch}...`
       );
-      const branchName = yield* promptService.inputBranchName(
-        "working"
+      yield* git.merge("upstream/main");
+
+      yield* Console.log(
+        `\n✓ Successfully merged upstream/main into ${workingBranch}`
       );
-      yield* git.checkoutNewBranch(branchName);
-      workingBranch = branchName;
-    }
-
-    // Check for uncommitted changes
-    const { hasUncommittedChanges, statusOutput } =
-      yield* git.getUncommittedChanges();
-
-    if (hasUncommittedChanges) {
-      return yield* new UncommittedChangesError({
-        statusOutput,
-      });
-    }
-
-    // Set up upstream remote
-    yield* git.setUpstreamRemote(opts.upstream);
-
-    // Fetch main from upstream
-    yield* Console.log("Fetching main from upstream...");
-    yield* git.fetch("upstream", "main");
-
-    // Merge upstream/main into current branch
-    yield* Console.log(
-      `Merging upstream/main into ${workingBranch}...`
-    );
-    yield* git.merge("upstream/main");
-
-    yield* Console.log(
-      `\n✓ Successfully merged upstream/main into ${workingBranch}`
-    );
-  });
+    })
+  );
 
 export const pull = CLICommand.make(
   "pull",

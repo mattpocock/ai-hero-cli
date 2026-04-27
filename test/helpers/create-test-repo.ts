@@ -88,6 +88,8 @@ export const createTestRepo = (): TestRepoBuilder => {
       // Create working repo and add remote
       fs.mkdirSync(workDir);
       git(workDir, "init");
+      git(workDir, "config", "user.name", "Test");
+      git(workDir, "config", "user.email", "test@test.com");
       git(workDir, "remote", "add", remoteName, bareDir);
 
       // Track commit SHAs per branch for withWorkingBranch
