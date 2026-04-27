@@ -1,5 +1,13 @@
 # ai-hero-cli
 
+## 0.4.1
+
+### Patch Changes
+
+- a2e01f0: Clean up the upstream remote and local tracking branch when CLI commands finish. Only cleans up resources that the CLI added -- if the user already had an upstream remote configured, it is left untouched.
+- 4e6a0ac: Prevent reset, cherry-pick, and pull commands from running while on the live-run-through branch. This branch contains exercise data and should not be modified directly.
+- 9e0df15: Suppress confusing `error: No such remote 'upstream'` and `error: branch '<name>' not found` messages that previously leaked to stderr during `reset`, `cherry-pick`, and `pull`. These came from probing git commands whose failure was expected and handled internally, but looked like real errors to users.
+
 ## 0.4.0
 
 ### Minor Changes
