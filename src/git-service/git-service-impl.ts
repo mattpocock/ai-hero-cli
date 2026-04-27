@@ -483,8 +483,10 @@ export const makeGitService = Effect.gen(function* () {
             );
           }
 
-          // Delete the target branch locally (to account for changes on the upstream)
-          yield* runCommandWithExitCode(
+          // Delete the target branch locally (to account for changes on the upstream).
+          // Use silent variant because "branch not found" is expected when the
+          // branch doesn't exist locally yet — that's not a user-facing error.
+          yield* runCommandSilentExitCode(
             "git",
             "branch",
             "-D",
@@ -522,14 +524,17 @@ export const makeGitService = Effect.gen(function* () {
         ),
         setUpstreamRemote: Effect.fn("setUpstreamRemote")(
           function* (url: string) {
-            // Try set-url first (works if remote already exists)
-            const setUrlExitCode = yield* runCommandWithExitCode(
-              "git",
-              "remote",
-              "set-url",
-              "upstream",
-              url
-            );
+            // Try set-url first (works if remote already exists).
+            // Use silent variant because "No such remote" is expected on the
+            // first run — that's not a user-facing error.
+            const setUrlExitCode =
+              yield* runCommandSilentExitCode(
+                "git",
+                "remote",
+                "set-url",
+                "upstream",
+                url
+              );
 
             if (setUrlExitCode !== 0) {
               // Remote doesn't exist yet, add it
