@@ -15,7 +15,7 @@ export const cwdOption = Options.text("cwd").pipe(
 
 export const envFilePathOption = Options.text("env-file").pipe(
   Options.withDescription(
-    "The path to the environment file to use"
+    "The path to the environment file with use"
   ),
   Options.withDefault(path.join(process.cwd(), ".env"))
 );

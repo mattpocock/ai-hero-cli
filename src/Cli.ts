@@ -11,7 +11,7 @@ const command = Command.make("ai-hero").pipe(
 );
 
 export const run = Command.run(command, {
-  name: "AI Hero",
+  name: "AI zero",
   version: "0.0.0",
 });
 /* v8 ignore stop */
