@@ -101,6 +101,14 @@ export const makeGitService = Effect.gen(function* () {
         yield* runCommandWithExitCode("git", "reset", "HEAD^");
       });
 
+      const clean = Effect.fn("clean")(function* () {
+        yield* runCommandWithExitCode(
+          "git",
+          "clean",
+          "-fd"
+        );
+      });
+
       const restoreStaged = Effect.fn(
         "restoreStaged"
       )(function* () {
@@ -175,6 +183,7 @@ export const makeGitService = Effect.gen(function* () {
         resetHard,
         resetHead,
         restoreStaged,
+        clean,
 
         applyAsUnstagedChanges: Effect.fn(
           "applyAsUnstagedChanges"
