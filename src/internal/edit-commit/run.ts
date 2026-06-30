@@ -2,23 +2,29 @@ import { FileSystem } from "@effect/platform";
 import { Effect } from "effect";
 import * as path from "node:path";
 import { getCommitsBetweenBranches } from "../../branch-commits.js";
+import type { PlatformError } from "@effect/platform/Error";
+import type { CherryPickConflictError } from "../../git-service/errors.js";
 import { GitService, GitServiceConfig } from "../../git-service.js";
 import {
   CommitNotFoundError,
+  InvalidPhaseError,
   LeaseRejectedError,
   SessionExistsError,
   UnresolvedConflictsError,
 } from "./errors.js";
 import {
   clearState,
+  type EditCommitPhase,
   type EditCommitState,
   readStateOption,
+  requireSessionOnTempBranch,
+  requireSessionTempBranchExists,
   requireState,
   writeState,
 } from "./state.js";
 
 export interface Envelope {
-  phase: "editing" | "conflict" | "ready" | "published";
+  phase: "editing" | "conflict" | "ready" | "published" | "aborted";
   target: {
     sha: string;
     message: string;
@@ -28,6 +34,22 @@ export interface Envelope {
   conflictedFiles: Array<string>;
   nextStep: string;
 }
+
+/**
+ * Single source of truth for the per-phase next-step hint, keyed by the
+ * envelope phase. Every verb reads from here so the strings never drift.
+ */
+const nextStepFor: Record<Envelope["phase"], string> = {
+  editing:
+    "Edit the unstaged working-tree changes, then run `edit-commit continue`.",
+  conflict:
+    "Resolve the conflicted files, then run `edit-commit continue`.",
+  ready:
+    "Inspect the recomposed branch, then run `edit-commit publish` to force-push.",
+  published: "Done — the live branch is updated on origin.",
+  aborted:
+    "Session discarded — the original branch is restored.",
+};
 
 export interface BeginOptions {
   /** Commit to edit: a sequence number (1-based) or a SHA prefix. */
@@ -106,27 +128,50 @@ export const runBegin = (opts: BeginOptions) =>
       },
       following,
       conflictedFiles: [],
-      nextStep:
-        "Edit the unstaged working-tree changes, then run `edit-commit continue`.",
+      nextStep: nextStepFor.editing,
     };
     return envelope;
   });
+
+/** All changed paths parsed from `git status --short`. */
+const parseStatusPaths = (status: string) =>
+  status
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => ({
+      xy: line.slice(0, 2),
+      path: line.slice(3).trim(),
+    }));
 
 /** Files with unmerged paths, parsed from `git status --short`. */
 const conflictedFiles = (git: GitService) =>
   Effect.gen(function* () {
     const status = yield* git.getStatusShort();
-    return status
-      .split("\n")
-      .filter(Boolean)
-      .filter((line) => {
-        const xy = line.slice(0, 2);
-        return (
+    return parseStatusPaths(status)
+      .filter(
+        ({ xy }) =>
           xy.includes("U") || xy === "AA" || xy === "DD"
-        );
-      })
-      .map((line) => line.slice(3).trim());
+      )
+      .map((entry) => entry.path);
   });
+
+/**
+ * Run a cherry-pick effect and report whether it stopped on a conflict,
+ * folding the typed conflict error into a plain boolean result.
+ */
+const detectConflict = <A, R>(
+  effect: Effect.Effect<
+    A,
+    CherryPickConflictError | PlatformError,
+    R
+  >
+) =>
+  effect.pipe(
+    Effect.map(() => ({ conflict: false as const })),
+    Effect.catchTag("CherryPickConflictError", () =>
+      Effect.succeed({ conflict: true as const })
+    )
+  );
 
 const target = (state: EditCommitState) => ({
   sha: state.targetSha,
@@ -147,8 +192,7 @@ const enterConflict = (
       target: target(state),
       following: state.following,
       conflictedFiles: files,
-      nextStep:
-        "Resolve the conflicted files, then run `edit-commit continue`.",
+      nextStep: nextStepFor.conflict,
     } satisfies Envelope;
   });
 
@@ -161,8 +205,7 @@ const enterReady = (state: EditCommitState) =>
       target: target(state),
       following: state.following,
       conflictedFiles: [],
-      nextStep:
-        "Inspect the recomposed branch, then run `edit-commit publish` to force-push.",
+      nextStep: nextStepFor.ready,
     } satisfies Envelope;
   });
 
@@ -187,10 +230,24 @@ const filesWithMarkers = (git: GitService) =>
     return remaining;
   });
 
+const requirePhase = (
+  state: EditCommitState,
+  allowed: ReadonlyArray<EditCommitPhase>
+) =>
+  allowed.includes(state.phase)
+    ? Effect.succeed(state)
+    : Effect.fail(
+        new InvalidPhaseError({ phase: state.phase, allowed })
+      );
+
 export const runContinue = () =>
   Effect.gen(function* () {
     const git = yield* GitService;
     const state = yield* requireState;
+
+    // Guard phase + git reality before any mutation.
+    yield* requirePhase(state, ["editing", "conflict"]);
+    yield* requireSessionOnTempBranch(state);
 
     if (state.phase === "conflict") {
       // Refuse to proceed while any file still has conflict markers.
@@ -203,11 +260,8 @@ export const runContinue = () =>
         );
       }
       yield* git.stageAll();
-      const result = yield* git.cherryPickContinue().pipe(
-        Effect.map(() => ({ conflict: false as const })),
-        Effect.catchTag("CherryPickConflictError", () =>
-          Effect.succeed({ conflict: true as const })
-        )
+      const result = yield* detectConflict(
+        git.cherryPickContinue()
       );
       return result.conflict
         ? yield* enterConflict(git, state)
@@ -219,16 +273,11 @@ export const runContinue = () =>
     yield* git.commit(state.targetMessage);
 
     if (state.following > 0) {
-      const result = yield* git
-        .cherryPick(
+      const result = yield* detectConflict(
+        git.cherryPick(
           `${state.targetSha}..${state.targetBranchHead}`
         )
-        .pipe(
-          Effect.map(() => ({ conflict: false as const })),
-          Effect.catchTag("CherryPickConflictError", () =>
-            Effect.succeed({ conflict: true as const })
-          )
-        );
+      );
 
       if (result.conflict) {
         return yield* enterConflict(git, state);
@@ -242,6 +291,12 @@ export const runPublish = () =>
   Effect.gen(function* () {
     const git = yield* GitService;
     const state = yield* requireState;
+
+    // Publish only recomposed sessions; guard before any mutation. We don't
+    // require current==temp here because publish intentionally checks out the
+    // live branch — but the recomposed temp branch must still exist.
+    yield* requirePhase(state, ["ready"]);
+    yield* requireSessionTempBranchExists(state);
 
     // Move the live branch onto the recomposed temp branch, then push.
     yield* git.checkout(state.liveBranch);
@@ -269,25 +324,17 @@ export const runPublish = () =>
       target: target(state),
       following: state.following,
       conflictedFiles: [],
-      nextStep: "Done — the live branch is updated on origin.",
+      nextStep: nextStepFor.published,
     } satisfies Envelope;
   });
-
-const nextStepFor: Record<EditCommitState["phase"], string> =
-  {
-    editing:
-      "Edit the unstaged working-tree changes, then run `edit-commit continue`.",
-    conflict:
-      "Resolve the conflicted files, then run `edit-commit continue`.",
-    ready:
-      "Inspect the recomposed branch, then run `edit-commit publish` to force-push.",
-  };
 
 /** Read-only: report the current session phase without mutating anything. */
 export const runStatus = () =>
   Effect.gen(function* () {
     const git = yield* GitService;
     const state = yield* requireState;
+
+    yield* requireSessionTempBranchExists(state);
 
     const files =
       state.phase === "conflict"
@@ -303,8 +350,8 @@ export const runStatus = () =>
     } satisfies Envelope;
   });
 
-export interface AbortResult {
-  aborted: true;
+export interface AbortResult extends Envelope {
+  phase: "aborted";
   restoredBranch: string;
   deletedBranch: string;
   /** Working-tree paths that were thrown away by the abort. */
@@ -317,11 +364,12 @@ export const runAbort = () =>
     const git = yield* GitService;
     const state = yield* requireState;
 
+    yield* requireSessionOnTempBranch(state);
+
     // Record what we're about to throw away, for the report.
-    const discardedFiles = (yield* git.getStatusShort())
-      .split("\n")
-      .filter(Boolean)
-      .map((line) => line.slice(3).trim());
+    const discardedFiles = parseStatusPaths(
+      yield* git.getStatusShort()
+    ).map((entry) => entry.path);
 
     // If a cherry-pick is mid-flight, abort it first.
     if (state.phase === "conflict") {
@@ -337,7 +385,11 @@ export const runAbort = () =>
     yield* clearState;
 
     return {
-      aborted: true,
+      phase: "aborted",
+      target: target(state),
+      following: state.following,
+      conflictedFiles: [],
+      nextStep: nextStepFor.aborted,
       restoredBranch: state.originalBranch,
       deletedBranch: state.tempBranch,
       discardedFiles,

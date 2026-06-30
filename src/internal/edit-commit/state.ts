@@ -1,8 +1,8 @@
 import { FileSystem } from "@effect/platform";
 import { Effect } from "effect";
 import * as path from "node:path";
-import { GitServiceConfig } from "../../git-service.js";
-import { NoSessionError } from "./errors.js";
+import { GitService, GitServiceConfig } from "../../git-service.js";
+import { NoSessionError, StateDivergedError } from "./errors.js";
 
 /**
  * The phases an edit-commit session moves through.
@@ -71,6 +71,49 @@ export const writeState = (state: EditCommitState) =>
       file,
       JSON.stringify(state, null, 2)
     );
+  });
+
+/**
+ * Guard that the session's temp branch still exists in git. Used by every
+ * mutating/reporting verb so a stale state file can't drive git operations
+ * against a branch that's been deleted out from under us.
+ */
+export const requireSessionTempBranchExists = (
+  state: EditCommitState
+) =>
+  Effect.gen(function* () {
+    const git = yield* GitService;
+    const exists = yield* git.hasLocalBranch(state.tempBranch);
+    if (!exists) {
+      return yield* Effect.fail(
+        new StateDivergedError({
+          message: `Session temp branch \`${state.tempBranch}\` no longer exists.`,
+        })
+      );
+    }
+    return state;
+  });
+
+/**
+ * Guard that the working tree is still parked on the session's temp branch
+ * (and that the branch exists). Used by verbs that operate in place
+ * (`continue`, `abort`).
+ */
+export const requireSessionOnTempBranch = (
+  state: EditCommitState
+) =>
+  Effect.gen(function* () {
+    yield* requireSessionTempBranchExists(state);
+    const git = yield* GitService;
+    const current = yield* git.getCurrentBranch();
+    if (current !== state.tempBranch) {
+      return yield* Effect.fail(
+        new StateDivergedError({
+          message: `Expected to be on session branch \`${state.tempBranch}\` but currently on \`${current}\`.`,
+        })
+      );
+    }
+    return state;
   });
 
 export const clearState = Effect.gen(function* () {

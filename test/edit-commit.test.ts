@@ -657,4 +657,94 @@ describe("edit-commit begin", () => {
         ).toBe("");
       })
   );
+
+  it.effect(
+    "continue from ready fails with InvalidPhaseError and authors no second commit",
+    () =>
+      Effect.gen(function* () {
+        const repo = makeRepo();
+        const layer = yield* driveToReady(repo);
+
+        const commitsBefore = git(
+          repo.workingDir,
+          "log",
+          "--format=%H",
+          "main..HEAD"
+        );
+
+        const error = yield* runContinue().pipe(
+          Effect.provide(layer),
+          Effect.flip
+        );
+
+        expect(error._tag).toBe("InvalidPhaseError");
+
+        // No second commit was authored — same commit set as before.
+        const commitsAfter = git(
+          repo.workingDir,
+          "log",
+          "--format=%H",
+          "main..HEAD"
+        );
+        expect(commitsAfter).toBe(commitsBefore);
+      })
+  );
+
+  it.effect(
+    "publish from editing fails with InvalidPhaseError before touching the live branch",
+    () =>
+      Effect.gen(function* () {
+        const repo = makeRepo();
+        const layer = makeLayer(repo.workingDir);
+
+        yield* runBegin({
+          commit: "2",
+          branch: "live-run-through",
+          mainBranch: "main",
+        }).pipe(Effect.provide(layer));
+
+        const tempBranch = git(
+          repo.workingDir,
+          "branch",
+          "--show-current"
+        );
+
+        const error = yield* runPublish().pipe(
+          Effect.provide(layer),
+          Effect.flip
+        );
+
+        expect(error._tag).toBe("InvalidPhaseError");
+
+        // Still parked on the temp branch — publish didn't check anything out.
+        expect(
+          git(repo.workingDir, "branch", "--show-current")
+        ).toBe(tempBranch);
+      })
+  );
+
+  it.effect(
+    "continue fails with StateDivergedError when the session branch is gone",
+    () =>
+      Effect.gen(function* () {
+        const repo = makeRepo();
+        const layer = makeLayer(repo.workingDir);
+
+        yield* runBegin({
+          commit: "2",
+          branch: "live-run-through",
+          mainBranch: "main",
+        }).pipe(Effect.provide(layer));
+
+        // Simulate divergence: move off the temp branch back to main.
+        git(repo.workingDir, "checkout", "--force", "main");
+
+        const error = yield* runContinue().pipe(
+          Effect.provide(layer),
+          Effect.flip
+        );
+
+        expect(error._tag).toBe("StateDivergedError");
+      })
+  );
 });

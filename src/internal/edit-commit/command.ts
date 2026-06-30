@@ -19,13 +19,11 @@ const mainBranchOption = Options.text("main-branch").pipe(
   Options.withDefault("main")
 );
 
-/** snake_case error codes emitted on stdout for the agent to branch on. */
-const ERROR_CODES: Record<string, string> = {
-  SessionExistsError: "session_exists",
-  NoSessionError: "no_session",
-  CommitNotFoundError: "commit_not_found",
-  UnresolvedConflictsError: "unresolved_conflicts",
-  LeaseRejectedError: "lease_rejected",
+/**
+ * Fallback snake_case codes for foreign errors that don't carry their own
+ * `code` field (git/platform errors, and branch-commits' NoCommitsFoundError).
+ */
+const FALLBACK_ERROR_CODES: Record<string, string> = {
   NoCommitsFoundError: "no_commits_found",
 };
 
@@ -34,7 +32,11 @@ const ERROR_CODES: Record<string, string> = {
  * Typed failures become `{ "error": <code>, ... }` + a non-zero exit code,
  * so an agent always parses one schema regardless of outcome.
  */
-const emit = <A, E extends { _tag: string }, R>(
+const emit = <
+  A,
+  E extends { _tag: string; code?: string },
+  R,
+>(
   effect: Effect.Effect<A, E, R>
 ) =>
   effect.pipe(
@@ -43,7 +45,10 @@ const emit = <A, E extends { _tag: string }, R>(
     ),
     Effect.catchAll((error) =>
       Effect.gen(function* () {
-        const code = ERROR_CODES[error._tag] ?? "error";
+        const code =
+          error.code ??
+          FALLBACK_ERROR_CODES[error._tag] ??
+          "error";
         yield* Console.log(
           JSON.stringify({ error: code, ...error })
         );
