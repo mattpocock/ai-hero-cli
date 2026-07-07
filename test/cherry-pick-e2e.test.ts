@@ -86,10 +86,10 @@ describe("cherry-pick (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
+              commit("01.01.01: Arrays intro", {
                 "src/01.ts": "// arrays intro",
               }),
-              commit("01.01.02 Arrays advanced", {
+              commit("01.01.02: Arrays advanced", {
                 "src/02.ts": "// arrays advanced",
               }),
             ])
@@ -146,10 +146,10 @@ describe("cherry-pick (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
+              commit("01.01.01: Arrays intro", {
                 "src/01.ts": "// arrays",
               }),
-              commit("01.02.01 Objects intro", {
+              commit("01.02.01: Objects intro", {
                 "src/02.ts": "// objects",
               }),
             ])
@@ -194,13 +194,13 @@ describe("cherry-pick (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
+              commit("01.01.01: Arrays intro", {
                 "src/01.ts": "// arrays",
               }),
-              commit("01.01.02 Arrays advanced", {
+              commit("01.01.02: Arrays advanced", {
                 "src/02.ts": "// arrays advanced",
               }),
-              commit("01.02.01 Objects intro", {
+              commit("01.02.01: Objects intro", {
                 "src/03.ts": "// objects",
               }),
             ])
@@ -278,10 +278,10 @@ describe("cherry-pick (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("live-run-through", [
-              commit("01.01.01 First version", {
+              commit("01.01.01: First version", {
                 "src/01.ts": "// v1",
               }),
-              commit("01.01.01 Updated version", {
+              commit("01.01.01: Updated version", {
                 "src/01.ts": "// v2",
               }),
             ])
@@ -303,8 +303,8 @@ describe("cherry-pick (e2e)", () => {
 
           // Test selectLessonCommit directly (without excludeCurrentBranch)
           // to verify the dedup logic with real git log.
-          // git log returns newest-first, and the code takes the last match
-          // (oldest commit), which is the "First version" in this case.
+          // Candidates are ordered oldest -> newest and the code takes the last
+          // match, i.e. the latest commit carrying the id — "Updated version".
           const result = yield* selectLessonCommit({
             branch: "live-run-through",
             lessonId: Option.none(),
@@ -316,9 +316,8 @@ describe("cherry-pick (e2e)", () => {
             ),
           );
 
-          // Code takes matchingCommits[length-1], which is the last in
-          // git log output (oldest). With real git, this is "First version".
-          expect(result.commit.message).toBe("First version");
+          // "Latest wins": the newest commit with this id is selected.
+          expect(result.commit.message).toBe("Updated version");
           expect(result.lessonId).toBe("01.01.01");
         }),
     );
@@ -332,7 +331,7 @@ describe("cherry-pick (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
+              commit("01.01.01: Arrays intro", {
                 "src/01.ts": "// arrays",
               }),
             ])
@@ -372,15 +371,15 @@ describe("cherry-pick (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("main", [
-              commit("00.00.01 Base setup", {
+              commit("00.00.01: Base setup", {
                 "src/base.ts": "// base",
               }),
             ])
             .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
+              commit("01.01.01: Arrays intro", {
                 "src/01.ts": "// arrays",
               }),
-              commit("01.01.02 Arrays advanced", {
+              commit("01.01.02: Arrays advanced", {
                 "src/02.ts": "// arrays advanced",
               }),
             ])
@@ -473,7 +472,7 @@ describe("cherry-pick (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
+              commit("01.01.01: Arrays intro", {
                 "src/01.ts": "// arrays",
               }),
             ])
@@ -515,10 +514,10 @@ describe("cherry-pick (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
+              commit("01.01.01: Arrays intro", {
                 "src/01.ts": "// original content",
               }),
-              commit("01.01.02 Arrays modified", {
+              commit("01.01.02: Arrays modified", {
                 "src/01.ts": "// modified in lesson",
               }),
             ])
@@ -578,10 +577,10 @@ describe("cherry-pick (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
+              commit("01.01.01: Arrays intro", {
                 "src/01.ts": "// arrays",
               }),
-              commit("01.01.02 Arrays advanced", {
+              commit("01.01.02: Arrays advanced", {
                 "src/02.ts": "// arrays advanced",
               }),
             ])
@@ -627,12 +626,12 @@ describe("cherry-pick (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("main", [
-              commit("01.01.01 Main lesson", {
+              commit("01.01.01: Main lesson", {
                 "src/main.ts": "// main",
               }),
             ])
             .withBranch("custom-lessons", [
-              commit("02.01.01 Custom lesson", {
+              commit("02.01.01: Custom lesson", {
                 "src/custom.ts": "// custom content",
               }),
             ])
@@ -687,15 +686,15 @@ describe("cherry-pick (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("main", [
-              commit("01.01.01 Main lesson", {
+              commit("01.01.01: Main lesson", {
                 "src/main.ts": "// main",
               }),
             ])
             .withBranch("custom-lessons", [
-              commit("03.01.01 First custom", {
+              commit("03.01.01: First custom", {
                 "src/first.ts": "// first",
               }),
-              commit("03.01.02 Second custom", {
+              commit("03.01.02: Second custom", {
                 "src/second.ts": "// second",
               }),
             ])
@@ -786,15 +785,15 @@ describe("cherry-pick (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("main", [
-              commit("00.00.01 Base setup", {
+              commit("00.00.01: Base setup", {
                 "src/base.ts": "// base",
               }),
             ])
             .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
+              commit("01.01.01: Arrays intro", {
                 "src/01.ts": "// arrays",
               }),
-              commit("01.01.02 Arrays advanced", {
+              commit("01.01.02: Arrays advanced", {
                 "src/02.ts": "// arrays advanced",
               }),
             ])

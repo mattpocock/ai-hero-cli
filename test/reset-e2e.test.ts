@@ -111,7 +111,7 @@ describe("reset (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
+              commit("01.01.01: Arrays intro", {
                 "src/01.ts": "// arrays",
               }),
             ])
@@ -151,10 +151,10 @@ describe("reset (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
+              commit("01.01.01: Arrays intro", {
                 "src/01.ts": "// arrays intro",
               }),
-              commit("01.01.02 Arrays solution", {
+              commit("01.01.02: Arrays solution", {
                 "src/01.ts": "// arrays solution",
               }),
             ])
@@ -217,10 +217,10 @@ describe("reset (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
+              commit("01.01.01: Arrays intro", {
                 "src/01.ts": "// arrays intro",
               }),
-              commit("01.01.02 Arrays continued", {
+              commit("01.01.02: Arrays continued", {
                 "src/01.ts": "// arrays continued",
               }),
             ])
@@ -269,10 +269,10 @@ describe("reset (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
+              commit("01.01.01: Arrays intro", {
                 "src/01.ts": "// arrays intro",
               }),
-              commit("01.01.02 Arrays solution", {
+              commit("01.01.02: Arrays solution", {
                 "src/01.ts": "// arrays solution",
               }),
             ])
@@ -340,15 +340,15 @@ describe("reset (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("main", [
-              commit("00.00.01 Base setup", {
+              commit("00.00.01: Base setup", {
                 "src/base.ts": "// base",
               }),
             ])
             .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
+              commit("01.01.01: Arrays intro", {
                 "src/01.ts": "// arrays",
               }),
-              commit("01.01.02 Arrays solution", {
+              commit("01.01.02: Arrays solution", {
                 "src/01.ts": "// solution",
               }),
             ])
@@ -415,10 +415,10 @@ describe("reset (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
+              commit("01.01.01: Arrays intro", {
                 "src/01.ts": "// original",
               }),
-              commit("01.01.02 Arrays solution", {
+              commit("01.01.02: Arrays solution", {
                 "src/01.ts": "// solution",
               }),
             ])
@@ -482,10 +482,10 @@ describe("reset (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
+              commit("01.01.01: Arrays intro", {
                 "src/01.ts": "// original",
               }),
-              commit("01.01.02 Arrays solution", {
+              commit("01.01.02: Arrays solution", {
                 "src/01.ts": "// solution",
               }),
             ])
@@ -556,10 +556,10 @@ describe("reset (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
+              commit("01.01.01: Arrays intro", {
                 "src/01.ts": "// problem",
               }),
-              commit("01.01.02 Arrays solution", {
+              commit("01.01.02: Arrays solution", {
                 "src/01.ts": "// solution",
               }),
             ])
@@ -625,7 +625,7 @@ describe("reset (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
+              commit("01.01.01: Arrays intro", {
                 "src/01.ts": "// arrays",
               }),
             ])
@@ -672,7 +672,7 @@ describe("reset (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
+              commit("01.01.01: Arrays intro", {
                 "src/01.ts": "// arrays intro",
               }),
             ])
@@ -719,7 +719,7 @@ describe("reset (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("live-run-through", [
-              commit("01.02.03 Objects intro", {
+              commit("01.02.03: Objects intro", {
                 "src/02.ts": "// objects",
               }),
             ])
@@ -768,7 +768,7 @@ describe("reset (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
+              commit("01.01.01: Arrays intro", {
                 "src/01.ts": "// arrays",
               }),
             ])
@@ -814,12 +814,12 @@ describe("reset (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("main", [
-              commit("00.00.01 Base setup", {
+              commit("00.00.01: Base setup", {
                 "src/base.ts": "// base",
               }),
             ])
             .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
+              commit("01.01.01: Arrays intro", {
                 "src/01.ts": "// arrays",
               }),
             ])
@@ -875,12 +875,12 @@ describe("reset (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("main", [
-              commit("01.01.01 Main lesson", {
+              commit("01.01.01: Main lesson", {
                 "src/main.ts": "// main",
               }),
             ])
             .withBranch("custom-lessons", [
-              commit("02.01.01 Custom lesson", {
+              commit("02.01.01: Custom lesson", {
                 "src/custom.ts": "// custom content",
               }),
             ])
@@ -941,15 +941,15 @@ describe("reset (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("main", [
-              commit("01.01.01 Main lesson", {
+              commit("01.01.01: Main lesson", {
                 "src/main.ts": "// main",
               }),
             ])
             .withBranch("custom-lessons", [
-              commit("03.01.01 First custom", {
+              commit("03.01.01: First custom", {
                 "src/first.ts": "// first",
               }),
-              commit("03.01.02 Second custom", {
+              commit("03.01.02: Second custom", {
                 "src/second.ts": "// second",
               }),
             ])
@@ -998,7 +998,7 @@ describe("reset (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("live-run-through", [
-              commit("01.02.03 Some lesson", {
+              commit("01.02.03: Some lesson", {
                 "src/01.ts": "// content",
               }),
             ])
@@ -1038,12 +1038,12 @@ describe("reset (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("main", [
-              commit("00.00.01 Base setup", {
+              commit("00.00.01: Base setup", {
                 "src/base.ts": "// base setup",
               }),
             ])
             .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
+              commit("01.01.01: Arrays intro", {
                 "src/01.ts": "// arrays",
               }),
             ])
@@ -1099,12 +1099,12 @@ describe("reset (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("main", [
-              commit("00.00.01 Base setup", {
+              commit("00.00.01: Base setup", {
                 "src/base.ts": "// base setup",
               }),
             ])
             .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
+              commit("01.01.01: Arrays intro", {
                 "src/01.ts": "// arrays",
               }),
             ])
@@ -1148,12 +1148,12 @@ describe("reset (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("main", [
-              commit("00.00.01 Base setup", {
+              commit("00.00.01: Base setup", {
                 "src/base.ts": "// base setup",
               }),
             ])
             .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
+              commit("01.01.01: Arrays intro", {
                 "src/01.ts": "// arrays",
               }),
             ])
@@ -1214,12 +1214,12 @@ describe("reset (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("main", [
-              commit("00.00.01 Base setup", {
+              commit("00.00.01: Base setup", {
                 "src/base.ts": "// base setup",
               }),
             ])
             .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
+              commit("01.01.01: Arrays intro", {
                 "src/01.ts": "// arrays",
               }),
             ])
@@ -1271,12 +1271,12 @@ describe("reset (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("main", [
-              commit("00.00.01 Base setup", {
+              commit("00.00.01: Base setup", {
                 "src/base.ts": "// base setup",
               }),
             ])
             .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
+              commit("01.01.01: Arrays intro", {
                 "src/01.ts": "// arrays",
               }),
             ])
@@ -1339,7 +1339,7 @@ describe("reset (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
+              commit("01.01.01: Arrays intro", {
                 "src/01.ts": "// arrays intro",
               }),
             ])
@@ -1415,7 +1415,7 @@ describe("reset (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
+              commit("01.01.01: Arrays intro", {
                 "src/01.ts": "// arrays intro",
               }),
             ])
@@ -1475,7 +1475,7 @@ describe("reset (e2e)", () => {
           const repo = createTestRepo()
             .withRemote("upstream")
             .withBranch("live-run-through", [
-              commit("01.01.01 Arrays intro", {
+              commit("01.01.01: Arrays intro", {
                 "src/01.ts": "// arrays",
               }),
             ])
@@ -1531,6 +1531,197 @@ describe("reset (e2e)", () => {
             "--list"
           );
           expect(branches).not.toContain("live-run-through");
+        })
+    );
+  });
+
+  describe("slug lesson ids", () => {
+    it.effect(
+      "should reset to the exact commit for a given slug",
+      () =>
+        Effect.gen(function* () {
+          const repo = createTestRepo()
+            .withRemote("upstream")
+            .withBranch("main", [
+              commit("chore: set up tooling", {
+                "src/base.ts": "// base",
+              }),
+            ])
+            .withBranch("live-run-through", [
+              commit("add-arrays: Arrays intro", {
+                "src/01.ts": "// arrays intro",
+              }),
+              commit("add-objects: Objects intro", {
+                "src/02.ts": "// objects intro",
+              }),
+            ])
+            .withWorkingBranch("my-branch", {
+              from: "live-run-through",
+              atCommit: 0,
+            })
+            .build();
+
+          cleanup = repo.cleanup;
+          configureGitUser(repo.workingDir);
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectResetAction: Effect.fn("selectResetAction")(
+              function* () {
+                return "reset-current" as const;
+              }
+            ),
+          });
+
+          yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.some("add-arrays"),
+            demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
+          }).pipe(
+            Effect.provide(
+              makeLayer(repo.workingDir, mockPromptService)
+            )
+          );
+
+          const content = fs.readFileSync(
+            `${repo.workingDir}/src/01.ts`,
+            "utf-8"
+          );
+          expect(content).toBe("// arrays intro");
+        })
+    );
+
+    it.effect(
+      "should reset to the interactively selected slug",
+      () =>
+        Effect.gen(function* () {
+          const repo = createTestRepo()
+            .withRemote("upstream")
+            .withBranch("main", [
+              commit("chore: set up tooling", {
+                "src/base.ts": "// base",
+              }),
+            ])
+            .withBranch("live-run-through", [
+              commit("add-arrays: Arrays intro", {
+                "src/01.ts": "// arrays intro",
+              }),
+              commit("add-objects: Objects solution", {
+                "src/02.ts": "// objects solution",
+              }),
+            ])
+            .withWorkingBranch("my-branch", {
+              from: "live-run-through",
+              atCommit: 0,
+            })
+            .build();
+
+          cleanup = repo.cleanup;
+          configureGitUser(repo.workingDir);
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectLessonCommit: Effect.fn("selectLessonCommit")(
+              function* () {
+                return "add-objects";
+              }
+            ),
+            selectResetAction: Effect.fn("selectResetAction")(
+              function* () {
+                return "reset-current" as const;
+              }
+            ),
+          });
+
+          yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.none(),
+            demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
+          }).pipe(
+            Effect.provide(
+              makeLayer(repo.workingDir, mockPromptService)
+            )
+          );
+
+          const content = fs.readFileSync(
+            `${repo.workingDir}/src/02.ts`,
+            "utf-8"
+          );
+          expect(content).toBe("// objects solution");
+        })
+    );
+
+    it.effect(
+      "should exclude conventional-commit base commits on main from the candidate list",
+      () =>
+        Effect.gen(function* () {
+          const repo = createTestRepo()
+            .withRemote("upstream")
+            .withBranch("main", [
+              commit("chore: set up tooling", {
+                "src/base.ts": "// base",
+              }),
+              commit("fix: correct a typo", {
+                "README.md": "# readme",
+              }),
+            ])
+            .withBranch("live-run-through", [
+              commit("add-arrays: Arrays intro", {
+                "src/01.ts": "// arrays intro",
+              }),
+              commit("add-objects: Objects intro", {
+                "src/02.ts": "// objects intro",
+              }),
+            ])
+            .withWorkingBranch("my-branch", {
+              from: "live-run-through",
+              atCommit: 0,
+            })
+            .build();
+
+          cleanup = repo.cleanup;
+          configureGitUser(repo.workingDir);
+
+          let capturedIds: Array<string> = [];
+          const mockPromptService = fromPartial<PromptService>({
+            selectLessonCommit: Effect.fn("selectLessonCommit")(
+              function* (
+                commits: Array<{
+                  lessonId: string;
+                  message: string;
+                }>
+              ) {
+                capturedIds = commits.map((c) => c.lessonId);
+                return "add-arrays";
+              }
+            ),
+            selectResetAction: Effect.fn("selectResetAction")(
+              function* () {
+                return "reset-current" as const;
+              }
+            ),
+          });
+
+          yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.none(),
+            demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
+          }).pipe(
+            Effect.provide(
+              makeLayer(repo.workingDir, mockPromptService)
+            )
+          );
+
+          // The fence: main's conventional-commit lines never surface as lessons,
+          // and teaching order is commit order (main extra choice, then lessons).
+          expect(capturedIds).not.toContain("chore");
+          expect(capturedIds).not.toContain("fix");
+          expect(capturedIds).toEqual([
+            "main",
+            "add-arrays",
+            "add-objects",
+          ]);
         })
     );
   });
