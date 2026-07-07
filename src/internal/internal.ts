@@ -7,7 +7,7 @@ import { rename } from "./rename.js";
 import { uploadToCloudinary } from "./upload-to-cloudinary.js";
 import { getDiffs } from "./get-diffs.js";
 import { diffsToRepo } from "./diffs-to-repo.js";
-import { editCommit } from "./edit-commit.js";
+import { editCommit } from "./edit-commit/command.js";
 import { rebaseToMain } from "./rebase-to-main.js";
 import { walkThrough } from "./walk-through.js";
 import { init } from "./init.js";
