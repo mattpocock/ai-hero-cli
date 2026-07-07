@@ -3,8 +3,12 @@ import { GitService } from "./git-service.js";
 import { PromptService } from "./prompt-service.js";
 
 /**
- * Normalizes a lesson ID to the standard format (e.g., "1.1.1" -> "01.01.01").
- * Handles various input formats like "1.1.1", "01.1.01", "1-1-1", etc.
+ * Normalizes a numeric lesson ID to the standard format (e.g., "1.1.1" -> "01.01.01").
+ * Handles input formats like "1.1.1", "01.1.01", "1-1-1", etc.
+ *
+ * Returns null for anything that is not a numeric section.lesson.step id — so
+ * a slug passes straight through the caller untouched. Kept as a pass-through
+ * so numeric ids stay ergonomic while repos migrate to slugs.
  */
 export const normalizeLessonId = (lessonId: string): string | null => {
   // Match pattern like 1.1.1, 01.01.01, 1-1-1, etc.
@@ -25,13 +29,25 @@ export class CommitNotFoundError extends Data.TaggedError(
 type ParsedCommit = {
   /** Short commit SHA */
   sha: string;
-  /** Commit message with lesson ID prefix removed (e.g., "Add new feature" from "01.01.01 Add new feature") */
+  /** Commit message with the lesson-id prefix removed (e.g., "Add new feature" from "add-feature: Add new feature") */
   message: string;
-  /** Normalized lesson ID (e.g., "01.01.01") extracted from commit message, or null if no lesson ID found */
+  /** Lesson id — everything before the first ": " — or null when the commit has no such prefix */
   lessonId: string | null;
 };
 
-const parseCommits = (
+/** The parse boundary: everything before the first ": " is the lesson id. */
+const LESSON_ID_BOUNDARY = ": ";
+
+/**
+ * Parses `git log --oneline` output into commits, extracting each lesson id as
+ * the token before the first ": ". A slug (`add-settings-json`), a numeric id
+ * (`06.06.01`), and a conventional-commit type (`fix`) are all just "the token
+ * before the colon" — there is no format-specific logic here. Commits with no
+ * ": " (a bare `initial`, a `WIP foo`) get a null id and are treated as
+ * non-lessons. Fencing out base/conventional commits is the range's job (see
+ * getCandidateCommits), not this function's.
+ */
+export const parseCommits = (
   commitHistory: string
 ): Array<ParsedCommit> => {
   return commitHistory
@@ -42,32 +58,72 @@ const parseCommits = (
       const [sha, ...messageParts] = line.split(" ");
       const fullMessage = messageParts.join(" ");
 
-      // Extract lesson ID - match pattern like 01.01.01, 1.1.1, etc.
-      const lessonMatch = fullMessage.match(
-        /^(\d+)[.-](\d+)[.-](\d+)\s*/
+      const boundaryIndex = fullMessage.indexOf(
+        LESSON_ID_BOUNDARY
       );
-      const extractedLessonId = lessonMatch
-        ? `${lessonMatch[1]!.padStart(
-            2,
-            "0"
-          )}.${lessonMatch[2]!.padStart(
-            2,
-            "0"
-          )}.${lessonMatch[3]!.padStart(2, "0")}`
-        : null;
 
-      // Remove lesson ID prefix from message
-      const message = lessonMatch
-        ? fullMessage.slice(lessonMatch[0].length).trim()
-        : fullMessage;
+      // boundaryIndex > 0 so the id is non-empty (a leading ": " is not an id).
+      const lessonId =
+        boundaryIndex > 0
+          ? fullMessage.slice(0, boundaryIndex)
+          : null;
+
+      const message =
+        boundaryIndex > 0
+          ? fullMessage
+              .slice(boundaryIndex + LESSON_ID_BOUNDARY.length)
+              .trim()
+          : fullMessage;
 
       return {
         sha: sha!,
         message,
-        lessonId: extractedLessonId,
+        lessonId,
       };
     });
 };
+
+/**
+ * Builds the lesson-commit candidate set for `branch`, in teaching order
+ * (oldest -> newest).
+ *
+ * Lessons are exactly the commits in `upstream/main..branch` — the lesson
+ * stack. Scoping to that range structurally excludes every base commit
+ * (including conventional-commit-shaped ones like `chore: ...` that live on
+ * main) regardless of message shape, so no denylist or slug-shape heuristic is
+ * needed.
+ *
+ * When there is no `upstream/main` to anchor on, we fall back to the branch's
+ * full history: the base `initial` commit has no ": " and drops out as a
+ * non-lesson anyway.
+ *
+ * Precondition: the `upstream` remote is live. Callers (`reset`, `cherry-pick`)
+ * set it up under `withUpstreamCleanup` before calling `selectLessonCommit`,
+ * which owns the remote's lifecycle — this function only reads through it. The
+ * `upstream/main` fetch lands the commit objects permanently; the resolved SHA
+ * outlives the ephemeral remote once the caller tears it down.
+ */
+const getCandidateCommits = (branch: string) =>
+  Effect.gen(function* () {
+    const git = yield* GitService;
+
+    const hasUpstreamMain = yield* git
+      .fetch("upstream", "main")
+      .pipe(
+        Effect.as(true),
+        Effect.catchTag("FailedToFetchError", () =>
+          Effect.succeed(false)
+        )
+      );
+
+    const range = hasUpstreamMain
+      ? `upstream/main..${branch}`
+      : branch;
+
+    const history = yield* git.getLogOnelineReverse(range);
+
+    return parseCommits(history);
+  });
 
 export const selectLessonCommit = ({
   branch,
@@ -86,40 +142,36 @@ export const selectLessonCommit = ({
     const gitService = yield* GitService;
     const promptService = yield* PromptService;
 
-    // Search commit history for lesson ID
-    let commits: Array<ParsedCommit>;
+    // Candidate lessons, scoped to the lesson stack, in teaching order.
+    let commits: Array<ParsedCommit> =
+      yield* getCandidateCommits(branch);
 
     if (excludeCurrentBranch) {
-      // Get commits from current branch to extract lesson IDs
-      const currentBranchHistory = yield* gitService.getLogOneline("HEAD");
-      const currentBranchCommits = parseCommits(currentBranchHistory);
+      // Extract lesson ids already applied on the current branch and drop them
+      // from the candidate set. Scanning HEAD's full history is fine — a stray
+      // non-lesson prefix there simply matches no candidate.
+      const currentBranchHistory =
+        yield* gitService.getLogOneline("HEAD");
+      const currentBranchCommits = parseCommits(
+        currentBranchHistory
+      );
 
-      // Extract lesson IDs from current branch (only commits with lesson IDs)
       const currentLessonIds = new Set(
         currentBranchCommits
           .filter((c) => c.lessonId !== null)
           .map((c) => c.lessonId!)
       );
 
-      // Get commits from target branch
-      const targetBranchHistory = yield* gitService.getLogOneline(branch);
-      const allTargetCommits = parseCommits(targetBranchHistory);
-
-      // Filter out commits with lesson IDs that exist on current branch
-      commits = allTargetCommits.filter(
+      commits = commits.filter(
         (c) => !c.lessonId || !currentLessonIds.has(c.lessonId)
       );
-    } else {
-      const commitHistory = yield* gitService.getLogOneline(branch);
-
-      commits = parseCommits(commitHistory);
     }
 
     // Get selected lesson ID
     let selectedLessonId: string;
 
     if (Option.isSome(lessonId)) {
-      // Normalize the user-provided lesson ID (e.g., "1.1.1" -> "01.01.01")
+      // Normalize numeric input (e.g. "1.1.1" -> "01.01.01"); slugs pass through.
       const normalized = normalizeLessonId(lessonId.value);
       selectedLessonId = normalized ?? lessonId.value;
       yield* Console.log(
@@ -140,14 +192,11 @@ export const selectLessonCommit = ({
         );
       }
 
-      // Sort commits by lesson ID ascending
-      const sortedCommits = commitsWithLessonIds.sort((a, b) => {
-        return a.lessonId!.localeCompare(b.lessonId!);
-      });
-
+      // Teaching order is commit order (oldest -> newest), carried by the stack
+      // itself — no sort. Slugs deliberately carry no ordinal.
       const choices = [
         ...(extraChoices ?? []),
-        ...sortedCommits.map((commit) => ({
+        ...commitsWithLessonIds.map((commit) => ({
           lessonId: commit.lessonId!,
           message: commit.message,
         })),
@@ -182,7 +231,8 @@ export const selectLessonCommit = ({
       });
     }
 
-    // If multiple commits found, choose the latest one (last in the list)
+    // Latest wins: candidates are oldest -> newest, so the last match is the
+    // newest commit carrying this id (duplicate slugs are a maintainer trap).
     const targetCommit =
       matchingCommits[matchingCommits.length - 1]!;
 
@@ -195,4 +245,3 @@ export const selectLessonCommit = ({
       lessonId: selectedLessonId,
     };
   });
-
