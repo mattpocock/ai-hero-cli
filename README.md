@@ -79,18 +79,6 @@ After an exercise completes, you can:
 - **Choose Exercise**: Browse and select a different exercise
 - **Finish**: Exit the CLI
 
-## Internal Commands
-
-The CLI also includes internal commands for maintenance:
-
-```bash
-# Upgrade AI SDK packages
-ai-hero internal upgrade
-
-# Upgrade with verbose output
-ai-hero internal upgrade --verbose
-```
-
 ## File Structure Expectations
 
 The CLI expects your AI Hero exercises to follow this structure:
