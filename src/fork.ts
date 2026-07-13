@@ -95,6 +95,13 @@ export const runFork = (opts: {
     yield* Console.log("Resetting local git history...");
     yield* git.removeGitDirectory();
     yield* git.initRepo();
+    // Guarantee a committer identity so the first commit succeeds even if
+    // the user has never configured git globally. Falls back to the
+    // authenticated GitHub user; existing config is left untouched.
+    yield* git.ensureCommitterIdentity({
+      name: login,
+      email: `${login}@users.noreply.github.com`,
+    });
     yield* git.stageAll();
     yield* git.commit("Initial commit");
     yield* git.renameCurrentBranchTo("main");

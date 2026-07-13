@@ -501,6 +501,49 @@ export const makeGitService = Effect.gen(function* () {
           );
         }),
         /**
+         * Ensures a committer identity is available before committing.
+         *
+         * If `user.name` / `user.email` are already set (locally or
+         * globally) they are left untouched. Otherwise a local identity
+         * is set from the provided fallback — so `git commit` works even
+         * for users who have never run `git config --global user.email`
+         * (e.g. after `ai-hero fork` re-inits the repo).
+         */
+        ensureCommitterIdentity: Effect.fn(
+          "ensureCommitterIdentity"
+        )(function* (fallback: {
+          name: string;
+          email: string;
+        }) {
+          const nameExit = yield* runCommandSilentExitCode(
+            "git",
+            "config",
+            "user.name"
+          );
+          if (nameExit !== 0) {
+            yield* runCommandWithExitCode(
+              "git",
+              "config",
+              "user.name",
+              fallback.name
+            );
+          }
+
+          const emailExit = yield* runCommandSilentExitCode(
+            "git",
+            "config",
+            "user.email"
+          );
+          if (emailExit !== 0) {
+            yield* runCommandWithExitCode(
+              "git",
+              "config",
+              "user.email",
+              fallback.email
+            );
+          }
+        }),
+        /**
          * Renames the current branch (`git branch -M <name>`).
          */
         renameCurrentBranchTo: Effect.fn(

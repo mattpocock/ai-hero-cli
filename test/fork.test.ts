@@ -221,6 +221,57 @@ describe("fork (e2e)", () => {
   );
 
   it.effect(
+    "commits successfully even with no configured git identity",
+    () =>
+      Effect.gen(function* () {
+        const repo = buildRepo();
+
+        // Simulate a fresh machine with no global/system git identity
+        // (as in CI, or a student who never ran `git config --global`).
+        const prevGlobal = process.env.GIT_CONFIG_GLOBAL;
+        const prevSystem = process.env.GIT_CONFIG_SYSTEM;
+        process.env.GIT_CONFIG_GLOBAL = "/dev/null";
+        process.env.GIT_CONFIG_SYSTEM = "/dev/null";
+
+        try {
+          yield* runFork({
+            name: Option.some("no-identity-repo"),
+          }).pipe(
+            Effect.provide(
+              makeLayer(
+                repo.workingDir,
+                confirmingPrompt(),
+                makeFakeGitHub({ user: "octocat" })
+              )
+            )
+          );
+
+          // The commit landed and picked up the fallback identity.
+          expect(
+            git(repo.workingDir, "rev-list", "--count", "HEAD")
+          ).toBe("1");
+          expect(
+            git(repo.workingDir, "log", "-1", "--format=%an")
+          ).toBe("octocat");
+          expect(
+            git(repo.workingDir, "log", "-1", "--format=%ae")
+          ).toBe("octocat@users.noreply.github.com");
+        } finally {
+          if (prevGlobal === undefined) {
+            delete process.env.GIT_CONFIG_GLOBAL;
+          } else {
+            process.env.GIT_CONFIG_GLOBAL = prevGlobal;
+          }
+          if (prevSystem === undefined) {
+            delete process.env.GIT_CONFIG_SYSTEM;
+          } else {
+            process.env.GIT_CONFIG_SYSTEM = prevSystem;
+          }
+        }
+      })
+  );
+
+  it.effect(
     "uses the name from the prompt when no arg is given",
     () =>
       Effect.gen(function* () {
