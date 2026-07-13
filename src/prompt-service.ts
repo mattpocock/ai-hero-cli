@@ -706,6 +706,34 @@ export class PromptService extends Effect.Service<PromptService>()(
         }
       );
 
+      /**
+       * Prompts the user for a GitHub repository name, pre-filled with a
+       * suggested default (typically the current directory name).
+       *
+       * @param defaultName - The suggested repo name
+       * @returns The entered repo name (falls back to the default if empty)
+       * @throws PromptCancelledError if user presses Ctrl+C
+       */
+      const inputRepoName = Effect.fn("inputRepoName")(
+        function* (defaultName: string) {
+          const { repoName } = yield* runPrompt<{
+            repoName: string;
+          }>(() =>
+            prompt([
+              {
+                type: "text",
+                name: "repoName",
+                message: "Name for your new private GitHub repo:",
+                initial: defaultName,
+              },
+            ])
+          );
+
+          const trimmed = (repoName ?? "").trim();
+          return trimmed === "" ? defaultName : trimmed;
+        }
+      );
+
       return {
         confirmReadyToCommit,
         confirmSaveToTargetBranch,
@@ -723,6 +751,7 @@ export class PromptService extends Effect.Service<PromptService>()(
         confirmContinue,
         selectSubdirectory,
         inputText,
+        inputRepoName,
       };
     }),
     dependencies: [],

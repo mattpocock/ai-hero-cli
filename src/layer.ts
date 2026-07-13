@@ -5,12 +5,14 @@ import {
   defaultGitServiceConfigLayer,
   GitService,
 } from "./git-service.js";
+import { GitHubService } from "./github-service.js";
 import { LessonParserService } from "./lesson-parser-service.js";
 import { PromptService } from "./prompt-service.js";
 
 export const layerLive = Layer.mergeAll(
   NodeContext.layer,
   GitService.Default,
+  GitHubService.Default,
   defaultGitServiceConfigLayer,
   LessonParserService.Default,
   PromptService.Default

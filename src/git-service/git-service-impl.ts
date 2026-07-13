@@ -11,7 +11,10 @@ import {
   FailedToFetchError,
   FailedToFetchOriginError,
   FailedToFetchUpstreamError,
+  FailedToInitRepoError,
   FailedToPushError,
+  FailedToRemoveGitDirError,
+  FailedToRenameBranchError,
   FailedToResetError,
   FailedToTrackBranchError,
   InvalidRefError,
@@ -458,6 +461,67 @@ export const makeGitService = Effect.gen(function* () {
             }
           }
         ),
+        /**
+         * Deletes the `.git` directory to disconnect from the current
+         * remote/history. Safe if `.git` doesn't exist.
+         */
+        removeGitDirectory: Effect.fn("removeGitDirectory")(
+          function* () {
+            const gitDirPath = path.join(config.cwd, ".git");
+            yield* fs
+              .remove(gitDirPath, { recursive: true })
+              .pipe(
+                Effect.catchAll(
+                  (error) =>
+                    new FailedToRemoveGitDirError({
+                      path: gitDirPath,
+                      message: `Failed to remove ${gitDirPath}: ${error}`,
+                    })
+                )
+              );
+          }
+        ),
+        /**
+         * Initialises a fresh git repository (`git init`). The branch is
+         * renamed to `main` separately after the first commit so this
+         * works on older git versions too.
+         */
+        initRepo: Effect.fn("initRepo")(function* () {
+          const exitCode = yield* runCommandWithExitCode(
+            "git",
+            "init"
+          );
+
+          yield* mapExitCode(
+            exitCode,
+            (code) =>
+              new FailedToInitRepoError({
+                message: `Failed to initialise git repository (exit code: ${code})`,
+              })
+          );
+        }),
+        /**
+         * Renames the current branch (`git branch -M <name>`).
+         */
+        renameCurrentBranchTo: Effect.fn(
+          "renameCurrentBranchTo"
+        )(function* (branchName: string) {
+          const exitCode = yield* runCommandWithExitCode(
+            "git",
+            "branch",
+            "-M",
+            branchName
+          );
+
+          yield* mapExitCode(
+            exitCode,
+            (code) =>
+              new FailedToRenameBranchError({
+                branchName,
+                message: `Failed to rename branch to ${branchName} (exit code: ${code})`,
+              })
+          );
+        }),
         getUncommittedChanges: Effect.fn(
           "getUncommittedChanges"
         )(function* () {

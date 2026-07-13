@@ -7,6 +7,36 @@ export class NotAGitRepoError extends Data.TaggedError(
   message: string;
 }> {}
 
+/**
+ * Error thrown when removing the `.git` directory fails.
+ * Used when re-initialising a repo with fresh history (e.g. `ai-hero fork`).
+ */
+export class FailedToRemoveGitDirError extends Data.TaggedError(
+  "FailedToRemoveGitDirError"
+)<{
+  path: string;
+  message: string;
+}> {}
+
+/**
+ * Error thrown when `git init` fails.
+ */
+export class FailedToInitRepoError extends Data.TaggedError(
+  "FailedToInitRepoError"
+)<{
+  message: string;
+}> {}
+
+/**
+ * Error thrown when renaming the current branch (`git branch -M`) fails.
+ */
+export class FailedToRenameBranchError extends Data.TaggedError(
+  "FailedToRenameBranchError"
+)<{
+  branchName: string;
+  message: string;
+}> {}
+
 export class FailedToFetchUpstreamError extends Data.TaggedError(
   "FailedToFetchUpstreamError"
 )<{
