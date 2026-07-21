@@ -5,18 +5,25 @@ import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import {
+  type BranchCommit,
+  resolveCommitRef,
+} from "../src/branch-commits.js";
+import {
   GitService,
   GitServiceConfig,
   makeGitService,
 } from "../src/git-service.js";
 import {
-  runAbort,
-  runBegin,
-  runContinue,
-  runPublish,
-  runStatus,
-} from "../src/internal/edit-commit/run.js";
-import { stateFilePath } from "../src/internal/edit-commit/state.js";
+  applyToLiveBranch,
+  beginSession,
+  filesWithMarkers,
+  finish,
+  loadCommits,
+  publish,
+  recompose,
+  resumeCherryPick,
+  unwind,
+} from "../src/internal/edit-commit/session.js";
 import {
   commit,
   createTestRepo,
@@ -53,11 +60,32 @@ const makeLayer = (workingDir: string) => {
   );
 };
 
+/** Resolve a lesson ref and park its diff in the working tree. */
+const startSession = (ref: string) =>
+  Effect.gen(function* () {
+    const commits = yield* loadCommits({
+      branch: "live-run-through",
+      mainBranch: "main",
+    });
+    const target = resolveCommitRef(commits, ref)!;
+    expect(target).toBeDefined();
+
+    return yield* beginSession({
+      commits,
+      target,
+      liveBranch: "live-run-through",
+    });
+  });
+
+const bareDirOf = (workingDir: string) =>
+  path.resolve(workingDir, "..", "bare.git");
+
 /**
- * Integration tests for the agent-driven edit-commit state machine.
- * Uses a real GitService against a real temp repo + bare remote.
+ * Integration tests for the interactive edit-commit's git layer. Uses a real
+ * GitService against a real temp repo + bare remote — the prompts sit above
+ * these functions and are not exercised here.
  */
-describe("edit-commit begin", () => {
+describe("edit-commit session", () => {
   let cleanup: (() => void) | undefined;
 
   afterEach(() => {
@@ -72,121 +100,14 @@ describe("edit-commit begin", () => {
         commit("base", { "base.txt": "base" }),
       ])
       .withBranch("live-run-through", [
-        commit("01.01 - First", { "a.txt": "first" }),
-        commit("01.02 - Second", { "b.txt": "second" }),
-        commit("01.03 - Third", { "c.txt": "third" }),
+        commit("add-first: First", { "a.txt": "first" }),
+        commit("add-second: Second", { "b.txt": "second" }),
+        commit("add-third: Third", { "c.txt": "third" }),
       ])
       .build();
     cleanup = repo.cleanup;
     return repo;
   };
-
-  it.effect(
-    "opens an editing session with the target commit's diff as the unstaged working tree",
-    () =>
-      Effect.gen(function* () {
-        const repo = makeRepo();
-
-        const envelope = yield* runBegin({
-          commit: "2",
-          branch: "live-run-through",
-          mainBranch: "main",
-        }).pipe(Effect.provide(makeLayer(repo.workingDir)));
-
-        // Envelope describes the targeted commit
-        expect(envelope.phase).toBe("editing");
-        expect(envelope.target.sequence).toBe(2);
-        expect(envelope.target.message).toBe("01.02 - Second");
-        // One commit follows #2 on the live branch (#3)
-        expect(envelope.following).toBe(1);
-
-        // We are parked on a temp branch, not the original branch
-        const branch = git(
-          repo.workingDir,
-          "branch",
-          "--show-current"
-        );
-        expect(branch).toMatch(/^matt\/edit-commit-/);
-
-        // The target commit (#2) introduced b.txt — it should now be
-        // sitting in the working tree as an uncommitted change, and HEAD
-        // should be the target's parent (#1), which introduced a.txt.
-        const status = git(
-          repo.workingDir,
-          "status",
-          "--short"
-        );
-        expect(status).toContain("b.txt");
-
-        const headMessage = git(
-          repo.workingDir,
-          "log",
-          "-1",
-          "--format=%s"
-        );
-        expect(headMessage).toBe("01.01 - First");
-      })
-  );
-
-  it.effect(
-    "continue folds the agent's edit into the re-authored commit and replays the following commits",
-    () =>
-      Effect.gen(function* () {
-        const repo = makeRepo();
-        const layer = makeLayer(repo.workingDir);
-
-        yield* runBegin({
-          commit: "2",
-          branch: "live-run-through",
-          mainBranch: "main",
-        }).pipe(Effect.provide(layer));
-
-        // Agent edits the working tree: change the content the target
-        // commit (#2) introduced.
-        fs.writeFileSync(
-          path.join(repo.workingDir, "b.txt"),
-          "second-EDITED"
-        );
-
-        const envelope = yield* runContinue().pipe(
-          Effect.provide(layer)
-        );
-
-        expect(envelope.phase).toBe("ready");
-        expect(envelope.conflictedFiles).toEqual([]);
-
-        // The branch still has the same three commits, same messages,
-        // same order.
-        const messages = git(
-          repo.workingDir,
-          "log",
-          "--format=%s",
-          "--reverse",
-          "main..HEAD"
-        ).split("\n");
-        expect(messages).toEqual([
-          "01.01 - First",
-          "01.02 - Second",
-          "01.03 - Third",
-        ]);
-
-        // The edit landed in commit #2 specifically (HEAD~1), not the tip.
-        const editedAtSecond = git(
-          repo.workingDir,
-          "show",
-          "HEAD~1:b.txt"
-        );
-        expect(editedAtSecond).toBe("second-EDITED");
-
-        // The following commit (#3) is intact.
-        const third = git(
-          repo.workingDir,
-          "show",
-          "HEAD:c.txt"
-        );
-        expect(third).toBe("third");
-      })
-  );
 
   const makeConflictingRepo = () => {
     const repo = createTestRepo()
@@ -195,9 +116,9 @@ describe("edit-commit begin", () => {
         commit("base", { "base.txt": "base" }),
       ])
       .withBranch("live-run-through", [
-        commit("01.01 - First", { "shared.txt": "v1\n" }),
-        commit("01.02 - Second", { "shared.txt": "v2\n" }),
-        commit("01.03 - Third", { "shared.txt": "v3\n" }),
+        commit("add-first: First", { "shared.txt": "v1\n" }),
+        commit("add-second: Second", { "shared.txt": "v2\n" }),
+        commit("add-third: Third", { "shared.txt": "v3\n" }),
       ])
       .build();
     cleanup = repo.cleanup;
@@ -205,168 +126,180 @@ describe("edit-commit begin", () => {
   };
 
   it.effect(
-    "continue stops at the conflict phase and names the conflicted files when a following commit conflicts",
+    "beginSession parks the target's diff in the working tree on a temp branch",
     () =>
       Effect.gen(function* () {
-        const repo = makeConflictingRepo();
+        const repo = makeRepo();
+
+        const session = yield* startSession(
+          "add-second"
+        ).pipe(Effect.provide(makeLayer(repo.workingDir)));
+
+        expect(session.target.message).toBe(
+          "add-second: Second"
+        );
+        expect(session.target.lessonId).toBe("add-second");
+        // One commit follows add-second on the live branch.
+        expect(session.following).toBe(1);
+        expect(session.originalBranch).toBe("main");
+
+        expect(
+          git(repo.workingDir, "branch", "--show-current")
+        ).toMatch(/^matt\/edit-commit-/);
+
+        // The target introduced b.txt, so it should now be uncommitted, and
+        // HEAD should be its parent (which introduced a.txt).
+        expect(
+          git(repo.workingDir, "status", "--short")
+        ).toContain("b.txt");
+        expect(
+          git(repo.workingDir, "log", "-1", "--format=%s")
+        ).toBe("add-first: First");
+      })
+  );
+
+  it.effect(
+    "recompose re-authors the commit with its original subject and replays the rest",
+    () =>
+      Effect.gen(function* () {
+        const repo = makeRepo();
         const layer = makeLayer(repo.workingDir);
 
-        yield* runBegin({
-          commit: "2",
-          branch: "live-run-through",
-          mainBranch: "main",
-        }).pipe(Effect.provide(layer));
+        const session = yield* startSession(
+          "add-second"
+        ).pipe(Effect.provide(layer));
 
-        // Agent re-writes the line the target (#2) owns. Cherry-picking #3
-        // (which also edits that line, based on the original #2) will
-        // conflict against the agent's new content.
         fs.writeFileSync(
-          path.join(repo.workingDir, "shared.txt"),
-          "v2-EDITED\n"
+          path.join(repo.workingDir, "b.txt"),
+          "second-EDITED"
         );
 
-        const envelope = yield* runContinue().pipe(
+        const result = yield* recompose(session).pipe(
           Effect.provide(layer)
         );
-
-        expect(envelope.phase).toBe("conflict");
-        expect(envelope.conflictedFiles).toEqual([
-          "shared.txt",
-        ]);
-
-        // Git really is mid-cherry-pick with an unmerged path.
-        const status = git(
-          repo.workingDir,
-          "status",
-          "--short"
-        );
-        expect(status).toContain("UU shared.txt");
-      })
-  );
-
-  const driveToConflict = (repo: {
-    workingDir: string;
-  }) => {
-    const layer = makeLayer(repo.workingDir);
-    return Effect.gen(function* () {
-      yield* runBegin({
-        commit: "2",
-        branch: "live-run-through",
-        mainBranch: "main",
-      }).pipe(Effect.provide(layer));
-      fs.writeFileSync(
-        path.join(repo.workingDir, "shared.txt"),
-        "v2-EDITED\n"
-      );
-      yield* runContinue().pipe(Effect.provide(layer));
-      return layer;
-    });
-  };
-
-  it.effect(
-    "continue refuses while conflict markers remain",
-    () =>
-      Effect.gen(function* () {
-        const repo = makeConflictingRepo();
-        const layer = yield* driveToConflict(repo);
-
-        // Do NOT resolve — the file still has conflict markers.
-        const error = yield* runContinue().pipe(
-          Effect.provide(layer),
-          Effect.flip
-        );
-
-        expect(error._tag).toBe("UnresolvedConflictsError");
-        if (error._tag === "UnresolvedConflictsError") {
-          expect(error.files).toEqual(["shared.txt"]);
-        }
-      })
-  );
-
-  it.effect(
-    "continue completes the cherry-pick once the conflict is resolved",
-    () =>
-      Effect.gen(function* () {
-        const repo = makeConflictingRepo();
-        const layer = yield* driveToConflict(repo);
-
-        // Agent resolves the conflict: remove markers, pick final content.
-        fs.writeFileSync(
-          path.join(repo.workingDir, "shared.txt"),
-          "v3-resolved\n"
-        );
-
-        const envelope = yield* runContinue().pipe(
-          Effect.provide(layer)
-        );
-
-        expect(envelope.phase).toBe("ready");
+        expect(result.conflict).toBe(false);
 
         const messages = git(
           repo.workingDir,
           "log",
           "--format=%s",
-          "--reverse",
+          "main..HEAD"
+        ).split("\n");
+        // Newest first: the stack is intact and the subject is unchanged.
+        expect(messages).toEqual([
+          "add-third: Third",
+          "add-second: Second",
+          "add-first: First",
+        ]);
+
+        // The edit landed in the re-authored commit, not a new one.
+        const editedAtSecond = git(
+          repo.workingDir,
+          "show",
+          "HEAD~1:b.txt"
+        );
+        expect(editedAtSecond).toBe("second-EDITED");
+
+        // The following commit still applies on top.
+        expect(
+          git(repo.workingDir, "show", "HEAD:c.txt")
+        ).toBe("third");
+      })
+  );
+
+  it.effect(
+    "recompose reports a conflict when the replay collides",
+    () =>
+      Effect.gen(function* () {
+        const repo = makeConflictingRepo();
+        const layer = makeLayer(repo.workingDir);
+
+        const session = yield* startSession(
+          "add-second"
+        ).pipe(Effect.provide(layer));
+
+        fs.writeFileSync(
+          path.join(repo.workingDir, "shared.txt"),
+          "v2-EDITED\n"
+        );
+
+        const result = yield* recompose(session).pipe(
+          Effect.provide(layer)
+        );
+
+        expect(result.conflict).toBe(true);
+        expect(
+          git(repo.workingDir, "status", "--short")
+        ).toContain("shared.txt");
+      })
+  );
+
+  it.effect(
+    "filesWithMarkers reports unresolved files and clears once they're fixed",
+    () =>
+      Effect.gen(function* () {
+        const repo = makeConflictingRepo();
+        const layer = makeLayer(repo.workingDir);
+
+        const session = yield* startSession(
+          "add-second"
+        ).pipe(Effect.provide(layer));
+        fs.writeFileSync(
+          path.join(repo.workingDir, "shared.txt"),
+          "v2-EDITED\n"
+        );
+        yield* recompose(session).pipe(Effect.provide(layer));
+
+        // Conflict markers are still in the file.
+        const stillMarked = yield* filesWithMarkers.pipe(
+          Effect.provide(layer)
+        );
+        expect(stillMarked).toEqual(["shared.txt"]);
+
+        // Resolve, and the guard clears.
+        fs.writeFileSync(
+          path.join(repo.workingDir, "shared.txt"),
+          "v3-resolved\n"
+        );
+        const afterFix = yield* filesWithMarkers.pipe(
+          Effect.provide(layer)
+        );
+        expect(afterFix).toEqual([]);
+
+        const result = yield* resumeCherryPick.pipe(
+          Effect.provide(layer)
+        );
+        expect(result.conflict).toBe(false);
+
+        const messages = git(
+          repo.workingDir,
+          "log",
+          "--format=%s",
           "main..HEAD"
         ).split("\n");
         expect(messages).toEqual([
-          "01.01 - First",
-          "01.02 - Second",
-          "01.03 - Third",
+          "add-third: Third",
+          "add-second: Second",
+          "add-first: First",
         ]);
-
-        const tip = git(
-          repo.workingDir,
-          "show",
-          "HEAD:shared.txt"
-        );
-        expect(tip).toBe("v3-resolved");
       })
   );
 
-  const bareDirOf = (workingDir: string) =>
-    path.resolve(workingDir, "..", "bare.git");
-
-  // Move origin's live-run-through from a *different* clone, so the local
-  // force-with-lease becomes stale.
-  const moveOrigin = (workingDir: string) => {
-    const bare = bareDirOf(workingDir);
-    const clone = path.resolve(workingDir, "..", "other-clone");
-    fs.mkdirSync(clone);
-    git(clone, "clone", bare, ".");
-    git(clone, "checkout", "live-run-through");
-    fs.writeFileSync(
-      path.join(clone, "intruder.txt"),
-      "sneaky"
-    );
-    git(clone, "add", ".");
-    git(clone, "commit", "-m", "intruder");
-    git(clone, "push", "origin", "live-run-through");
-  };
-
-  const driveToReady = (repo: { workingDir: string }) => {
-    const layer = makeLayer(repo.workingDir);
-    return Effect.gen(function* () {
-      yield* runBegin({
-        commit: "2",
-        branch: "live-run-through",
-        mainBranch: "main",
-      }).pipe(Effect.provide(layer));
-      fs.writeFileSync(
-        path.join(repo.workingDir, "b.txt"),
-        "second-EDITED"
-      );
-      yield* runContinue().pipe(Effect.provide(layer));
-      return layer;
-    });
-  };
-
   it.effect(
-    "publish force-pushes the recomposed branch to origin and cleans up",
+    "applyToLiveBranch + publish force-pushes the recomposition and finish cleans up",
     () =>
       Effect.gen(function* () {
         const repo = makeRepo();
-        const layer = yield* driveToReady(repo);
+        const layer = makeLayer(repo.workingDir);
+
+        const session = yield* startSession(
+          "add-second"
+        ).pipe(Effect.provide(layer));
+        fs.writeFileSync(
+          path.join(repo.workingDir, "b.txt"),
+          "second-EDITED"
+        );
+        yield* recompose(session).pipe(Effect.provide(layer));
 
         const recomposed = git(
           repo.workingDir,
@@ -374,84 +307,11 @@ describe("edit-commit begin", () => {
           "HEAD"
         );
 
-        const envelope = yield* runPublish().pipe(
+        yield* applyToLiveBranch(session).pipe(
           Effect.provide(layer)
         );
+        yield* publish(session).pipe(Effect.provide(layer));
 
-        expect(envelope.phase).toBe("published");
-
-        // Origin's live-run-through now points at the recomposed tip.
-        const remoteTip = git(
-          bareDirOf(repo.workingDir),
-          "rev-parse",
-          "live-run-through"
-        );
-        expect(remoteTip).toBe(recomposed);
-
-        // Back on the original branch, temp branch gone, state cleared.
-        expect(
-          git(repo.workingDir, "branch", "--show-current")
-        ).toBe("main");
-        expect(
-          git(
-            repo.workingDir,
-            "branch",
-            "--list",
-            "matt/edit-commit-*"
-          )
-        ).toBe("");
-        expect(
-          fs.existsSync(stateFilePath(repo.workingDir))
-        ).toBe(false);
-      })
-  );
-
-  it.effect(
-    "publish fails with LeaseRejectedError when origin has moved",
-    () =>
-      Effect.gen(function* () {
-        const repo = makeRepo();
-        const layer = yield* driveToReady(repo);
-
-        moveOrigin(repo.workingDir);
-
-        const error = yield* runPublish().pipe(
-          Effect.provide(layer),
-          Effect.flip
-        );
-
-        expect(error._tag).toBe("LeaseRejectedError");
-      })
-  );
-
-  it.effect(
-    "publish is re-runnable: after a rejected lease, re-fetching and retrying succeeds",
-    () =>
-      Effect.gen(function* () {
-        const repo = makeRepo();
-        const layer = yield* driveToReady(repo);
-
-        const recomposed = git(
-          repo.workingDir,
-          "rev-parse",
-          "HEAD"
-        );
-
-        // First attempt: origin moved -> rejected.
-        moveOrigin(repo.workingDir);
-        const error = yield* runPublish().pipe(
-          Effect.provide(layer),
-          Effect.flip
-        );
-        expect(error._tag).toBe("LeaseRejectedError");
-
-        // Agent re-fetches to refresh the lease, then retries the same verb.
-        git(repo.workingDir, "fetch", "origin");
-        const envelope = yield* runPublish().pipe(
-          Effect.provide(layer)
-        );
-
-        expect(envelope.phase).toBe("published");
         expect(
           git(
             bareDirOf(repo.workingDir),
@@ -459,51 +319,12 @@ describe("edit-commit begin", () => {
             "live-run-through"
           )
         ).toBe(recomposed);
-      })
-  );
 
-  it.effect(
-    "begin refuses when a session already exists",
-    () =>
-      Effect.gen(function* () {
-        const repo = makeRepo();
-        const layer = makeLayer(repo.workingDir);
+        yield* finish(session).pipe(Effect.provide(layer));
 
-        yield* runBegin({
-          commit: "2",
-          branch: "live-run-through",
-          mainBranch: "main",
-        }).pipe(Effect.provide(layer));
-
-        const error = yield* runBegin({
-          commit: "3",
-          branch: "live-run-through",
-          mainBranch: "main",
-        }).pipe(Effect.provide(layer), Effect.flip);
-
-        expect(error._tag).toBe("SessionExistsError");
-        if (error._tag === "SessionExistsError") {
-          expect(error.phase).toBe("editing");
-        }
-      })
-  );
-
-  it.effect(
-    "begin rejects a commit reference that matches nothing",
-    () =>
-      Effect.gen(function* () {
-        const repo = makeRepo();
-        const layer = makeLayer(repo.workingDir);
-
-        const error = yield* runBegin({
-          commit: "99",
-          branch: "live-run-through",
-          mainBranch: "main",
-        }).pipe(Effect.provide(layer), Effect.flip);
-
-        expect(error._tag).toBe("CommitNotFoundError");
-
-        // It bailed before stranding a temp branch.
+        expect(
+          git(repo.workingDir, "branch", "--show-current")
+        ).toBe("main");
         expect(
           git(
             repo.workingDir,
@@ -516,103 +337,89 @@ describe("edit-commit begin", () => {
   );
 
   it.effect(
-    "status reports the current phase without mutating the repo",
+    "publish fails rather than clobbering when origin has moved",
     () =>
       Effect.gen(function* () {
         const repo = makeRepo();
         const layer = makeLayer(repo.workingDir);
 
-        yield* runBegin({
-          commit: "2",
-          branch: "live-run-through",
-          mainBranch: "main",
-        }).pipe(Effect.provide(layer));
-
-        const branchBefore = git(
-          repo.workingDir,
-          "branch",
-          "--show-current"
+        const session = yield* startSession(
+          "add-second"
+        ).pipe(Effect.provide(layer));
+        fs.writeFileSync(
+          path.join(repo.workingDir, "b.txt"),
+          "second-EDITED"
         );
-
-        const envelope = yield* runStatus().pipe(
+        yield* recompose(session).pipe(Effect.provide(layer));
+        yield* applyToLiveBranch(session).pipe(
           Effect.provide(layer)
         );
 
-        expect(envelope.phase).toBe("editing");
-        expect(envelope.target.sequence).toBe(2);
+        // Someone else pushes to live-run-through from another clone, so our
+        // force-with-lease is now stale.
+        const bare = bareDirOf(repo.workingDir);
+        const clone = path.resolve(
+          repo.workingDir,
+          "..",
+          "other-clone"
+        );
+        fs.mkdirSync(clone);
+        git(clone, "clone", bare, ".");
+        git(clone, "checkout", "live-run-through");
+        fs.writeFileSync(
+          path.join(clone, "intruder.txt"),
+          "sneaky"
+        );
+        git(clone, "add", ".");
+        git(clone, "commit", "-m", "intruder");
+        git(clone, "push", "origin", "live-run-through");
 
-        // status is read-only: same branch, still mid-edit.
+        const exit = yield* publish(session).pipe(
+          Effect.provide(layer),
+          Effect.exit
+        );
+        expect(exit._tag).toBe("Failure");
+
+        // The intruder's commit is still the remote tip.
         expect(
-          git(repo.workingDir, "branch", "--show-current")
-        ).toBe(branchBefore);
+          git(bare, "log", "-1", "--format=%s", "live-run-through")
+        ).toBe("intruder");
       })
   );
 
   it.effect(
-    "status fails with NoSessionError when nothing is in progress",
+    "unwind discards the working tree, restores the original branch and deletes the temp branch",
     () =>
       Effect.gen(function* () {
         const repo = makeRepo();
         const layer = makeLayer(repo.workingDir);
 
-        const error = yield* runStatus().pipe(
-          Effect.provide(layer),
-          Effect.flip
-        );
-
-        expect(error._tag).toBe("NoSessionError");
-      })
-  );
-
-  it.effect(
-    "continue fails with NoSessionError when nothing is in progress",
-    () =>
-      Effect.gen(function* () {
-        const repo = makeRepo();
-        const layer = makeLayer(repo.workingDir);
-
-        const error = yield* runContinue().pipe(
-          Effect.provide(layer),
-          Effect.flip
-        );
-
-        expect(error._tag).toBe("NoSessionError");
-      })
-  );
-
-  it.effect(
-    "abort from editing restores the original branch clean and reports the discarded edits",
-    () =>
-      Effect.gen(function* () {
-        const repo = makeRepo();
-        const layer = makeLayer(repo.workingDir);
-
-        yield* runBegin({
-          commit: "2",
-          branch: "live-run-through",
-          mainBranch: "main",
-        }).pipe(Effect.provide(layer));
+        const session = yield* startSession(
+          "add-second"
+        ).pipe(Effect.provide(layer));
 
         fs.writeFileSync(
           path.join(repo.workingDir, "b.txt"),
           "second-EDITED"
         );
-
-        const result = yield* runAbort().pipe(
-          Effect.provide(layer)
+        fs.writeFileSync(
+          path.join(repo.workingDir, "untracked.txt"),
+          "scratch"
         );
 
-        expect(result.restoredBranch).toBe("main");
-        expect(result.discardedFiles).toContain("b.txt");
+        const { discardedFiles } = yield* unwind(session, {
+          midCherryPick: false,
+          liveBranchMoved: false,
+          keepTempBranch: false,
+        }).pipe(Effect.provide(layer));
 
-        // Back on main with a clean tree.
+        expect(discardedFiles).toContain("b.txt");
         expect(
           git(repo.workingDir, "branch", "--show-current")
         ).toBe("main");
         expect(
           git(repo.workingDir, "status", "--short")
         ).toBe("");
-        // Temp branch and state gone.
         expect(
           git(
             repo.workingDir,
@@ -621,26 +428,123 @@ describe("edit-commit begin", () => {
             "matt/edit-commit-*"
           )
         ).toBe("");
+        // `clean` removed the untracked scratch file too.
         expect(
-          fs.existsSync(stateFilePath(repo.workingDir))
+          fs.existsSync(
+            path.join(repo.workingDir, "untracked.txt")
+          )
         ).toBe(false);
       })
   );
 
   it.effect(
-    "abort from a conflict aborts the cherry-pick and restores the original branch",
+    "unwind keeps the temp branch when the edits are already committed",
     () =>
       Effect.gen(function* () {
-        const repo = makeConflictingRepo();
-        const layer = yield* driveToConflict(repo);
+        const repo = makeRepo();
+        const layer = makeLayer(repo.workingDir);
 
-        const result = yield* runAbort().pipe(
+        const session = yield* startSession(
+          "add-second"
+        ).pipe(Effect.provide(layer));
+        fs.writeFileSync(
+          path.join(repo.workingDir, "b.txt"),
+          "second-EDITED"
+        );
+        yield* recompose(session).pipe(Effect.provide(layer));
+
+        yield* unwind(session, {
+          midCherryPick: false,
+          liveBranchMoved: false,
+          keepTempBranch: true,
+        }).pipe(Effect.provide(layer));
+
+        expect(
+          git(repo.workingDir, "branch", "--show-current")
+        ).toBe("main");
+        // The recomposed work is still reachable.
+        expect(
+          git(
+            repo.workingDir,
+            "branch",
+            "--list",
+            "matt/edit-commit-*"
+          )
+        ).toContain("matt/edit-commit-");
+        expect(
+          git(
+            repo.workingDir,
+            "show",
+            `${session.tempBranch}~1:b.txt`
+          )
+        ).toBe("second-EDITED");
+      })
+  );
+
+  it.effect(
+    "unwind puts the live branch back when it has already been moved",
+    () =>
+      Effect.gen(function* () {
+        const repo = makeRepo();
+        const layer = makeLayer(repo.workingDir);
+
+        const session = yield* startSession(
+          "add-second"
+        ).pipe(Effect.provide(layer));
+        fs.writeFileSync(
+          path.join(repo.workingDir, "b.txt"),
+          "second-EDITED"
+        );
+        yield* recompose(session).pipe(Effect.provide(layer));
+        yield* applyToLiveBranch(session).pipe(
           Effect.provide(layer)
         );
 
-        expect(result.restoredBranch).toBe("main");
+        yield* unwind(session, {
+          midCherryPick: false,
+          liveBranchMoved: true,
+          keepTempBranch: true,
+        }).pipe(Effect.provide(layer));
 
-        // No cherry-pick in progress, clean tree, back on main.
+        // The live branch is back at the tip it had before the session.
+        expect(
+          git(
+            repo.workingDir,
+            "rev-parse",
+            "live-run-through"
+          )
+        ).toBe(session.targetBranchHead);
+        expect(
+          git(repo.workingDir, "branch", "--show-current")
+        ).toBe("main");
+      })
+  );
+
+  it.effect(
+    "unwind aborts an in-flight cherry-pick before restoring",
+    () =>
+      Effect.gen(function* () {
+        const repo = makeConflictingRepo();
+        const layer = makeLayer(repo.workingDir);
+
+        const session = yield* startSession(
+          "add-second"
+        ).pipe(Effect.provide(layer));
+        fs.writeFileSync(
+          path.join(repo.workingDir, "shared.txt"),
+          "v2-EDITED\n"
+        );
+        const result = yield* recompose(session).pipe(
+          Effect.provide(layer)
+        );
+        expect(result.conflict).toBe(true);
+
+        yield* unwind(session, {
+          midCherryPick: true,
+          liveBranchMoved: false,
+          keepTempBranch: false,
+        }).pipe(Effect.provide(layer));
+
         expect(
           git(repo.workingDir, "branch", "--show-current")
         ).toBe("main");
@@ -657,94 +561,63 @@ describe("edit-commit begin", () => {
         ).toBe("");
       })
   );
+});
 
-  it.effect(
-    "continue from ready fails with InvalidPhaseError and authors no second commit",
-    () =>
-      Effect.gen(function* () {
-        const repo = makeRepo();
-        const layer = yield* driveToReady(repo);
+describe("resolveCommitRef", () => {
+  const make = (
+    sequence: number,
+    lessonId: string | null,
+    sha: string
+  ): BranchCommit => ({
+    sha,
+    message: lessonId ? `${lessonId}: Lesson` : "no lesson",
+    lessonId,
+    description: "Lesson",
+    sequence,
+  });
 
-        const commitsBefore = git(
-          repo.workingDir,
-          "log",
-          "--format=%H",
-          "main..HEAD"
-        );
+  const commits = [
+    make(1, "add-first", "aaa1111"),
+    make(2, "06.06.01", "bbb2222"),
+    make(3, "add-third", "ccc3333"),
+  ];
 
-        const error = yield* runContinue().pipe(
-          Effect.provide(layer),
-          Effect.flip
-        );
+  it("resolves a slug lesson id", () => {
+    expect(resolveCommitRef(commits, "add-third")?.sha).toBe(
+      "ccc3333"
+    );
+  });
 
-        expect(error._tag).toBe("InvalidPhaseError");
+  it("normalises a numeric lesson id", () => {
+    expect(resolveCommitRef(commits, "6.6.1")?.sha).toBe(
+      "bbb2222"
+    );
+  });
 
-        // No second commit was authored — same commit set as before.
-        const commitsAfter = git(
-          repo.workingDir,
-          "log",
-          "--format=%H",
-          "main..HEAD"
-        );
-        expect(commitsAfter).toBe(commitsBefore);
-      })
-  );
+  it("resolves a SHA prefix", () => {
+    expect(resolveCommitRef(commits, "aaa")?.sha).toBe(
+      "aaa1111"
+    );
+  });
 
-  it.effect(
-    "publish from editing fails with InvalidPhaseError before touching the live branch",
-    () =>
-      Effect.gen(function* () {
-        const repo = makeRepo();
-        const layer = makeLayer(repo.workingDir);
+  it("returns undefined for an unknown ref", () => {
+    expect(
+      resolveCommitRef(commits, "nope")
+    ).toBeUndefined();
+  });
 
-        yield* runBegin({
-          commit: "2",
-          branch: "live-run-through",
-          mainBranch: "main",
-        }).pipe(Effect.provide(layer));
+  it("resolves a duplicated lesson id to the latest commit", () => {
+    const withDuplicate = [
+      ...commits,
+      make(4, "add-first", "ddd4444"),
+    ];
+    expect(
+      resolveCommitRef(withDuplicate, "add-first")?.sha
+    ).toBe("ddd4444");
+  });
 
-        const tempBranch = git(
-          repo.workingDir,
-          "branch",
-          "--show-current"
-        );
-
-        const error = yield* runPublish().pipe(
-          Effect.provide(layer),
-          Effect.flip
-        );
-
-        expect(error._tag).toBe("InvalidPhaseError");
-
-        // Still parked on the temp branch — publish didn't check anything out.
-        expect(
-          git(repo.workingDir, "branch", "--show-current")
-        ).toBe(tempBranch);
-      })
-  );
-
-  it.effect(
-    "continue fails with StateDivergedError when the session branch is gone",
-    () =>
-      Effect.gen(function* () {
-        const repo = makeRepo();
-        const layer = makeLayer(repo.workingDir);
-
-        yield* runBegin({
-          commit: "2",
-          branch: "live-run-through",
-          mainBranch: "main",
-        }).pipe(Effect.provide(layer));
-
-        // Simulate divergence: move off the temp branch back to main.
-        git(repo.workingDir, "checkout", "--force", "main");
-
-        const error = yield* runContinue().pipe(
-          Effect.provide(layer),
-          Effect.flip
-        );
-
-        expect(error._tag).toBe("StateDivergedError");
-      })
-  );
+  it("does not treat a positional index as an identifier", () => {
+    // "2" was the old positional selector; it must no longer match anything.
+    expect(resolveCommitRef(commits, "2")).toBeUndefined();
+  });
 });

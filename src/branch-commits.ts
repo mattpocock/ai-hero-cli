@@ -1,11 +1,21 @@
 import { Data, Effect } from "effect";
+import {
+  normalizeLessonId,
+  splitLessonId,
+} from "./commit-utils.js";
 import { GitService } from "./git-service.js";
 import { PromptService } from "./prompt-service.js";
 
 export interface BranchCommit {
   sha: string;
+  /** The untouched commit subject — what we re-author the commit with. */
   message: string;
-  sequence: number; // 1-based
+  /** Lesson id: the token before the first ": ", or null for non-lessons. */
+  lessonId: string | null;
+  /** The subject with the lesson-id prefix stripped, for display. */
+  description: string;
+  /** 1-based position in teaching order. Ordering only — never identity. */
+  sequence: number;
 }
 
 export class NoCommitsFoundError extends Data.TaggedError(
@@ -15,9 +25,19 @@ export class NoCommitsFoundError extends Data.TaggedError(
   liveBranch: string;
 }> {}
 
+export class CommitNotFoundError extends Data.TaggedError(
+  "CommitNotFoundError"
+)<{
+  commit: string;
+}> {}
+
 /**
- * Gets all commits between mainBranch and liveBranch.
- * Returns commits in chronological order (oldest first) with 1-based sequence numbers.
+ * Gets all commits between mainBranch and liveBranch, in teaching order
+ * (oldest first), decomposed with the shared lesson-id parser.
+ *
+ * `sequence` is retained because the cherry-pick range needs to know how many
+ * commits follow the target — it is *not* an identifier. Lessons are named by
+ * their slug (see `lessonId`).
  */
 export const getCommitsBetweenBranches = (opts: {
   mainBranch: string;
@@ -37,10 +57,14 @@ export const getCommitsBetweenBranches = (opts: {
       .map((line, index) => {
         const [sha, ...messageParts] = line.split(" ");
         const message = messageParts.join(" ");
+        const { description, lessonId } =
+          splitLessonId(message);
 
         return {
           sha: sha!,
           message,
+          lessonId,
+          description,
           sequence: index + 1,
         };
       });
@@ -58,8 +82,34 @@ export const getCommitsBetweenBranches = (opts: {
   });
 
 /**
- * Prompts user to select a commit from a list.
- * Displays sequence number and message for each commit.
+ * Resolves a user-supplied reference to one of `commits`.
+ *
+ * A reference is a lesson id — a slug (`add-settings-json`) or a numeric id
+ * (`6.6.1`, normalised to `06.06.01`) — or a SHA prefix. Lesson ids are tried
+ * first so a slug that happens to look like hex can't be shadowed. Duplicate
+ * ids resolve to the latest commit carrying them, matching `reset` and
+ * `cherry-pick`.
+ */
+export const resolveCommitRef = (
+  commits: Array<BranchCommit>,
+  ref: string
+) => {
+  const normalized = normalizeLessonId(ref) ?? ref;
+
+  const byLessonId = commits.filter(
+    (commit) => commit.lessonId === normalized
+  );
+  if (byLessonId.length > 0) {
+    // Latest wins: commits are oldest -> newest.
+    return byLessonId[byLessonId.length - 1]!;
+  }
+
+  return commits.find((commit) => commit.sha.startsWith(ref));
+};
+
+/**
+ * Prompts the user to pick a lesson commit, listed by lesson id in teaching
+ * order. Commits with no lesson id are not selectable — they aren't lessons.
  */
 /* v8 ignore start - UI prompt wrapper */
 export const selectCommit = (opts: {
@@ -69,28 +119,33 @@ export const selectCommit = (opts: {
   Effect.gen(function* () {
     const promptService = yield* PromptService;
 
-    // Format commits for display: "01.01 - message"
-    const formattedCommits = opts.commits.map((commit) => ({
-      lessonId: commit.sequence.toString().padStart(2, "0"),
-      message: commit.message,
-    }));
+    const lessons = opts.commits.filter(
+      (commit) => commit.lessonId !== null
+    );
+
+    if (lessons.length === 0) {
+      return yield* new CommitNotFoundError({ commit: "any" });
+    }
 
     const selectedId = yield* promptService.selectLessonCommit(
-      formattedCommits,
+      lessons.map((commit) => ({
+        lessonId: commit.lessonId!,
+        message: commit.description,
+      })),
       opts.promptMessage
     );
 
-    // Find the commit by sequence number
-    const selectedSequence = parseInt(selectedId, 10);
-    const selectedCommit = opts.commits.find(
-      (c) => c.sequence === selectedSequence
-    );
+    const selected = resolveCommitRef(lessons, selectedId);
 
-    if (!selectedCommit) {
-      // Fallback to first match if parsing failed
-      return opts.commits[0]!;
+    // The picker can only return an id we offered, so a miss means the list
+    // and the resolver disagree — fail loudly rather than edit a commit the
+    // user didn't choose.
+    if (!selected) {
+      return yield* new CommitNotFoundError({
+        commit: selectedId,
+      });
     }
 
-    return selectedCommit;
+    return selected;
   });
 /* v8 ignore stop */
