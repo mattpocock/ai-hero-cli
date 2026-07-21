@@ -139,9 +139,14 @@ export const createTestRepo = (): TestRepoBuilder => {
             fs.writeFileSync(fullPath, content);
           }
           git(workDir, "add", ".");
+          // `commit("msg", {})` means an empty placeholder commit —
+          // message only, no content — as used by course repos.
+          const isEmpty =
+            Object.keys(commitDef.files).length === 0;
           git(
             workDir,
             "commit",
+            ...(isEmpty ? ["--allow-empty"] : []),
             "-m",
             commitDef.message
           );

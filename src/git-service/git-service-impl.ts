@@ -200,10 +200,14 @@ export const makeGitService = Effect.gen(function* () {
           yield* runCommandWithExitCode("git", "add", ".");
         }),
 
+        // `--allow-empty` so a commit whose content is unchanged (or which
+        // was an empty placeholder to begin with) still gets re-authored
+        // rather than failing with "nothing to commit".
         commit: Effect.fn("commit")(function* (message: string) {
           const exitCode = yield* runCommandWithExitCode(
             "git",
             "commit",
+            "--allow-empty",
             "-m",
             message
           );
@@ -217,12 +221,20 @@ export const makeGitService = Effect.gen(function* () {
           );
         }),
 
+        // Empty commits are load-bearing in course repos — a placeholder
+        // lesson commit carries a slug and message with no content. Keep
+        // them: `--allow-empty` for commits that started empty,
+        // `--keep-redundant-commits` for ones that become empty on replay.
+        // (The sequencer records both in `.git/sequencer/opts`, so a later
+        // `cherry-pick --continue` inherits them.)
         cherryPick: Effect.fn("cherryPick")(function* (
           range: string
         ) {
           const exitCode = yield* runCommandWithExitCode(
             "git",
             "cherry-pick",
+            "--allow-empty",
+            "--keep-redundant-commits",
             range
           );
 

@@ -109,6 +109,26 @@ describe("edit-commit session", () => {
     return repo;
   };
 
+  /**
+   * A course-repo shaped stack: one filled-in lesson followed by empty
+   * placeholder commits that carry only a slug + subject.
+   */
+  const makePlaceholderRepo = () => {
+    const repo = createTestRepo()
+      .withRemote("origin")
+      .withBranch("main", [
+        commit("base", { "base.txt": "base" }),
+      ])
+      .withBranch("live-run-through", [
+        commit("add-first: First", { "a.txt": "first" }),
+        commit("add-second: Second", {}),
+        commit("add-third: Third", {}),
+      ])
+      .build();
+    cleanup = repo.cleanup;
+    return repo;
+  };
+
   const makeConflictingRepo = () => {
     const repo = createTestRepo()
       .withRemote("origin")
@@ -204,6 +224,87 @@ describe("edit-commit session", () => {
         expect(
           git(repo.workingDir, "show", "HEAD:c.txt")
         ).toBe("third");
+      })
+  );
+
+  it.effect(
+    "recompose replays following empty placeholder commits instead of stalling on them",
+    () =>
+      Effect.gen(function* () {
+        const repo = makePlaceholderRepo();
+        const layer = makeLayer(repo.workingDir);
+
+        const session = yield* startSession("add-first").pipe(
+          Effect.provide(layer)
+        );
+
+        fs.writeFileSync(
+          path.join(repo.workingDir, "a.txt"),
+          "first-EDITED"
+        );
+
+        const result = yield* recompose(session).pipe(
+          Effect.provide(layer)
+        );
+        expect(result.conflict).toBe(false);
+
+        // The placeholders survive the replay, in order.
+        const messages = git(
+          repo.workingDir,
+          "log",
+          "--format=%s",
+          "main..HEAD"
+        ).split("\n");
+        expect(messages).toEqual([
+          "add-third: Third",
+          "add-second: Second",
+          "add-first: First",
+        ]);
+
+        // And they're still empty.
+        for (const ref of ["HEAD~1", "HEAD"]) {
+          expect(
+            git(
+              repo.workingDir,
+              "diff",
+              "--name-only",
+              `${ref}^`,
+              ref
+            )
+          ).toBe("");
+        }
+      })
+  );
+
+  it.effect(
+    "recompose re-authors an empty placeholder target the user left empty",
+    () =>
+      Effect.gen(function* () {
+        const repo = makePlaceholderRepo();
+        const layer = makeLayer(repo.workingDir);
+
+        const session = yield* startSession("add-second").pipe(
+          Effect.provide(layer)
+        );
+
+        // The user decides there's nothing to add to this lesson yet, so
+        // the working tree is left exactly as it was found.
+        const result = yield* recompose(session).pipe(
+          Effect.provide(layer)
+        );
+        expect(result.conflict).toBe(false);
+
+        const messages = git(
+          repo.workingDir,
+          "log",
+          "--format=%s",
+          "main..HEAD"
+        ).split("\n");
+        expect(messages).toEqual([
+          "add-third: Third",
+          "add-second: Second",
+          "add-first: First",
+        ]);
       })
   );
 
