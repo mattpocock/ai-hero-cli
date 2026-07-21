@@ -157,16 +157,45 @@ export class PromptService extends Effect.Service<PromptService>()(
       );
 
       /**
+       * Prompts user to confirm discarding their working-tree changes.
+       * Default is false (no) — this throws away hand-written work.
+       *
+       * @returns true to discard, false to leave the branch in place
+       * @throws PromptCancelledError if user presses Ctrl+C
+       */
+      const confirmDiscardChanges = Effect.fn(
+        "confirmDiscardChanges"
+      )(function* (branch: string) {
+        const { confirm } = yield* runPrompt<{
+          confirm: boolean;
+        }>(() =>
+          prompt([
+            {
+              type: "confirm",
+              name: "confirm",
+              message: `Discard your changes? (No leaves them on ${branch})`,
+              initial: false,
+            },
+          ])
+        );
+
+        return confirm;
+      });
+
+      /**
        * Prompts user to select action during cherry-pick conflict.
        *
-       * @returns 'continue' | 'abort' | 'skip'
+       * "Skip" is deliberately absent: the old implementation returned without
+       * touching the in-flight cherry-pick, leaving the repo half-recomposed.
+       *
+       * @returns 'continue' | 'abort'
        * @throws PromptCancelledError if user presses Ctrl+C
        */
       const selectCherryPickConflictAction = Effect.fn(
         "selectCherryPickConflictAction"
       )(function* () {
         const { action } = yield* runPrompt<{
-          action: "continue" | "abort" | "skip";
+          action: "continue" | "abort";
         }>(() =>
           prompt([
             {
@@ -177,7 +206,6 @@ export class PromptService extends Effect.Service<PromptService>()(
               choices: [
                 { title: "Continue", value: "continue" },
                 { title: "Abort", value: "abort" },
-                { title: "Skip", value: "skip" },
               ],
             },
           ])
@@ -738,6 +766,7 @@ export class PromptService extends Effect.Service<PromptService>()(
         confirmReadyToCommit,
         confirmSaveToTargetBranch,
         confirmForcePush,
+        confirmDiscardChanges,
         selectCherryPickConflictAction,
         selectResetAction,
         confirmResetWithUncommittedChanges,

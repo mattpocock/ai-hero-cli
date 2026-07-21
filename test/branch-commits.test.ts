@@ -18,14 +18,14 @@ import { GitService } from "../src/git-service.js";
 describe("branch-commits", () => {
   describe("getCommitsBetweenBranches", () => {
     it.effect(
-      "should return commits between branches with sequence numbers",
+      "should decompose commits into lesson ids, keeping the original subject",
       () =>
         Effect.gen(function* () {
           const mockGitService = fromPartial<GitService>({
             getLogOnelineReverse: Effect.fn("getLogOnelineReverse")(
               function* (range: string) {
                 expect(range).toBe("main..live-run-through");
-                return "abc123 01.01 First lesson\ndef456 01.02 Second lesson\nghi789 02.01 Third lesson";
+                return "abc123 add-first: First lesson\ndef456 01.02.01: Second lesson\nghi789 no lesson prefix";
               }
             ),
           });
@@ -41,9 +41,28 @@ describe("branch-commits", () => {
           }).pipe(Effect.provide(testLayer));
 
           expect(commits).toEqual([
-            { sha: "abc123", message: "01.01 First lesson", sequence: 1 },
-            { sha: "def456", message: "01.02 Second lesson", sequence: 2 },
-            { sha: "ghi789", message: "02.01 Third lesson", sequence: 3 },
+            {
+              sha: "abc123",
+              message: "add-first: First lesson",
+              lessonId: "add-first",
+              description: "First lesson",
+              sequence: 1,
+            },
+            {
+              sha: "def456",
+              message: "01.02.01: Second lesson",
+              lessonId: "01.02.01",
+              description: "Second lesson",
+              sequence: 2,
+            },
+            // No ": " boundary — not a lesson, so it carries no id.
+            {
+              sha: "ghi789",
+              message: "no lesson prefix",
+              lessonId: null,
+              description: "no lesson prefix",
+              sequence: 3,
+            },
           ]);
         })
     );

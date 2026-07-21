@@ -39,6 +39,31 @@ type ParsedCommit = {
 const LESSON_ID_BOUNDARY = ": ";
 
 /**
+ * Splits a commit subject into its lesson id and the description that follows.
+ *
+ * The single source of truth for what a lesson id *is*: the token before the
+ * first ": ". Callers that need the untouched subject keep their own copy —
+ * this only reports how it decomposes.
+ */
+export const splitLessonId = (
+  fullMessage: string
+): { lessonId: string | null; description: string } => {
+  const boundaryIndex = fullMessage.indexOf(LESSON_ID_BOUNDARY);
+
+  // boundaryIndex > 0 so the id is non-empty (a leading ": " is not an id).
+  if (boundaryIndex <= 0) {
+    return { lessonId: null, description: fullMessage };
+  }
+
+  return {
+    lessonId: fullMessage.slice(0, boundaryIndex),
+    description: fullMessage
+      .slice(boundaryIndex + LESSON_ID_BOUNDARY.length)
+      .trim(),
+  };
+};
+
+/**
  * Parses `git log --oneline` output into commits, extracting each lesson id as
  * the token before the first ": ". A slug (`add-settings-json`), a numeric id
  * (`06.06.01`), and a conventional-commit type (`fix`) are all just "the token
@@ -58,26 +83,12 @@ export const parseCommits = (
       const [sha, ...messageParts] = line.split(" ");
       const fullMessage = messageParts.join(" ");
 
-      const boundaryIndex = fullMessage.indexOf(
-        LESSON_ID_BOUNDARY
-      );
-
-      // boundaryIndex > 0 so the id is non-empty (a leading ": " is not an id).
-      const lessonId =
-        boundaryIndex > 0
-          ? fullMessage.slice(0, boundaryIndex)
-          : null;
-
-      const message =
-        boundaryIndex > 0
-          ? fullMessage
-              .slice(boundaryIndex + LESSON_ID_BOUNDARY.length)
-              .trim()
-          : fullMessage;
+      const { description, lessonId } =
+        splitLessonId(fullMessage);
 
       return {
         sha: sha!,
-        message,
+        message: description,
         lessonId,
       };
     });
