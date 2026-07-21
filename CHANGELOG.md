@@ -1,5 +1,24 @@
 # ai-hero-cli
 
+## 0.6.0
+
+### Minor Changes
+
+- 399024d: Add `ai-hero fork` command: turn your course clone into a fresh private GitHub repo you own in one step. It checks the GitHub CLI is installed and authenticated, resets local history to a single commit, creates a private repo, and pushes your files to it as `origin` (GitHub Issues enabled by default). Guides you through the common failure modes (no `gh`, not logged in, repo name already taken, not run from a clone).
+- 0812e8d: Make `internal edit-commit` interactive again. It is once more a single prompt-driven command — pick a lesson, edit it, confirm, push — rather than a state machine driven from outside.
+
+  **The `begin`, `continue`, `status`, `abort` and `publish` subcommands are removed**, along with the `.git/ai-hero/edit-commit.json` session file and the JSON output envelope. `edit-commit` is invoked bare: `ai-hero internal edit-commit [--commit <lesson-id>]`. It requires a TTY and exits with an error when it doesn't have one, rather than silently degrading. A session no longer survives its process — there is nothing to resume.
+
+  Carried over from the agent-driven version rather than reverted:
+
+  - **`--commit` still skips the picker**, and now takes a **lesson id** — a slug (`add-settings-json`) or a numeric id (`6.6.1`, normalised to `06.06.01`) — or a SHA prefix, resolved by the same parser `reset` and `cherry-pick` use. Duplicate ids resolve to the latest commit. The old positional selector (`--commit 2` meaning "the second commit") is gone; the picker now lists real lesson ids in teaching order instead of list positions.
+  - **Conflict resolution is verified.** Choosing "Continue" re-reads the unmerged files and refuses while conflict markers remain, instead of taking your word for it and committing `<<<<<<<` into a lesson. The "Skip" option is gone — it left the cherry-pick half-applied.
+  - **Cancelling unwinds.** Previously, cancelling a prompt printed "Branch left as-is" and abandoned a `matt/edit-commit-*` branch nothing could later find. Now the command aborts any in-flight cherry-pick, restores the branch you started on, and cleans up. Before your edits are committed it asks first, since unwinding discards them; once they are committed it unwinds without asking but keeps the temp branch, so backing out of a force-push never costs you the edit. A hard interrupt still leaves the branch, but prints its name.
+
+- 95406cd: Trim the `internal` namespace down to the one authoring command still in active use. The `update-cvm`, `rename`, `upload-to-cloudinary`, `get-diffs`, `diffs-to-repo`, `walk-through`, `init`, `lint`, and `rebase-to-main` commands, plus the inline `upgrade` command, have been removed — `ai-hero internal` now exposes only `edit-commit`. The student-facing commands (`exercise`, `reset`, `cherry-pick`, `pull`) are unchanged.
+
+  The dependencies orphaned by those removals (`cloudinary`, `dotenv`) and pre-existing dead dependencies (`@effect/sql`, `@effect/cluster`, `@effect/rpc`) have been dropped, along with the in-repo `sandcastle` agent harness and its `@ai-hero/sandcastle` devDependency.
+
 ## 0.5.0
 
 ### Minor Changes
