@@ -762,6 +762,224 @@ export class PromptService extends Effect.Service<PromptService>()(
         }
       );
 
+      /**
+       * Prompts for a lesson slug — the durable id, named for the change.
+       *
+       * @param initial - Prefilled value, for renaming an existing lesson
+       * @returns The entered slug (unvalidated; see `checkSlug`)
+       * @throws PromptCancelledError if user presses Ctrl+C
+       */
+      const inputSlug = Effect.fn("inputSlug")(function* (
+        initial?: string | undefined
+      ) {
+        const { slug } = yield* runPrompt<{ slug: string }>(() =>
+          prompt([
+            {
+              type: "text",
+              name: "slug",
+              message:
+                "Slug (the durable id, named for the change — e.g. add-settings-json):",
+              ...(initial === undefined ? {} : { initial }),
+            },
+          ])
+        );
+
+        return slug ?? "";
+      });
+
+      /**
+       * Prompts for a lesson title — the human half of the subject, free to
+       * change later.
+       *
+       * @param initial - Prefilled value, for renaming an existing lesson
+       * @returns The entered title
+       * @throws PromptCancelledError if user presses Ctrl+C
+       */
+      const inputTitle = Effect.fn("inputTitle")(function* (
+        initial?: string | undefined
+      ) {
+        const { title } = yield* runPrompt<{ title: string }>(
+          () =>
+            prompt([
+              {
+                type: "text",
+                name: "title",
+                message: "Title:",
+                ...(initial === undefined ? {} : { initial }),
+              },
+            ])
+        );
+
+        return title ?? "";
+      });
+
+      /**
+       * Prompts for where a new lesson should be inserted.
+       *
+       * The two boundary choices are pinned: "at the start" first, "at the
+       * end" last, with the existing lessons in teaching order between them.
+       *
+       * @param lessons - Existing lessons, in teaching order
+       * @returns "start", "end", or the lesson id to insert after
+       * @throws PromptCancelledError if user presses Ctrl+C
+       */
+      const selectInsertPosition = Effect.fn(
+        "selectInsertPosition"
+      )(function* (
+        lessons: Array<{ lessonId: string; message: string }>
+      ) {
+        const START = " start";
+        const END = " end";
+
+        const choices = [
+          {
+            title: "── at the start ──",
+            value: START,
+            description: "Before the first lesson",
+          },
+          ...lessons.map((lesson) => ({
+            title: `after ${lesson.lessonId}`,
+            value: lesson.lessonId,
+            description: lesson.message,
+          })),
+          {
+            title: "── at the end ──",
+            value: END,
+            description: "After the last lesson",
+          },
+        ];
+
+        const { position } = yield* runPrompt<{
+          position: string;
+        }>(() =>
+          prompt([
+            {
+              type: "autocomplete",
+              name: "position",
+              message: "Where should the new lesson go?",
+              choices,
+              suggest: async (
+                input: string,
+                options: Array<{
+                  title: string;
+                  value: string;
+                  description: string;
+                }>
+              ) => {
+                const lowerInput = input.toLowerCase().trim();
+                if (lowerInput === "") {
+                  return options;
+                }
+                return options.filter((choice) =>
+                  `${choice.title} ${choice.description}`
+                    .toLowerCase()
+                    .includes(lowerInput)
+                );
+              },
+            },
+          ])
+        );
+
+        if (position === START) {
+          return { _tag: "start" as const };
+        }
+        if (position === END) {
+          return { _tag: "end" as const };
+        }
+        return { _tag: "after" as const, lessonId: position };
+      });
+
+      /**
+       * Confirms a lesson deletion, having shown what it destroys.
+       * Default is false (no) — this is the only op that discards authored
+       * work rather than moving it.
+       *
+       * @throws PromptCancelledError if user declines or cancels
+       */
+      const confirmDeleteLesson = Effect.fn(
+        "confirmDeleteLesson"
+      )(function* (opts: { label: string; following: number }) {
+        const replay =
+          opts.following === 0
+            ? "Nothing follows it."
+            : `This will replay ${opts.following} commit${
+                opts.following === 1 ? "" : "s"
+              } after it.`;
+
+        const { confirm } = yield* runPrompt<{
+          confirm: boolean;
+        }>(() =>
+          prompt([
+            {
+              type: "confirm",
+              name: "confirm",
+              message: `Delete ${opts.label}? ${replay}`,
+              initial: false,
+            },
+          ])
+        );
+
+        if (!confirm) {
+          return yield* new PromptCancelledError();
+        }
+      });
+
+      /**
+       * The menu shown by a bare `internal` invocation.
+       *
+       * Edit first — it's the one used daily. Delete last, so a stray Enter
+       * can't reach the destructive one.
+       *
+       * @returns The selected command name
+       * @throws PromptCancelledError if user presses Ctrl+C
+       */
+      const selectInternalCommand = Effect.fn(
+        "selectInternalCommand"
+      )(function* () {
+        const { command } = yield* runPrompt<{
+          command:
+            | "edit-commit"
+            | "add-commit"
+            | "rename-commit"
+            | "delete-commit";
+        }>(() =>
+          prompt([
+            {
+              type: "select",
+              name: "command",
+              message: "What would you like to do?",
+              choices: [
+                {
+                  title: "edit-commit",
+                  value: "edit-commit",
+                  description:
+                    "Edit a lesson's contents and replay the commits after it",
+                },
+                {
+                  title: "add-commit",
+                  value: "add-commit",
+                  description:
+                    "Add an empty stub lesson to fill in later",
+                },
+                {
+                  title: "rename-commit",
+                  value: "rename-commit",
+                  description: "Change a lesson's slug and title",
+                },
+                {
+                  title: "delete-commit",
+                  value: "delete-commit",
+                  description:
+                    "Remove a lesson from the history entirely",
+                },
+              ],
+            },
+          ])
+        );
+
+        return command;
+      });
+
       return {
         confirmReadyToCommit,
         confirmSaveToTargetBranch,
@@ -781,6 +999,11 @@ export class PromptService extends Effect.Service<PromptService>()(
         selectSubdirectory,
         inputText,
         inputRepoName,
+        inputSlug,
+        inputTitle,
+        selectInsertPosition,
+        confirmDeleteLesson,
+        selectInternalCommand,
       };
     }),
     dependencies: [],

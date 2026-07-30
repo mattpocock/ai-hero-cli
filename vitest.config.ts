@@ -16,7 +16,13 @@ export default defineConfig({
         "src/git-service.ts",
         "src/prompt-service.ts",
         "src/internal/internal.ts",
-        "src/internal/edit-commit/command.ts"
+        "src/internal/edit-commit/command.ts",
+        "src/internal/add-commit/command.ts",
+        "src/internal/rename-commit/command.ts",
+        "src/internal/delete-commit/command.ts",
+        "src/internal/stack/ceremony.ts",
+        "src/internal/stack/options.ts",
+        "src/internal/stack/target.ts"
       ]
     }
   }

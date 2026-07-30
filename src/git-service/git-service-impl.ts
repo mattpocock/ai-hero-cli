@@ -383,6 +383,67 @@ export const makeGitService = Effect.gen(function* () {
           }
         ),
 
+        // A branch created without checking it out — the backup snapshot
+        // taken before a destructive rewrite, per the maintainer's iron rule.
+        createBranchAt: Effect.fn("createBranchAt")(function* (
+          branchName: string,
+          sha: string
+        ) {
+          const exitCode = yield* runCommandWithExitCode(
+            "git",
+            "branch",
+            branchName,
+            sha
+          );
+
+          yield* mapExitCode(
+            exitCode,
+            (code) =>
+              new FailedToCreateBranchError({
+                branchName,
+                message: `Failed to create branch ${branchName} at ${sha} (exit code: ${code})`,
+              })
+          );
+        }),
+
+        // Re-author HEAD's subject without touching its tree. `--allow-empty`
+        // because a placeholder lesson commit carries no content and must
+        // survive being renamed.
+        amendCommitMessage: Effect.fn("amendCommitMessage")(
+          function* (message: string) {
+            const exitCode = yield* runCommandWithExitCode(
+              "git",
+              "commit",
+              "--amend",
+              "--allow-empty",
+              "-m",
+              message
+            );
+
+            yield* mapExitCode(
+              exitCode,
+              (code) =>
+                new FailedToCommitError({
+                  message: `Failed to amend commit message (exit code: ${code})`,
+                })
+            );
+          }
+        ),
+
+        /** A commit's diffstat, for showing what a delete would destroy. */
+        showStat: Effect.fn("showStat")(function* (
+          sha: string
+        ) {
+          return yield* runCommandWithString(
+            "git",
+            "show",
+            "--stat",
+            "--format=%s",
+            "--no-color",
+            sha
+          );
+        }),
+
         deleteBranch: Effect.fn("deleteBranch")(function* (
           branchName: string
         ) {
