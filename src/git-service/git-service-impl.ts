@@ -351,6 +351,40 @@ export const makeGitService = Effect.gen(function* () {
           }
         ),
 
+        /**
+         * The shas in `range` that change no files — placeholder lessons with
+         * no content authored into them yet.
+         *
+         * One `git log` rather than a `diff-tree` per commit. The NUL before
+         * each sha keeps the commit boundary unambiguous even when a changed
+         * path looks like a sha, and `--no-merges` keeps merges out: they list
+         * no paths in this format and would read as empty.
+         */
+        getEmptyCommitShas: Effect.fn("getEmptyCommitShas")(
+          function* (range: string) {
+            const log = yield* runCommandWithString(
+              "git",
+              "log",
+              "--reverse",
+              "--no-merges",
+              "--format=%x00%h",
+              "--name-only",
+              range
+            );
+
+            return log
+              .split("\0")
+              .map((entry) => entry.trim())
+              .filter(Boolean)
+              .flatMap((entry) => {
+                const [sha, ...files] = entry.split("\n");
+                return files.some((file) => file.trim())
+                  ? []
+                  : [sha!];
+              });
+          }
+        ),
+
         getLogOneline: Effect.fn("getLogOneline")(function* (
           branch: string
         ) {
