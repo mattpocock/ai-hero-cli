@@ -16,6 +16,12 @@ export interface BranchCommit {
   description: string;
   /** 1-based position in teaching order. Ordering only — never identity. */
   sequence: number;
+  /**
+   * True when the commit changes no files — a lesson placeholder that carries
+   * no content yet. Surfaced in the picker so you can tell, before editing or
+   * deleting, whether there is anything in there.
+   */
+  isEmpty: boolean;
 }
 
 export class NoCommitsFoundError extends Data.TaggedError(
@@ -46,15 +52,32 @@ export const getCommitsBetweenBranches = (opts: {
   Effect.gen(function* () {
     const git = yield* GitService;
 
-    const commitHistory = yield* git.getLogOnelineReverse(
-      `${opts.mainBranch}..${opts.liveBranch}`
-    );
+    const range = `${opts.mainBranch}..${opts.liveBranch}`;
 
-    const commits: Array<BranchCommit> = commitHistory
+    const commitHistory = yield* git.getLogOnelineReverse(range);
+
+    const subjects = commitHistory
       .trim()
       .split("\n")
-      .filter(Boolean)
-      .map((line, index) => {
+      .filter(Boolean);
+
+    if (subjects.length === 0) {
+      return yield* Effect.fail(
+        new NoCommitsFoundError({
+          mainBranch: opts.mainBranch,
+          liveBranch: opts.liveBranch,
+        })
+      );
+    }
+
+    // Asked for only once there is something to describe, so an empty stack
+    // still costs one git read.
+    const emptyShas = new Set(
+      yield* git.getEmptyCommitShas(range)
+    );
+
+    const commits: Array<BranchCommit> = subjects.map(
+      (line, index) => {
         const [sha, ...messageParts] = line.split(" ");
         const message = messageParts.join(" ");
         const { description, lessonId } =
@@ -66,17 +89,10 @@ export const getCommitsBetweenBranches = (opts: {
           lessonId,
           description,
           sequence: index + 1,
+          isEmpty: emptyShas.has(sha!),
         };
-      });
-
-    if (commits.length === 0) {
-      return yield* Effect.fail(
-        new NoCommitsFoundError({
-          mainBranch: opts.mainBranch,
-          liveBranch: opts.liveBranch,
-        })
-      );
-    }
+      }
+    );
 
     return commits;
   });
@@ -131,6 +147,7 @@ export const selectCommit = (opts: {
       lessons.map((commit) => ({
         lessonId: commit.lessonId!,
         message: commit.description,
+        isEmpty: commit.isEmpty,
       })),
       opts.promptMessage
     );

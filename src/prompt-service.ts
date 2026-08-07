@@ -310,6 +310,9 @@ export class PromptService extends Effect.Service<PromptService>()(
       /**
        * Autocomplete prompt for selecting a lesson commit.
        *
+       * A commit marked `isEmpty` gets an "(empty)" notice in front of its
+       * description, so a placeholder lesson is obvious before you pick it.
+       *
        * @param commits - Array of commits with lessonId and message
        * @param promptMessage - Custom prompt message to display
        * @returns The selected lesson ID string
@@ -317,7 +320,11 @@ export class PromptService extends Effect.Service<PromptService>()(
        */
       const selectLessonCommit = Effect.fn("selectLessonCommit")(
         function* (
-          commits: Array<{ lessonId: string; message: string }>,
+          commits: Array<{
+            lessonId: string;
+            message: string;
+            isEmpty?: boolean;
+          }>,
           promptMessage: string
         ) {
           const { lesson } = yield* runPrompt<{
@@ -331,7 +338,10 @@ export class PromptService extends Effect.Service<PromptService>()(
                 choices: commits.map((commit) => ({
                   title: commit.lessonId,
                   value: commit.lessonId,
-                  description: commit.message,
+                  description: commit.isEmpty
+                    ? `(empty — no content) ${commit.message}`
+                        .trim()
+                    : commit.message,
                 })),
                 suggest: async (
                   input: string,

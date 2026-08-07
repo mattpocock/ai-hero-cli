@@ -28,6 +28,11 @@ describe("branch-commits", () => {
                 return "abc123 add-first: First lesson\ndef456 01.02.01: Second lesson\nghi789 no lesson prefix";
               }
             ),
+            getEmptyCommitShas: Effect.fn("getEmptyCommitShas")(
+              function* () {
+                return [];
+              }
+            ),
           });
 
           const testLayer = Layer.mergeAll(
@@ -47,6 +52,7 @@ describe("branch-commits", () => {
               lessonId: "add-first",
               description: "First lesson",
               sequence: 1,
+              isEmpty: false,
             },
             {
               sha: "def456",
@@ -54,6 +60,7 @@ describe("branch-commits", () => {
               lessonId: "01.02.01",
               description: "Second lesson",
               sequence: 2,
+              isEmpty: false,
             },
             // No ": " boundary — not a lesson, so it carries no id.
             {
@@ -62,7 +69,48 @@ describe("branch-commits", () => {
               lessonId: null,
               description: "no lesson prefix",
               sequence: 3,
+              isEmpty: false,
             },
+          ]);
+        })
+    );
+
+    it.effect(
+      "should mark the commits that change no files as empty",
+      () =>
+        Effect.gen(function* () {
+          const mockGitService = fromPartial<GitService>({
+            getLogOnelineReverse: Effect.fn(
+              "getLogOnelineReverse"
+            )(function* () {
+              return "abc123 add-first: First lesson\ndef456 add-second: Placeholder";
+            }),
+            getEmptyCommitShas: Effect.fn("getEmptyCommitShas")(
+              function* (range: string) {
+                expect(range).toBe("main..live-run-through");
+                return ["def456"];
+              }
+            ),
+          });
+
+          const testLayer = Layer.mergeAll(
+            Layer.succeed(GitService, mockGitService),
+            NodeContext.layer
+          );
+
+          const commits = yield* getCommitsBetweenBranches({
+            mainBranch: "main",
+            liveBranch: "live-run-through",
+          }).pipe(Effect.provide(testLayer));
+
+          expect(
+            commits.map((commit) => [
+              commit.lessonId,
+              commit.isEmpty,
+            ])
+          ).toEqual([
+            ["add-first", false],
+            ["add-second", true],
           ]);
         })
     );
