@@ -20,6 +20,17 @@ const runPrompt = <T extends object>(
 };
 
 /**
+ * A lesson as offered to a commit-picker: `selectLessonCommit` (edit/delete/
+ * rename-commit) and `selectInsertPosition` (add-commit) both list lessons by
+ * this same shape, so it's named once rather than repeated per signature.
+ */
+type LessonCommitOption = {
+  lessonId: string;
+  message: string;
+  isEmpty?: boolean;
+};
+
+/**
  * Prefixes a lesson's description with a 📭 notice when its commit carries no
  * content — a placeholder lesson stub. Emoji + text (not just text) so it
  * reads as visibly empty in the list rather than blank when you're picking a
@@ -331,11 +342,7 @@ export class PromptService extends Effect.Service<PromptService>()(
        */
       const selectLessonCommit = Effect.fn("selectLessonCommit")(
         function* (
-          commits: Array<{
-            lessonId: string;
-            message: string;
-            isEmpty?: boolean;
-          }>,
+          commits: Array<LessonCommitOption>,
           promptMessage: string
         ) {
           const { lesson } = yield* runPrompt<{
@@ -849,13 +856,7 @@ export class PromptService extends Effect.Service<PromptService>()(
        */
       const selectInsertPosition = Effect.fn(
         "selectInsertPosition"
-      )(function* (
-        lessons: Array<{
-          lessonId: string;
-          message: string;
-          isEmpty?: boolean;
-        }>
-      ) {
+      )(function* (lessons: Array<LessonCommitOption>) {
         const START = " start";
         const END = " end";
 
