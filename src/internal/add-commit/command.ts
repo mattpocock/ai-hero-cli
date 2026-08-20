@@ -44,6 +44,7 @@ const askPosition = (commits: Array<BranchCommit>) =>
       lessons.map((commit) => ({
         lessonId: commit.lessonId!,
         message: commit.description,
+        isEmpty: commit.isEmpty,
       }))
     );
 
