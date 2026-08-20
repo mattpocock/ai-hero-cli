@@ -20,6 +20,16 @@ const runPrompt = <T extends object>(
 };
 
 /**
+ * Prefixes a lesson's description with a 📭 notice when its commit carries no
+ * content — a placeholder lesson stub. Emoji + text (not just text) so it
+ * reads as visibly empty in the list rather than blank when you're picking a
+ * commit, not just something you'd notice if you read the gray description
+ * text carefully.
+ */
+const emptyCommitNotice = (message: string) =>
+  `📭 (empty — no content) ${message}`.trim();
+
+/**
  * Normalizes exercise numbers for fuzzy matching.
  * Generates variations like "02.03" -> ["02.03", "0203", "2.3", "23", etc.]
  */
@@ -310,8 +320,9 @@ export class PromptService extends Effect.Service<PromptService>()(
       /**
        * Autocomplete prompt for selecting a lesson commit.
        *
-       * A commit marked `isEmpty` gets an "(empty)" notice in front of its
-       * description, so a placeholder lesson is obvious before you pick it.
+       * A commit marked `isEmpty` gets a 📭 "(empty — no content)" notice in
+       * front of its description, so a placeholder lesson is obvious before
+       * you pick it.
        *
        * @param commits - Array of commits with lessonId and message
        * @param promptMessage - Custom prompt message to display
@@ -339,8 +350,7 @@ export class PromptService extends Effect.Service<PromptService>()(
                   title: commit.lessonId,
                   value: commit.lessonId,
                   description: commit.isEmpty
-                    ? `(empty — no content) ${commit.message}`
-                        .trim()
+                    ? emptyCommitNotice(commit.message)
                     : commit.message,
                 })),
                 suggest: async (
@@ -829,6 +839,10 @@ export class PromptService extends Effect.Service<PromptService>()(
        * The two boundary choices are pinned: "at the start" first, "at the
        * end" last, with the existing lessons in teaching order between them.
        *
+       * A lesson marked `isEmpty` gets the same 📭 "(empty — no content)"
+       * notice as `selectLessonCommit`, so inserting after a placeholder
+       * lesson is an informed choice, not a guess.
+       *
        * @param lessons - Existing lessons, in teaching order
        * @returns "start", "end", or the lesson id to insert after
        * @throws PromptCancelledError if user presses Ctrl+C
@@ -836,7 +850,11 @@ export class PromptService extends Effect.Service<PromptService>()(
       const selectInsertPosition = Effect.fn(
         "selectInsertPosition"
       )(function* (
-        lessons: Array<{ lessonId: string; message: string }>
+        lessons: Array<{
+          lessonId: string;
+          message: string;
+          isEmpty?: boolean;
+        }>
       ) {
         const START = " start";
         const END = " end";
@@ -850,7 +868,9 @@ export class PromptService extends Effect.Service<PromptService>()(
           ...lessons.map((lesson) => ({
             title: `after ${lesson.lessonId}`,
             value: lesson.lessonId,
-            description: lesson.message,
+            description: lesson.isEmpty
+              ? emptyCommitNotice(lesson.message)
+              : lesson.message,
           })),
           {
             title: "── at the end ──",
