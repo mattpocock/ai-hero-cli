@@ -64,6 +64,10 @@ export const makeGitService = Effect.gen(function* () {
         const cwd = config.cwd;
         const command = Command.make(...commandArgs).pipe(
           Command.workingDirectory(cwd),
+          // stdin is inherited so commit signing (GPG/SSH) can read its
+          // passphrase prompt from the user's terminal instead of hanging
+          // forever on a disconnected pipe.
+          Command.stdin("inherit"),
           Command.stdout("inherit"),
           Command.stderr("inherit")
         );

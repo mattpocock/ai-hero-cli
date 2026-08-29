@@ -70,6 +70,10 @@ export const makeGitHubService = Effect.gen(function* () {
     function* (...commandArgs: [string, ...Array<string>]) {
       const command = Command.make(...commandArgs).pipe(
         Command.workingDirectory(config.cwd),
+        // stdin is inherited so a push needing an SSH key passphrase can
+        // prompt on the user's terminal instead of hanging forever on a
+        // disconnected pipe.
+        Command.stdin("inherit"),
         Command.stdout("inherit"),
         Command.stderr("inherit")
       );
