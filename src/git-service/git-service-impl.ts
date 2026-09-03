@@ -803,6 +803,38 @@ export const makeGitService = Effect.gen(function* () {
           );
           return exitCode === 0;
         }),
+        /**
+         * True when this repo checks out symlinks as plain text files
+         * instead of real links — `core.symlinks=false`. Git sets this
+         * automatically on Windows when Developer Mode isn't on and the
+         * process isn't elevated, since it can't create symlinks there.
+         * Unset (the common case elsewhere) reads as symlinks working.
+         */
+        hasSymlinksDisabled: Effect.fn("hasSymlinksDisabled")(
+          function* () {
+            const value = yield* runCommandWithString(
+              "git",
+              "config",
+              "--get",
+              "core.symlinks"
+            ).pipe(Effect.catchAll(() => Effect.succeed("")));
+            return value.trim() === "false";
+          }
+        ),
+        /** Whether `ref`'s tree contains any git-tracked symlinks (mode 120000). */
+        commitHasSymlinks: Effect.fn("commitHasSymlinks")(
+          function* (ref: string) {
+            const output = yield* runCommandWithString(
+              "git",
+              "ls-tree",
+              "-r",
+              ref
+            ).pipe(Effect.catchAll(() => Effect.succeed("")));
+            return output
+              .split("\n")
+              .some((line) => line.startsWith("120000 "));
+          }
+        ),
       };
     });
 

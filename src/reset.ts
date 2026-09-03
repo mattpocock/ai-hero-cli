@@ -83,6 +83,31 @@ export const runReset = ({
 
       const isResetToMain = selectedLessonId === "main";
 
+      // Windows checks out a git symlink as a plain text file containing
+      // its target path instead of a real link when Developer Mode isn't
+      // on and the process isn't elevated — git falls back by setting
+      // core.symlinks=false at clone/init time. Warn up front so a
+      // broken-looking course doesn't read as "something is lost".
+      const symlinksDisabled = yield* git.hasSymlinksDisabled();
+      if (symlinksDisabled) {
+        const targetHasSymlinks = yield* git.commitHasSymlinks(
+          commitToUse
+        );
+        if (targetHasSymlinks) {
+          yield* Console.log(
+            "\n⚠ Symlinks are disabled for this repo (core.symlinks=false), " +
+              "which Windows sets automatically when Developer Mode is off and " +
+              "you're not running as Administrator. This lesson includes " +
+              "symlinks, so they'll be checked out as plain text files instead " +
+              "of working links, and the course will look broken.\n" +
+              "  Fix: turn on Developer Mode (Settings > Privacy & security > " +
+              "For developers), or re-run your terminal as Administrator, then:\n" +
+              "    git config core.symlinks true\n" +
+              "  and run `npm run reset` again.\n"
+          );
+        }
+      }
+
       // Cannot reset to main while on main
       if (isResetToMain && currentBranch === "main") {
         return yield* new InvalidBranchOperationError({

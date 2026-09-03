@@ -1,5 +1,5 @@
 import { NodeContext, NodeFileSystem } from "@effect/platform-node";
-import { afterEach, describe, expect, it } from "@effect/vitest";
+import { afterEach, describe, expect, it, vi } from "@effect/vitest";
 import { fromPartial } from "@total-typescript/shoehorn";
 import { Effect, Layer, Option } from "effect";
 import { execFileSync } from "node:child_process";
@@ -544,6 +544,234 @@ describe("reset (e2e)", () => {
             "utf-8"
           );
           expect(content).toBe("// uncommitted changes");
+        })
+    );
+  });
+
+  describe("symlink support warning", () => {
+    it.effect(
+      "should warn when core.symlinks is false and the target lesson has symlinks",
+      () =>
+        Effect.gen(function* () {
+          const repo = createTestRepo()
+            .withRemote("upstream")
+            .withBranch("live-run-through", [
+              commit("01.01.01: Arrays intro", {
+                "src/01.ts": "// arrays intro",
+              }),
+            ])
+            .withWorkingBranch("my-branch", {
+              from: "live-run-through",
+              atCommit: 0,
+            })
+            .build();
+
+          cleanup = repo.cleanup;
+          configureGitUser(repo.workingDir);
+
+          // Add a lesson commit that carries a git-tracked symlink, and
+          // push it upstream so reset can fetch it.
+          git(repo.workingDir, "checkout", "live-run-through");
+          fs.symlinkSync(
+            "../.agents/skills",
+            path.join(repo.workingDir, ".claude-skills")
+          );
+          git(repo.workingDir, "add", ".claude-skills");
+          git(
+            repo.workingDir,
+            "commit",
+            "-m",
+            "01.01.02: Add skills symlink"
+          );
+          git(
+            repo.workingDir,
+            "push",
+            "upstream",
+            "live-run-through:live-run-through"
+          );
+          git(repo.workingDir, "checkout", "my-branch");
+
+          // Simulate Windows without Developer Mode / admin rights, where
+          // git falls back to checking symlinks out as plain text files.
+          git(
+            repo.workingDir,
+            "config",
+            "core.symlinks",
+            "false"
+          );
+
+          const consoleSpy = vi
+            .spyOn(console, "log")
+            .mockImplementation(() => {});
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectResetAction: Effect.fn("selectResetAction")(
+              function* () {
+                return "reset-current" as const;
+              }
+            ),
+          });
+
+          yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.some("01.01.02"),
+            demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
+          }).pipe(
+            Effect.provide(
+              makeLayer(repo.workingDir, mockPromptService)
+            )
+          );
+
+          const loggedLines = consoleSpy.mock.calls.flat();
+          consoleSpy.mockRestore();
+
+          expect(
+            loggedLines.some(
+              (line) =>
+                typeof line === "string" &&
+                line.includes("core.symlinks=false")
+            )
+          ).toBe(true);
+        })
+    );
+
+    it.effect(
+      "should not warn when core.symlinks is false but the target lesson has no symlinks",
+      () =>
+        Effect.gen(function* () {
+          const repo = createTestRepo()
+            .withRemote("upstream")
+            .withBranch("live-run-through", [
+              commit("01.01.01: Arrays intro", {
+                "src/01.ts": "// arrays intro",
+              }),
+            ])
+            .withWorkingBranch("my-branch", {
+              from: "live-run-through",
+              atCommit: 0,
+            })
+            .build();
+
+          cleanup = repo.cleanup;
+          configureGitUser(repo.workingDir);
+
+          git(
+            repo.workingDir,
+            "config",
+            "core.symlinks",
+            "false"
+          );
+
+          const consoleSpy = vi
+            .spyOn(console, "log")
+            .mockImplementation(() => {});
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectResetAction: Effect.fn("selectResetAction")(
+              function* () {
+                return "reset-current" as const;
+              }
+            ),
+          });
+
+          yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.some("01.01.01"),
+            demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
+          }).pipe(
+            Effect.provide(
+              makeLayer(repo.workingDir, mockPromptService)
+            )
+          );
+
+          const loggedLines = consoleSpy.mock.calls.flat();
+          consoleSpy.mockRestore();
+
+          expect(
+            loggedLines.some(
+              (line) =>
+                typeof line === "string" &&
+                line.includes("core.symlinks=false")
+            )
+          ).toBe(false);
+        })
+    );
+
+    it.effect(
+      "should not warn when the lesson has symlinks but core.symlinks is left enabled",
+      () =>
+        Effect.gen(function* () {
+          const repo = createTestRepo()
+            .withRemote("upstream")
+            .withBranch("live-run-through", [
+              commit("01.01.01: Arrays intro", {
+                "src/01.ts": "// arrays intro",
+              }),
+            ])
+            .withWorkingBranch("my-branch", {
+              from: "live-run-through",
+              atCommit: 0,
+            })
+            .build();
+
+          cleanup = repo.cleanup;
+          configureGitUser(repo.workingDir);
+
+          git(repo.workingDir, "checkout", "live-run-through");
+          fs.symlinkSync(
+            "../.agents/skills",
+            path.join(repo.workingDir, ".claude-skills")
+          );
+          git(repo.workingDir, "add", ".claude-skills");
+          git(
+            repo.workingDir,
+            "commit",
+            "-m",
+            "01.01.02: Add skills symlink"
+          );
+          git(
+            repo.workingDir,
+            "push",
+            "upstream",
+            "live-run-through:live-run-through"
+          );
+          git(repo.workingDir, "checkout", "my-branch");
+
+          const consoleSpy = vi
+            .spyOn(console, "log")
+            .mockImplementation(() => {});
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectResetAction: Effect.fn("selectResetAction")(
+              function* () {
+                return "reset-current" as const;
+              }
+            ),
+          });
+
+          yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.some("01.01.02"),
+            demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
+          }).pipe(
+            Effect.provide(
+              makeLayer(repo.workingDir, mockPromptService)
+            )
+          );
+
+          const loggedLines = consoleSpy.mock.calls.flat();
+          consoleSpy.mockRestore();
+
+          expect(
+            loggedLines.some(
+              (line) =>
+                typeof line === "string" &&
+                line.includes("core.symlinks=false")
+            )
+          ).toBe(false);
         })
     );
   });
