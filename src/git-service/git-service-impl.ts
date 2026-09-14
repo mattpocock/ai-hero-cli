@@ -173,6 +173,33 @@ export const makeGitService = Effect.gen(function* () {
           return parseInt(countOutput, 10);
         }),
 
+        /**
+         * Counts commits reachable from `ref` that aren't reachable from
+         * any of `excluding` — i.e. `git rev-list --count ref --not
+         * ...excluding`. Unlike `revListCount`'s single two-dot range,
+         * this can exclude several refs at once, which is what "is this
+         * commit recoverable from anywhere official" needs: a commit
+         * already on the lesson stack shouldn't count as lost just
+         * because it's also ahead of the reset target.
+         */
+        revListCountExcluding: Effect.fn(
+          "revListCountExcluding"
+        )(function* (
+          ref: string,
+          excluding: Array<string>
+        ) {
+          const countOutput = yield* runCommandWithString(
+            "git",
+            "rev-list",
+            "--count",
+            ref,
+            "--not",
+            ...excluding
+          );
+
+          return parseInt(countOutput, 10);
+        }),
+
         getStatusShort: Effect.fn("getStatusShort")(
           function* () {
             return yield* runCommandWithString(
@@ -520,12 +547,20 @@ export const makeGitService = Effect.gen(function* () {
           );
         }),
 
-        merge: Effect.fn("merge")(function* (ref: string) {
+        merge: Effect.fn("merge")(function* (
+          ref: string,
+          options?: { allowUnrelatedHistories?: boolean }
+        ) {
+          const allowUnrelatedHistories =
+            options?.allowUnrelatedHistories ?? true;
+
           const exitCode = yield* runCommandWithExitCode(
             "git",
             "merge",
             ref,
-            "--allow-unrelated-histories"
+            ...(allowUnrelatedHistories
+              ? ["--allow-unrelated-histories"]
+              : [])
           );
 
           yield* mapExitCode(

@@ -81,8 +81,6 @@ export const runReset = ({
         }
       }
 
-      const isResetToMain = selectedLessonId === "main";
-
       // Windows checks out a git symlink as a plain text file containing
       // its target path instead of a real link when Developer Mode isn't
       // on and the process isn't elevated — git falls back by setting
@@ -108,22 +106,9 @@ export const runReset = ({
         }
       }
 
-      // Cannot reset to main while on main
-      if (isResetToMain && currentBranch === "main") {
-        return yield* new InvalidBranchOperationError({
-          message:
-            "Cannot reset to main while on the main branch. Create a new branch first.",
-        });
-      }
-
       // Prompt for action (skip in demo mode)
       let action: "reset-current" | "create-branch";
-      if (currentBranch === "main") {
-        yield* Console.log(
-          "You cannot reset the main branch. Creating a new branch..."
-        );
-        action = "create-branch";
-      } else if (demo) {
+      if (demo) {
         action = "reset-current";
       } else {
         action = yield* promptService.selectResetAction(
@@ -157,8 +142,33 @@ export const runReset = ({
         return;
       }
 
-      // Reset current branch - check for unstaged changes (skip in demo mode)
+      // Reset current branch - warn about work this would discard (skip in demo mode)
       if (!demo) {
+        // A commit only counts as "discarded" if it's unrecoverable —
+        // reachable from HEAD but not from the reset target *and* not
+        // already sitting on the lesson stack (which was just refreshed
+        // from upstream above, so `branch` mirrors it exactly). Without
+        // that second exclusion, every ordinary "reset back to an
+        // earlier lesson" would flag its own in-between lesson commits
+        // as discarded, even though they're always one reset away from
+        // being back. This used to be moot for main (it never carried
+        // extra commits of its own), but now that main is a real working
+        // branch it can carry a whole course's worth of history — so
+        // this check is generic, not main-specific.
+        const commitsToDiscard = yield* git.revListCountExcluding(
+          "HEAD",
+          [commitToUse, branch]
+        );
+
+        if (commitsToDiscard > 0) {
+          yield* promptService.confirmContinue(
+            `This will discard ${commitsToDiscard} commit${
+              commitsToDiscard === 1 ? "" : "s"
+            } on "${currentBranch}" not present at ${selectedLessonId}. Continue?`,
+            false
+          );
+        }
+
         const { hasUncommittedChanges, statusOutput } =
           yield* git.getUncommittedChanges();
 
