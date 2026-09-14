@@ -110,8 +110,13 @@ export const pull = CLICommand.make(
         },
         MergeConflictError: () => {
           return Effect.gen(function* () {
+            // Usually a real content conflict, but `git merge` also exits
+            // non-zero when it refuses to merge unrelated histories (e.g.
+            // --upstream pointing at the wrong repo) - which this maps to
+            // the same tag, since both need a human to look before
+            // resolving anything.
             yield* Console.log(
-              "\nMerge conflicts detected. Resolve conflicts and commit."
+              "\nMerge failed. If this is a content conflict, resolve it and commit. If you didn't expect a conflict at all, check that --upstream points at the right repo - git refuses to merge histories with no common ancestor."
             );
             process.exitCode = 1;
           });

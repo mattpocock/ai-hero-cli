@@ -70,6 +70,19 @@ export const makeGitService = Effect.gen(function* () {
         return yield* Command.exitCode(command);
       });
 
+      const runRevListCount = Effect.fn("runRevListCount")(
+        function* (...revListArgs: Array<string>) {
+          const countOutput = yield* runCommandWithString(
+            "git",
+            "rev-list",
+            "--count",
+            ...revListArgs
+          );
+
+          return parseInt(countOutput, 10);
+        }
+      );
+
       const runCommandSilentExitCode = Effect.fn(
         "runCommandSilentExitCode"
       )(function* (...commandArgs: [string, ...Array<string>]) {
@@ -163,14 +176,7 @@ export const makeGitService = Effect.gen(function* () {
           from: string,
           to: string
         ) {
-          const countOutput = yield* runCommandWithString(
-            "git",
-            "rev-list",
-            "--count",
-            `${from}..${to}`
-          );
-
-          return parseInt(countOutput, 10);
+          return yield* runRevListCount(`${from}..${to}`);
         }),
 
         /**
@@ -188,16 +194,11 @@ export const makeGitService = Effect.gen(function* () {
           ref: string,
           excluding: Array<string>
         ) {
-          const countOutput = yield* runCommandWithString(
-            "git",
-            "rev-list",
-            "--count",
+          return yield* runRevListCount(
             ref,
             "--not",
             ...excluding
           );
-
-          return parseInt(countOutput, 10);
         }),
 
         getStatusShort: Effect.fn("getStatusShort")(
