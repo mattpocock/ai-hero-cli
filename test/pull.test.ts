@@ -10,10 +10,7 @@ import {
   GitServiceConfig,
   makeGitService,
 } from "../src/git-service.js";
-import {
-  PromptCancelledError,
-  PromptService,
-} from "../src/prompt-service.js";
+import { PromptService } from "../src/prompt-service.js";
 import { runPull } from "../src/pull.js";
 import {
   commit,
@@ -163,7 +160,7 @@ describe("pull on main branch", () => {
   };
 
   it.effect(
-    "should prompt for branch name, create branch, and merge upstream/main",
+    "should merge upstream/main directly into main, in place, without redirecting to a new branch",
     () =>
       Effect.gen(function* () {
         const repo = createTestRepo()
@@ -184,13 +181,8 @@ describe("pull on main branch", () => {
           "01.01 - Lesson (solution)"
         );
 
-        const mockPromptService = fromPartial<PromptService>({
-          inputBranchName: Effect.fn("inputBranchName")(
-            function* (_context: "working" | "new") {
-              return "my-dev-branch";
-            }
-          ),
-        });
+        const mockPromptService =
+          fromPartial<PromptService>({});
 
         yield* runPull({
           upstream: getBareRepoPath(repo.workingDir),
@@ -200,13 +192,13 @@ describe("pull on main branch", () => {
           )
         );
 
-        // Should be on the new branch
+        // Still on main - no redirect, no branch prompt
         const currentBranch = git(
           repo.workingDir,
           "branch",
           "--show-current"
         );
-        expect(currentBranch).toBe("my-dev-branch");
+        expect(currentBranch).toBe("main");
 
         // Should have the upstream changes merged in
         const content = fs.readFileSync(
@@ -218,7 +210,7 @@ describe("pull on main branch", () => {
   );
 
   it.effect(
-    "should stop when user cancels the branch name prompt",
+    "should reject unrelated histories when merging into main (no --allow-unrelated-histories)",
     () =>
       Effect.gen(function* () {
         const repo = createTestRepo()
@@ -232,13 +224,31 @@ describe("pull on main branch", () => {
 
         cleanup = repo.cleanup;
 
-        const mockPromptService = fromPartial<PromptService>({
-          inputBranchName: Effect.fn("inputBranchName")(
-            function* () {
-              return yield* new PromptCancelledError();
-            }
-          ),
-        });
+        // Simulate a misconfigured --upstream: local main's history has
+        // no common ancestor with upstream's main at all. Previously this
+        // never surfaced because pulling on main always redirected onto a
+        // fresh branch derived from the same history; now that main is
+        // merged into directly, and no longer shares that guaranteed
+        // ancestry, this should fail loudly rather than silently
+        // two-root-merging.
+        git(
+          repo.workingDir,
+          "checkout",
+          "--orphan",
+          "unrelated-main"
+        );
+        git(
+          repo.workingDir,
+          "commit",
+          "--allow-empty",
+          "-m",
+          "unrelated root"
+        );
+        git(repo.workingDir, "branch", "-D", "main");
+        git(repo.workingDir, "branch", "-m", "main");
+
+        const mockPromptService =
+          fromPartial<PromptService>({});
 
         const result = yield* runPull({
           upstream: getBareRepoPath(repo.workingDir),
@@ -249,15 +259,7 @@ describe("pull on main branch", () => {
           Effect.flip
         );
 
-        expect(result._tag).toBe("PromptCancelledError");
-
-        // Should still be on main
-        const currentBranch = git(
-          repo.workingDir,
-          "branch",
-          "--show-current"
-        );
-        expect(currentBranch).toBe("main");
+        expect(result._tag).toBe("MergeConflictError");
       })
   );
 });

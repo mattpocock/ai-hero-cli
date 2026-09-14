@@ -13,7 +13,6 @@ import {
 } from "./errors.js";
 import { GitService, GitServiceConfig } from "./git-service.js";
 import { cwdOption } from "./options.js";
-import { PromptService } from "./prompt-service.js";
 import { withUpstreamCleanup } from "./upstream-cleanup.js";
 
 /**
@@ -33,7 +32,6 @@ export const runCherryPick = ({
     { upstream, targetBranch: branch },
     Effect.gen(function* () {
       const git = yield* GitService;
-      const promptService = yield* PromptService;
 
       // Validate git repository
       yield* git.ensureIsGitRepo();
@@ -61,23 +59,6 @@ export const runCherryPick = ({
         return yield* new InvalidBranchOperationError({
           message: `Cannot cherry-pick when on target branch "${branch}"`,
         });
-      }
-
-      // Check if current branch is main
-      if (currentBranch === "main") {
-        yield* Console.log(
-          "You cannot cherry-pick onto the main branch."
-        );
-
-        const branchName = yield* promptService.inputBranchName(
-          "working"
-        );
-
-        yield* git.checkoutNewBranch(branchName);
-
-        yield* Console.log(
-          `✓ Created and switched to ${branchName}`
-        );
       }
 
       yield* Console.log(
@@ -136,12 +117,6 @@ export const cherryPick = CLICommand.make(
           });
         },
         InvalidBranchOperationError: (error) => {
-          return Effect.gen(function* () {
-            yield* Console.error(`Error: ${error.message}`);
-            process.exitCode = 1;
-          });
-        },
-        FailedToCreateBranchError: (error) => {
           return Effect.gen(function* () {
             yield* Console.error(`Error: ${error.message}`);
             process.exitCode = 1;

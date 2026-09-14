@@ -3,7 +3,6 @@ import { Console, Data, Effect } from "effect";
 import { ensureNotOnProtectedBranch } from "./errors.js";
 import { GitService, GitServiceConfig } from "./git-service.js";
 import { cwdOption } from "./options.js";
-import { PromptService } from "./prompt-service.js";
 import { withUpstreamCleanup } from "./upstream-cleanup.js";
 
 export class UncommittedChangesError extends Data.TaggedError(
@@ -24,18 +23,9 @@ export const runPull = (opts: { upstream: string }) =>
       // Validate git repository
       yield* git.ensureIsGitRepo();
 
-      let workingBranch = yield* ensureNotOnProtectedBranch("pull");
-      if (workingBranch === "main") {
-        const promptService = yield* PromptService;
-        yield* Console.log(
-          "You're on the main branch. To avoid losing work, create a dev branch to pull upstream changes into."
-        );
-        const branchName = yield* promptService.inputBranchName(
-          "working"
-        );
-        yield* git.checkoutNewBranch(branchName);
-        workingBranch = branchName;
-      }
+      const workingBranch = yield* ensureNotOnProtectedBranch(
+        "pull"
+      );
 
       // Check for uncommitted changes
       const { hasUncommittedChanges, statusOutput } =
@@ -54,11 +44,15 @@ export const runPull = (opts: { upstream: string }) =>
       yield* Console.log("Fetching main from upstream...");
       yield* git.fetch("upstream", "main");
 
-      // Merge upstream/main into current branch
-      yield* Console.log(
-        `Merging upstream/main into ${workingBranch}...`
-      );
-      yield* git.merge("upstream/main");
+      // Merge upstream/main into current branch. main itself now shares
+      // real ancestry with upstream/main (it's the same branch the
+      // student cloned and has been committing on directly), so we no
+      // longer need --allow-unrelated-histories to paper over a fresh
+      // dev branch's history — dropping it here means a genuinely wrong
+      // --upstream fails loudly instead of silently two-root-merging.
+      yield* git.merge("upstream/main", {
+        allowUnrelatedHistories: workingBranch !== "main",
+      });
 
       yield* Console.log(
         `\n✓ Successfully merged upstream/main into ${workingBranch}`
@@ -116,20 +110,14 @@ export const pull = CLICommand.make(
         },
         MergeConflictError: () => {
           return Effect.gen(function* () {
+            // Usually a real content conflict, but `git merge` also exits
+            // non-zero when it refuses to merge unrelated histories (e.g.
+            // --upstream pointing at the wrong repo) - which this maps to
+            // the same tag, since both need a human to look before
+            // resolving anything.
             yield* Console.log(
-              "\nMerge conflicts detected. Resolve conflicts and commit."
+              "\nMerge failed. If this is a content conflict, resolve it and commit. If you didn't expect a conflict at all, check that --upstream points at the right repo - git refuses to merge histories with no common ancestor."
             );
-            process.exitCode = 1;
-          });
-        },
-        PromptCancelledError: () => {
-          return Effect.gen(function* () {
-            yield* Console.log("\nPull cancelled.");
-          });
-        },
-        FailedToCreateBranchError: (error) => {
-          return Effect.gen(function* () {
-            yield* Console.error(`Error: ${error.message}`);
             process.exitCode = 1;
           });
         },

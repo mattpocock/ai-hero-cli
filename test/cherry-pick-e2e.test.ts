@@ -363,9 +363,9 @@ describe("cherry-pick (e2e)", () => {
     );
   });
 
-  describe("branch creation when on main", () => {
+  describe("cherry-pick directly onto main", () => {
     it.effect(
-      "should prompt for new branch and cherry-pick when on main",
+      "should cherry-pick onto main in place, without being forced onto a new branch",
       () =>
         Effect.gen(function* () {
           const repo = createTestRepo()
@@ -402,11 +402,6 @@ describe("cherry-pick (e2e)", () => {
                 return "01.01.02";
               },
             ),
-            inputBranchName: Effect.fn("inputBranchName")(
-              function* () {
-                return "matt/feature-work";
-              },
-            ),
           });
 
           yield* runCherryPick({
@@ -419,20 +414,23 @@ describe("cherry-pick (e2e)", () => {
             ),
           );
 
-          // Should now be on the new branch
+          // Still on main - no redirect to a new branch
           const currentAfter = git(
             repo.workingDir,
             "branch",
             "--show-current",
           );
-          expect(currentAfter).toBe("matt/feature-work");
+          expect(currentAfter).toBe("main");
 
-          // Cherry-picked file should exist
+          // Cherry-picked file should exist alongside main's own file
           const content = fs.readFileSync(
             `${repo.workingDir}/src/02.ts`,
             "utf-8",
           );
           expect(content).toBe("// arrays advanced");
+          expect(
+            fs.existsSync(`${repo.workingDir}/src/base.ts`),
+          ).toBe(true);
         }),
     );
   });
@@ -777,60 +775,4 @@ describe("cherry-pick (e2e)", () => {
     );
   });
 
-  describe("branch creation failure", () => {
-    it.effect(
-      "should fail with FailedToCreateBranchError when branch already exists",
-      () =>
-        Effect.gen(function* () {
-          const repo = createTestRepo()
-            .withRemote("upstream")
-            .withBranch("main", [
-              commit("00.00.01: Base setup", {
-                "src/base.ts": "// base",
-              }),
-            ])
-            .withBranch("live-run-through", [
-              commit("01.01.01: Arrays intro", {
-                "src/01.ts": "// arrays",
-              }),
-              commit("01.01.02: Arrays advanced", {
-                "src/02.ts": "// arrays advanced",
-              }),
-            ])
-            .build();
-
-          cleanup = repo.cleanup;
-          configureGitUser(repo.workingDir);
-
-          // Create a branch that will conflict with the name
-          git(repo.workingDir, "branch", "existing-branch");
-
-          const mockPromptService = fromPartial<PromptService>({
-            selectLessonCommit: Effect.fn("selectLessonCommit")(
-              function* () {
-                return "01.01.02";
-              },
-            ),
-            inputBranchName: Effect.fn("inputBranchName")(
-              function* () {
-                return "existing-branch";
-              },
-            ),
-          });
-
-          const result = yield* runCherryPick({
-            branch: "live-run-through",
-            lessonId: Option.none(),
-            upstream: getBareRepoPath(repo.workingDir),
-          }).pipe(
-            Effect.provide(
-              makeLayer(repo.workingDir, mockPromptService),
-            ),
-            Effect.flip,
-          );
-
-          expect(result._tag).toBe("FailedToCreateBranchError");
-        }),
-    );
-  });
 });

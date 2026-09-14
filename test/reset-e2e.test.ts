@@ -332,9 +332,9 @@ describe("reset (e2e)", () => {
     );
   });
 
-  describe("forced branch creation when on main", () => {
+  describe("main is a regular branch (no forced redirect)", () => {
     it.effect(
-      "should force create-branch when on main (skip selectResetAction)",
+      "should reset main in place when reset-current is chosen, without being forced onto a new branch",
       () =>
         Effect.gen(function* () {
           const repo = createTestRepo()
@@ -371,6 +371,79 @@ describe("reset (e2e)", () => {
                 return "01.01.02";
               }
             ),
+            // The old behavior skipped this prompt entirely and forced
+            // create-branch. Now main goes through the same choice as any
+            // other branch.
+            selectResetAction: Effect.fn("selectResetAction")(
+              function* () {
+                return "reset-current" as const;
+              }
+            ),
+          });
+
+          yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.none(),
+            demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
+          }).pipe(
+            Effect.provide(
+              makeLayer(repo.workingDir, mockPromptService)
+            )
+          );
+
+          // Still on main - no redirect to a new branch
+          const currentAfter = git(
+            repo.workingDir,
+            "branch",
+            "--show-current"
+          );
+          expect(currentAfter).toBe("main");
+
+          // File should match selected commit
+          const content = fs.readFileSync(
+            `${repo.workingDir}/src/01.ts`,
+            "utf-8"
+          );
+          expect(content).toBe("// solution");
+        })
+    );
+
+    it.effect(
+      "should still offer create-branch as a choice when on main",
+      () =>
+        Effect.gen(function* () {
+          const repo = createTestRepo()
+            .withRemote("upstream")
+            .withBranch("main", [
+              commit("00.00.01: Base setup", {
+                "src/base.ts": "// base",
+              }),
+            ])
+            .withBranch("live-run-through", [
+              commit("01.01.01: Arrays intro", {
+                "src/01.ts": "// arrays",
+              }),
+              commit("01.01.02: Arrays solution", {
+                "src/01.ts": "// solution",
+              }),
+            ])
+            .build();
+
+          cleanup = repo.cleanup;
+          configureGitUser(repo.workingDir);
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectLessonCommit: Effect.fn("selectLessonCommit")(
+              function* () {
+                return "01.01.02";
+              }
+            ),
+            selectResetAction: Effect.fn("selectResetAction")(
+              function* () {
+                return "create-branch" as const;
+              }
+            ),
             inputBranchName: Effect.fn("inputBranchName")(
               function* () {
                 return "matt/lesson-work";
@@ -389,7 +462,7 @@ describe("reset (e2e)", () => {
             )
           );
 
-          // Should now be on the new branch
+          // Chose create-branch, so we should be off main now
           const currentAfter = git(
             repo.workingDir,
             "branch",
@@ -397,7 +470,6 @@ describe("reset (e2e)", () => {
           );
           expect(currentAfter).toBe("matt/lesson-work");
 
-          // File should match selected commit
           const content = fs.readFileSync(
             `${repo.workingDir}/src/01.ts`,
             "utf-8"
@@ -1069,6 +1141,11 @@ describe("reset (e2e)", () => {
                 return "01.01.01";
               }
             ),
+            selectResetAction: Effect.fn("selectResetAction")(
+              function* () {
+                return "create-branch" as const;
+              }
+            ),
             inputBranchName: Effect.fn("inputBranchName")(
               function* () {
                 return "existing-branch";
@@ -1321,7 +1398,7 @@ describe("reset (e2e)", () => {
     );
 
     it.effect(
-      "should fail with InvalidBranchOperationError when on main branch",
+      "should hard-reset main in place when on main, after confirming the discarded commit",
       () =>
         Effect.gen(function* () {
           const repo = createTestRepo()
@@ -1339,6 +1416,7 @@ describe("reset (e2e)", () => {
             .build();
 
           cleanup = repo.cleanup;
+          configureGitUser(repo.workingDir);
 
           // We're on main after build (no working branch specified)
           const currentBefore = git(
@@ -1348,8 +1426,132 @@ describe("reset (e2e)", () => {
           );
           expect(currentBefore).toBe("main");
 
-          const mockPromptService =
-            fromPartial<PromptService>({});
+          // Simulate the student having developed directly on main: a
+          // local-only commit upstream/main doesn't have and that isn't
+          // part of the lesson stack either - genuinely unrecoverable.
+          fs.writeFileSync(
+            `${repo.workingDir}/src/scratch.ts`,
+            "// my own work-in-progress"
+          );
+          git(repo.workingDir, "add", ".");
+          git(
+            repo.workingDir,
+            "commit",
+            "-m",
+            "my own wip commit"
+          );
+
+          let confirmContinueCalledWith:
+            | { message: string; defaultToContinue: boolean }
+            | undefined;
+          const mockPromptService = fromPartial<PromptService>({
+            selectResetAction: Effect.fn("selectResetAction")(
+              function* () {
+                return "reset-current" as const;
+              }
+            ),
+            confirmContinue: Effect.fn("confirmContinue")(
+              function* (
+                message: string,
+                defaultToContinue?: boolean
+              ) {
+                confirmContinueCalledWith = {
+                  message,
+                  defaultToContinue: defaultToContinue ?? true,
+                };
+              }
+            ),
+          });
+
+          yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.some("main"),
+            demo: false,
+            upstream: getBareRepoPath(repo.workingDir),
+          }).pipe(
+            Effect.provide(
+              makeLayer(repo.workingDir, mockPromptService)
+            )
+          );
+
+          // The discard warning fired for exactly the 1 wip commit,
+          // defaulting to "no" for safety
+          expect(confirmContinueCalledWith?.message).toContain(
+            "discard 1 commit"
+          );
+          expect(
+            confirmContinueCalledWith?.defaultToContinue
+          ).toBe(false);
+
+          // Still on main - reset happened in place, no redirect
+          const currentAfter = git(
+            repo.workingDir,
+            "branch",
+            "--show-current"
+          );
+          expect(currentAfter).toBe("main");
+
+          // The wip commit's file is gone - reset to upstream/main
+          expect(
+            fs.existsSync(
+              `${repo.workingDir}/src/scratch.ts`
+            )
+          ).toBe(false);
+          const content = fs.readFileSync(
+            `${repo.workingDir}/src/base.ts`,
+            "utf-8"
+          );
+          expect(content).toBe("// base setup");
+        })
+    );
+
+    it.effect(
+      "should abort the reset when the user declines to discard unrecoverable commits",
+      () =>
+        Effect.gen(function* () {
+          const repo = createTestRepo()
+            .withRemote("upstream")
+            .withBranch("main", [
+              commit("00.00.01: Base setup", {
+                "src/base.ts": "// base setup",
+              }),
+            ])
+            .withBranch("live-run-through", [
+              commit("01.01.01: Arrays intro", {
+                "src/01.ts": "// arrays",
+              }),
+            ])
+            .build();
+
+          cleanup = repo.cleanup;
+          configureGitUser(repo.workingDir);
+
+          fs.writeFileSync(
+            `${repo.workingDir}/src/scratch.ts`,
+            "// my own work-in-progress"
+          );
+          git(repo.workingDir, "add", ".");
+          git(
+            repo.workingDir,
+            "commit",
+            "-m",
+            "my own wip commit"
+          );
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectResetAction: Effect.fn("selectResetAction")(
+              function* () {
+                return "reset-current" as const;
+              }
+            ),
+            confirmContinue: Effect.fn("confirmContinue")(
+              function* () {
+                return yield* Effect.fail(
+                  new PromptCancelledError()
+                );
+              }
+            ),
+          });
 
           const result = yield* runReset({
             branch: "live-run-through",
@@ -1363,9 +1565,14 @@ describe("reset (e2e)", () => {
             Effect.flip
           );
 
-          expect(result._tag).toBe(
-            "InvalidBranchOperationError"
-          );
+          expect(result).toBeInstanceOf(PromptCancelledError);
+
+          // The wip commit is still there - reset didn't happen
+          expect(
+            fs.existsSync(
+              `${repo.workingDir}/src/scratch.ts`
+            )
+          ).toBe(true);
         })
     );
 
