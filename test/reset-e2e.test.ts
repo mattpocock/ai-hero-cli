@@ -915,6 +915,73 @@ describe("reset (e2e)", () => {
           }
         })
     );
+
+    it.effect(
+      "should warn about uncommitted changes before applying as unstaged",
+      () =>
+        Effect.gen(function* () {
+          const repo = createTestRepo()
+            .withRemote("upstream")
+            .withBranch("live-run-through", [
+              commit("01.01.01: Arrays intro", {
+                "src/01.ts": "// problem",
+              }),
+              commit("01.01.02: Arrays solution", {
+                "src/01.ts": "// solution",
+              }),
+            ])
+            .withWorkingBranch("my-branch", {
+              from: "live-run-through",
+              atCommit: 0,
+            })
+            .build();
+
+          cleanup = repo.cleanup;
+          configureGitUser(repo.workingDir);
+
+          // Work the student has not committed yet
+          fs.writeFileSync(
+            `${repo.workingDir}/src/01.ts`,
+            "// uncommitted changes"
+          );
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectLessonCommit: Effect.fn("selectLessonCommit")(
+              function* () {
+                return "01.01.02";
+              }
+            ),
+            confirmResetWithUncommittedChanges: Effect.fn(
+              "confirmResetWithUncommittedChanges"
+            )(function* () {
+              return yield* Effect.fail(
+                new PromptCancelledError()
+              );
+            }),
+          });
+
+          const result = yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.none(),
+            unstaged: true,
+            upstream: getBareRepoPath(repo.workingDir),
+          }).pipe(
+            Effect.provide(
+              makeLayer(repo.workingDir, mockPromptService)
+            ),
+            Effect.flip
+          );
+
+          expect(result).toBeInstanceOf(PromptCancelledError);
+
+          // The student's work survives - the hard reset never ran
+          const content = fs.readFileSync(
+            `${repo.workingDir}/src/01.ts`,
+            "utf-8"
+          );
+          expect(content).toBe("// uncommitted changes");
+        })
+    );
   });
 
   describe("prompt cancellation", () => {

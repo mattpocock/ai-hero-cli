@@ -142,44 +142,45 @@ export const runReset = ({
         return;
       }
 
-      // Reset current branch - warn about work this would discard (skip when applying as unstaged changes)
-      if (!unstaged) {
-        // A commit only counts as "discarded" if it's unrecoverable —
-        // reachable from HEAD but not from the reset target *and* not
-        // already sitting on the lesson stack (which was just refreshed
-        // from upstream above, so `branch` mirrors it exactly). Without
-        // that second exclusion, every ordinary "reset back to an
-        // earlier lesson" would flag its own in-between lesson commits
-        // as discarded, even though they're always one reset away from
-        // being back. This used to be moot for main (it never carried
-        // extra commits of its own), but now that main is a real working
-        // branch it can carry a whole course's worth of history — so
-        // this check is generic, not main-specific.
-        const commitsToDiscard = yield* git.revListCountExcluding(
-          "HEAD",
-          [commitToUse, branch]
+      // Reset current branch - warn about work this would discard.
+      // These checks also run for --unstaged: applyAsUnstagedChanges
+      // starts with a hard reset, so it discards uncommitted work and
+      // commits exactly as an ordinary reset does.
+      // A commit only counts as "discarded" if it's unrecoverable —
+      // reachable from HEAD but not from the reset target *and* not
+      // already sitting on the lesson stack (which was just refreshed
+      // from upstream above, so `branch` mirrors it exactly). Without
+      // that second exclusion, every ordinary "reset back to an
+      // earlier lesson" would flag its own in-between lesson commits
+      // as discarded, even though they're always one reset away from
+      // being back. This used to be moot for main (it never carried
+      // extra commits of its own), but now that main is a real working
+      // branch it can carry a whole course's worth of history — so
+      // this check is generic, not main-specific.
+      const commitsToDiscard = yield* git.revListCountExcluding(
+        "HEAD",
+        [commitToUse, branch]
+      );
+
+      if (commitsToDiscard > 0) {
+        yield* promptService.confirmContinue(
+          `This will discard ${commitsToDiscard} commit${
+            commitsToDiscard === 1 ? "" : "s"
+          } on "${currentBranch}" not present at ${selectedLessonId}. Continue?`,
+          false
         );
+      }
 
-        if (commitsToDiscard > 0) {
-          yield* promptService.confirmContinue(
-            `This will discard ${commitsToDiscard} commit${
-              commitsToDiscard === 1 ? "" : "s"
-            } on "${currentBranch}" not present at ${selectedLessonId}. Continue?`,
-            false
-          );
-        }
+      const { hasUncommittedChanges, statusOutput } =
+        yield* git.getUncommittedChanges();
 
-        const { hasUncommittedChanges, statusOutput } =
-          yield* git.getUncommittedChanges();
+      if (hasUncommittedChanges) {
+        yield* Console.log(
+          "\nWarning: You have uncommitted changes:"
+        );
+        yield* Console.log(statusOutput);
 
-        if (hasUncommittedChanges) {
-          yield* Console.log(
-            "\nWarning: You have uncommitted changes:"
-          );
-          yield* Console.log(statusOutput);
-
-          yield* promptService.confirmResetWithUncommittedChanges();
-        }
+        yield* promptService.confirmResetWithUncommittedChanges();
       }
 
       // Reset to target commit
