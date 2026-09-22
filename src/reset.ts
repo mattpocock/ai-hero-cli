@@ -21,13 +21,13 @@ import { withUpstreamCleanup } from "./upstream-cleanup.js";
  */
 export const runReset = ({
   branch,
-  demo,
   lessonId,
+  unstaged,
   upstream,
 }: {
   branch: string;
   lessonId: Option.Option<string>;
-  demo: boolean;
+  unstaged: boolean;
   upstream: string;
 }) =>
   withUpstreamCleanup(
@@ -106,9 +106,9 @@ export const runReset = ({
         }
       }
 
-      // Prompt for action (skip in demo mode)
+      // Prompt for action (skip when applying as unstaged changes)
       let action: "reset-current" | "create-branch";
-      if (demo) {
+      if (unstaged) {
         action = "reset-current";
       } else {
         action = yield* promptService.selectResetAction(
@@ -142,8 +142,8 @@ export const runReset = ({
         return;
       }
 
-      // Reset current branch - warn about work this would discard (skip in demo mode)
-      if (!demo) {
+      // Reset current branch - warn about work this would discard (skip when applying as unstaged changes)
+      if (!unstaged) {
         // A commit only counts as "discarded" if it's unrecoverable —
         // reachable from HEAD but not from the reset target *and* not
         // already sitting on the lesson stack (which was just refreshed
@@ -187,11 +187,11 @@ export const runReset = ({
         `Resetting to ${selectedLessonId}...`
       );
 
-      if (demo) {
+      if (unstaged) {
         yield* git.applyAsUnstagedChanges(commitToUse);
 
         yield* Console.log(
-          `✓ Demo mode: Reset to ${selectedLessonId} with unstaged changes`
+          `✓ Reset to ${selectedLessonId} with unstaged changes`
         );
       } else {
         yield* git.resetHard(commitToUse);
@@ -215,7 +215,12 @@ export const reset = CLICommand.make(
       ),
       Options.withDefault(DEFAULT_PROJECT_TARGET_BRANCH)
     ),
-    demo: Options.boolean("demo").pipe(Options.withAlias("d")),
+    unstaged: Options.boolean("unstaged").pipe(
+      Options.withAlias("u"),
+      Options.withDescription(
+        "Leave the lesson's diff in the working tree as unstaged changes, with HEAD on its parent"
+      )
+    ),
     upstream: Options.text("upstream").pipe(
       Options.withDescription(
         "Git URL or local path to the upstream exercise repo"
@@ -224,8 +229,8 @@ export const reset = CLICommand.make(
     cwd: cwdOption,
   },
   /* v8 ignore start - CLI error handlers are presentation logic */
-  ({ branch, cwd, demo, lessonId, upstream }) =>
-    runReset({ branch, lessonId, demo, upstream }).pipe(
+  ({ branch, cwd, lessonId, unstaged, upstream }) =>
+    runReset({ branch, lessonId, unstaged, upstream }).pipe(
       Effect.provideService(
         GitServiceConfig,
         GitServiceConfig.of({
