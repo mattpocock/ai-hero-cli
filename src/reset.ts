@@ -21,13 +21,13 @@ import { withUpstreamCleanup } from "./upstream-cleanup.js";
  */
 export const runReset = ({
   branch,
-  demo,
   lessonId,
+  unstaged,
   upstream,
 }: {
   branch: string;
   lessonId: Option.Option<string>;
-  demo: boolean;
+  unstaged: boolean;
   upstream: string;
 }) =>
   withUpstreamCleanup(
@@ -106,9 +106,9 @@ export const runReset = ({
         }
       }
 
-      // Prompt for action (skip in demo mode)
+      // Prompt for action (skip when applying as unstaged changes)
       let action: "reset-current" | "create-branch";
-      if (demo) {
+      if (unstaged) {
         action = "reset-current";
       } else {
         action = yield* promptService.selectResetAction(
@@ -142,44 +142,45 @@ export const runReset = ({
         return;
       }
 
-      // Reset current branch - warn about work this would discard (skip in demo mode)
-      if (!demo) {
-        // A commit only counts as "discarded" if it's unrecoverable —
-        // reachable from HEAD but not from the reset target *and* not
-        // already sitting on the lesson stack (which was just refreshed
-        // from upstream above, so `branch` mirrors it exactly). Without
-        // that second exclusion, every ordinary "reset back to an
-        // earlier lesson" would flag its own in-between lesson commits
-        // as discarded, even though they're always one reset away from
-        // being back. This used to be moot for main (it never carried
-        // extra commits of its own), but now that main is a real working
-        // branch it can carry a whole course's worth of history — so
-        // this check is generic, not main-specific.
-        const commitsToDiscard = yield* git.revListCountExcluding(
-          "HEAD",
-          [commitToUse, branch]
+      // Reset current branch - warn about work this would discard.
+      // These checks also run for --unstaged: applyAsUnstagedChanges
+      // starts with a hard reset, so it discards uncommitted work and
+      // commits exactly as an ordinary reset does.
+      // A commit only counts as "discarded" if it's unrecoverable —
+      // reachable from HEAD but not from the reset target *and* not
+      // already sitting on the lesson stack (which was just refreshed
+      // from upstream above, so `branch` mirrors it exactly). Without
+      // that second exclusion, every ordinary "reset back to an
+      // earlier lesson" would flag its own in-between lesson commits
+      // as discarded, even though they're always one reset away from
+      // being back. This used to be moot for main (it never carried
+      // extra commits of its own), but now that main is a real working
+      // branch it can carry a whole course's worth of history — so
+      // this check is generic, not main-specific.
+      const commitsToDiscard = yield* git.revListCountExcluding(
+        "HEAD",
+        [commitToUse, branch]
+      );
+
+      if (commitsToDiscard > 0) {
+        yield* promptService.confirmContinue(
+          `This will discard ${commitsToDiscard} commit${
+            commitsToDiscard === 1 ? "" : "s"
+          } on "${currentBranch}" not present at ${selectedLessonId}. Continue?`,
+          false
         );
+      }
 
-        if (commitsToDiscard > 0) {
-          yield* promptService.confirmContinue(
-            `This will discard ${commitsToDiscard} commit${
-              commitsToDiscard === 1 ? "" : "s"
-            } on "${currentBranch}" not present at ${selectedLessonId}. Continue?`,
-            false
-          );
-        }
+      const { hasUncommittedChanges, statusOutput } =
+        yield* git.getUncommittedChanges();
 
-        const { hasUncommittedChanges, statusOutput } =
-          yield* git.getUncommittedChanges();
+      if (hasUncommittedChanges) {
+        yield* Console.log(
+          "\nWarning: You have uncommitted changes:"
+        );
+        yield* Console.log(statusOutput);
 
-        if (hasUncommittedChanges) {
-          yield* Console.log(
-            "\nWarning: You have uncommitted changes:"
-          );
-          yield* Console.log(statusOutput);
-
-          yield* promptService.confirmResetWithUncommittedChanges();
-        }
+        yield* promptService.confirmResetWithUncommittedChanges();
       }
 
       // Reset to target commit
@@ -187,11 +188,11 @@ export const runReset = ({
         `Resetting to ${selectedLessonId}...`
       );
 
-      if (demo) {
+      if (unstaged) {
         yield* git.applyAsUnstagedChanges(commitToUse);
 
         yield* Console.log(
-          `✓ Demo mode: Reset to ${selectedLessonId} with unstaged changes`
+          `✓ Reset to ${selectedLessonId} with unstaged changes`
         );
       } else {
         yield* git.resetHard(commitToUse);
@@ -215,7 +216,12 @@ export const reset = CLICommand.make(
       ),
       Options.withDefault(DEFAULT_PROJECT_TARGET_BRANCH)
     ),
-    demo: Options.boolean("demo").pipe(Options.withAlias("d")),
+    unstaged: Options.boolean("unstaged").pipe(
+      Options.withAlias("u"),
+      Options.withDescription(
+        "Leave the lesson's diff in the working tree as unstaged changes, with HEAD on its parent"
+      )
+    ),
     upstream: Options.text("upstream").pipe(
       Options.withDescription(
         "Git URL or local path to the upstream exercise repo"
@@ -224,8 +230,8 @@ export const reset = CLICommand.make(
     cwd: cwdOption,
   },
   /* v8 ignore start - CLI error handlers are presentation logic */
-  ({ branch, cwd, demo, lessonId, upstream }) =>
-    runReset({ branch, lessonId, demo, upstream }).pipe(
+  ({ branch, cwd, lessonId, unstaged, upstream }) =>
+    runReset({ branch, lessonId, unstaged, upstream }).pipe(
       Effect.provideService(
         GitServiceConfig,
         GitServiceConfig.of({
