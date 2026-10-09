@@ -1,6 +1,7 @@
 /* v8 ignore start - CLI entry point, no business logic */
 import { Command } from "@effect/cli";
 import { cherryPick } from "./cherry-pick.js";
+import { createPr } from "./create-pr.js";
 import { exercise } from "./exercise.js";
 import { fork } from "./fork.js";
 import { internal } from "./internal/internal.js";
@@ -15,6 +16,7 @@ const command = Command.make("ai-hero").pipe(
     cherryPick,
     pull,
     fork,
+    createPr,
   ])
 );
 
