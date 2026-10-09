@@ -69,7 +69,14 @@ const originRefs = (workingDir: string) =>
   );
 
 type FakeGitHubCall =
-  | { kind: "create"; repo: string; base: string; head: string }
+  | {
+      kind: "create";
+      repo: string;
+      base: string;
+      head: string;
+      title: string;
+      body: string;
+    }
   | {
       kind: "edit";
       repo: string;
@@ -118,7 +125,13 @@ const makeFakeGitHub = (
       }
     ),
     createDraftPullRequest: Effect.fn("createDraftPullRequest")(
-      function* (args: { repo: string; base: string; head: string }) {
+      function* (args: {
+        repo: string;
+        base: string;
+        head: string;
+        title: string;
+        body: string;
+      }) {
         calls.push({ kind: "create", ...args });
         openPr = {
           number: 7,
@@ -300,18 +313,14 @@ describe("create-pr (e2e)", () => {
           git(repo.dir, "config", "branch.pr/add-arrays.gh-merge-base")
         ).toBe("pr-base/add-arrays");
 
-        // `gh pr create --fill` reads origin/pr-base/<slug>..pr/<slug>,
-        // so the push must leave the remote-tracking ref behind.
-        expect(
-          git(repo.dir, "rev-parse", "origin/pr-base/add-arrays")
-        ).toBe(repo.initial);
-
         expect(github.calls).toEqual([
           {
             kind: "create",
             repo: "student/course",
             base: "pr-base/add-arrays",
             head: "pr/add-arrays",
+            title: "Arrays intro",
+            body: "Why arrays matter.",
           },
         ]);
       })
@@ -468,6 +477,38 @@ describe("create-pr (e2e)", () => {
         ).pipe(Effect.flip);
 
         expect(error._tag).toBe("NotAGitHubRemoteError");
+      })
+  );
+
+  it.effect(
+    "fails before pushing anything when the lesson id can't be a branch name",
+    () =>
+      Effect.gen(function* () {
+        const repo = buildRepo();
+        // A lesson id is whatever precedes the first ": " — spaces too.
+        git(repo.dir, "checkout", "-q", "live-run-through");
+        fs.writeFileSync(path.join(repo.dir, "src/wip.ts"), "// wip");
+        git(repo.dir, "add", ".");
+        git(repo.dir, "commit", "-q", "-m", "WIP thing: half done");
+        git(
+          repo.dir,
+          "push",
+          "-q",
+          "upstream",
+          "live-run-through"
+        );
+        git(repo.dir, "checkout", "-q", "my-branch");
+        const github = makeFakeGitHub();
+
+        const error = yield* run(
+          repo.dir,
+          "WIP thing",
+          noPrompts,
+          github.service
+        ).pipe(Effect.flip);
+
+        expect(error._tag).toBe("InvalidBranchOperationError");
+        expect(originRefs(repo.dir)).toEqual({});
       })
   );
 

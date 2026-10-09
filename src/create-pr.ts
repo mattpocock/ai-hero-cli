@@ -9,7 +9,10 @@ import {
   splitLessonId,
 } from "./commit-utils.js";
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "./constants.js";
-import { ensureNotOnProtectedBranch } from "./errors.js";
+import {
+  ensureNotOnProtectedBranch,
+  InvalidBranchOperationError,
+} from "./errors.js";
 import { GitService, GitServiceConfig } from "./git-service.js";
 import {
   GitHubService,
@@ -54,8 +57,10 @@ export class LessonHasNoParentError extends Data.TaggedError(
  * the lesson. A subject that is nothing but the prefix falls back to the
  * bare lesson id, which has no ": " and so parses as a non-lesson.
  *
- * Also returns the title and body `gh pr create --fill` derives from a
- * single-commit branch: the subject and the body, respectively.
+ * Also returns the title and body `gh pr create --fill` would derive
+ * from the resulting single-commit branch: its subject and its body.
+ * They're passed to gh explicitly rather than via `--fill`, which depends
+ * on local remote-tracking refs (see createDraftPullRequest).
  */
 export const toPrCommitMessage = (
   lessonId: string,
@@ -166,34 +171,39 @@ export const runCreatePr = ({
         });
 
       const lessonCommit = yield* git.revParse(commit.sha);
+      // revParse doesn't fail on a non-zero exit — `rev-parse <root>^`
+      // echoes the input back — so check the result is a sha.
       const parentCommit = yield* git
         .revParse(`${lessonCommit}^`)
-        .pipe(
-          Effect.catchTag(
-            "InvalidRefError",
-            () =>
-              new LessonHasNoParentError({
-                lessonId: selectedLessonId,
-                message: `Lesson ${selectedLessonId} is the first commit in the repo, so it has no parent to open a PR against.`,
-              })
-          )
-        );
+        .pipe(Effect.orElseSucceed(() => ""));
+
+      if (!/^[0-9a-f]{40,64}$/.test(parentCommit)) {
+        return yield* new LessonHasNoParentError({
+          lessonId: selectedLessonId,
+          message: `Lesson ${selectedLessonId} is the first commit in the repo, so it has no parent to open a PR against.`,
+        });
+      }
 
       const prBranch = prBranchName(selectedLessonId);
       const prBaseBranch = prBaseBranchName(selectedLessonId);
+
+      // Lesson ids are "whatever precedes the first ': '", so one can
+      // hold characters git refuses in a branch name. Catch that before
+      // anything is pushed.
+      for (const name of [prBranch, prBaseBranch]) {
+        if (!(yield* git.isValidBranchName(name))) {
+          return yield* new InvalidBranchOperationError({
+            message: `Lesson id "${selectedLessonId}" can't be used in a branch name ("${name}").`,
+          });
+        }
+      }
 
       // pr/<lesson> is CLI-owned, but it's also a local branch the
       // student may have committed to — ask before replacing it.
       const prBranchExists = yield* git.hasLocalBranch(prBranch);
       if (prBranchExists) {
-        const commitsOnBranch = yield* git.revListCountExcluding(
-          `refs/heads/${prBranch}`,
-          [parentCommit]
-        );
         yield* promptService.confirmContinue(
-          `Branch "${prBranch}" already exists (${commitsOnBranch} commit${
-            commitsOnBranch === 1 ? "" : "s"
-          } on top of the lesson's starting point). Replace it with a fresh copy of ${selectedLessonId}?`,
+          `Branch "${prBranch}" already exists. Replace it with a fresh copy of ${selectedLessonId}? Any commits you made on it will be discarded.`,
           false
         );
       }
@@ -268,6 +278,8 @@ export const runCreatePr = ({
           repo,
           base: prBaseBranch,
           head: prBranch,
+          title,
+          body,
         });
       }
 

@@ -457,6 +457,19 @@ export const makeGitService = Effect.gen(function* () {
           }
         ),
 
+        /** `git check-ref-format --branch`: is `name` a legal branch name? */
+        isValidBranchName: Effect.fn("isValidBranchName")(
+          function* (name: string) {
+            const exitCode = yield* runCommandSilentExitCode(
+              "git",
+              "check-ref-format",
+              "--branch",
+              name
+            );
+            return exitCode === 0;
+          }
+        ),
+
         setConfig: Effect.fn("setConfig")(function* (
           key: string,
           value: string
