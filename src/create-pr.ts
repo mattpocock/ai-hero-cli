@@ -322,9 +322,7 @@ export const runCreatePr = ({
         : `https://github.com/${repo}/pulls`;
 
       yield* Console.log(
-        `\n✓ ${isDraft ? "Draft PR" : "PR"} for ${selectedLessonId}: ${prUrl}\n\n` +
-          "Next step: ask your agent to rewrite the PR body, e.g.\n" +
-          `  "Read ${prUrl} and rewrite its description to explain the change."`
+        `\n✓ ${isDraft ? "Draft PR" : "PR"} for ${selectedLessonId}: ${prUrl}`
       );
 
       return { prUrl, prBranch, prBaseBranch, isDraft };
