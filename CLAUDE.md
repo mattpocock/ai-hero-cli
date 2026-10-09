@@ -1,3 +1,17 @@
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues (`mattpocock/ai-hero-cli`). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five-label vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout — `CONTEXT.md` at root + `docs/adr/`. See `docs/agents/domain.md`.
+
 When creating tests which test commands, mock the GitService.
 
 For user-facing changes, add a changeset to `.changeset`. Check all changesets there first to see if there are duplicates. We use `@changesets/cli`, but you can create/edit the file manually. Use `package.json#name` for the name.
