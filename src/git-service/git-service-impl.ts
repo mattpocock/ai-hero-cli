@@ -1,6 +1,6 @@
 import { Command, FileSystem } from "@effect/platform";
 import { NodeFileSystem } from "@effect/platform-node";
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, Layer, Option } from "effect";
 import * as path from "node:path";
 import {
   CherryPickConflictError,
@@ -346,6 +346,128 @@ export const makeGitService = Effect.gen(function* () {
             );
           }
         ),
+
+        /**
+         * Force-pushes `src` to `dst` on `remote` — `git push --force
+         * <remote> <src>:<dst>`. Only for refs the CLI owns outright
+         * (e.g. `create-pr`'s `pr/*` and `pr-base/*` branches), where
+         * overwriting whatever is there is the point.
+         */
+        pushRefForce: Effect.fn("pushRefForce")(function* (
+          remote: string,
+          src: string,
+          dst: string
+        ) {
+          const exitCode = yield* runCommandWithExitCode(
+            "git",
+            "push",
+            "--force",
+            remote,
+            `${src}:${dst}`
+          );
+
+          yield* mapExitCode(
+            exitCode,
+            (code) =>
+              new FailedToPushError({
+                remote,
+                branch: dst,
+                message: `Failed to push ${dst} to ${remote} (exit code: ${code})`,
+              })
+          );
+        }),
+
+        /** The raw, un-rewritten URL configured for `remote`, if any. */
+        getRemoteUrl: Effect.fn("getRemoteUrl")(function* (
+          remote: string
+        ) {
+          const url = yield* runCommandWithString(
+            "git",
+            "config",
+            "--get",
+            `remote.${remote}.url`
+          ).pipe(Effect.catchAll(() => Effect.succeed("")));
+          return url === "" ? Option.none() : Option.some(url);
+        }),
+
+        /** A commit's full message (subject, blank line, body). */
+        getCommitMessage: Effect.fn("getCommitMessage")(
+          function* (sha: string) {
+            return yield* runCommandWithString(
+              "git",
+              "log",
+              "-1",
+              "--format=%B",
+              sha
+            );
+          }
+        ),
+
+        /**
+         * Creates a commit carrying `tree` on top of `parent` without
+         * touching the index or working tree, and returns its sha.
+         */
+        commitTree: Effect.fn("commitTree")(function* (opts: {
+          tree: string;
+          parent: string;
+          message: string;
+        }) {
+          const sha = yield* runCommandWithString(
+            "git",
+            "commit-tree",
+            opts.tree,
+            "-p",
+            opts.parent,
+            "-m",
+            opts.message
+          ).pipe(Effect.catchAll(() => Effect.succeed("")));
+
+          if (!/^[0-9a-f]{40,64}$/.test(sha)) {
+            return yield* new FailedToCommitError({
+              message: `Failed to create a commit from ${opts.tree} on top of ${opts.parent}`,
+            });
+          }
+
+          return sha;
+        }),
+
+        /**
+         * Creates or resets `branchName` to `sha` and switches to it —
+         * `git checkout -B`. Works even when `branchName` is the
+         * current branch.
+         */
+        checkoutResetBranchAt: Effect.fn("checkoutResetBranchAt")(
+          function* (branchName: string, sha: string) {
+            const exitCode = yield* runCommandWithExitCode(
+              "git",
+              "checkout",
+              "-B",
+              branchName,
+              sha
+            );
+
+            yield* mapExitCode(
+              exitCode,
+              (code) =>
+                new FailedToCreateBranchError({
+                  branchName,
+                  message: `Failed to switch to ${branchName} at ${sha} (exit code: ${code})`,
+                })
+            );
+          }
+        ),
+
+        setConfig: Effect.fn("setConfig")(function* (
+          key: string,
+          value: string
+        ) {
+          yield* runCommandWithExitCode(
+            "git",
+            "config",
+            key,
+            value
+          );
+        }),
 
         checkoutNewBranch: Effect.fn("checkoutNewBranch")(
           function* (branchName: string) {
