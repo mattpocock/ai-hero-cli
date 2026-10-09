@@ -1,5 +1,11 @@
 # ai-hero-cli
 
+## 0.10.1
+
+### Patch Changes
+
+- cf5f51c: `create-pr` no longer prints a "Next step: ask your agent to rewrite the PR body" hint after opening or resetting a PR. It now ends with just the PR URL line; what to do with the PR is left to the lesson.
+
 ## 0.10.0
 
 ### Minor Changes
