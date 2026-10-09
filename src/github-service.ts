@@ -313,20 +313,22 @@ export const makeGitHubService = Effect.gen(function* () {
     ),
 
     /**
-     * `gh pr create --draft` with an explicit title and body.
+     * `gh pr create` (with `--draft` when `draft` is set) with an
+     * explicit title and body.
      *
      * Callers pass what `--fill` would write rather than using `--fill`
      * itself: `--fill` reads `<remote>/<base>..<head>` from local
      * remote-tracking refs, which don't exist when the clone has a
      * narrow fetch refspec or gh can't match the remote to `--repo`.
      */
-    createDraftPullRequest: Effect.fn("createDraftPullRequest")(
+    createPullRequest: Effect.fn("createPullRequest")(
       function* (opts: {
         repo: string;
         base: string;
         head: string;
         title: string;
         body: string;
+        draft: boolean;
       }) {
         const exitCode = yield* runInheritExitCode(
           "gh",
@@ -334,7 +336,7 @@ export const makeGitHubService = Effect.gen(function* () {
           "create",
           "--repo",
           opts.repo,
-          "--draft",
+          ...(opts.draft ? ["--draft"] : []),
           "--title",
           opts.title,
           "--body",

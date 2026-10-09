@@ -23,6 +23,7 @@ import {
   makeGitService,
 } from "../src/git-service.js";
 import {
+  FailedPullRequestCommandError,
   GhNotAuthenticatedError,
   GitHubService,
   parseGitHubRemoteUrl,
@@ -76,6 +77,7 @@ type FakeGitHubCall =
       head: string;
       title: string;
       body: string;
+      draft: boolean;
     }
   | {
       kind: "edit";
@@ -95,6 +97,8 @@ const makeFakeGitHub = (
   opts: {
     authenticated?: boolean;
     openPr?: { number: number; url: string };
+    /** false = a private repo on GitHub Free: --draft and ready --undo fail */
+    draftsSupported?: boolean;
   } = {}
 ) => {
   const calls: Array<FakeGitHubCall> = [];
@@ -124,15 +128,21 @@ const makeFakeGitHub = (
         return openPr ? Option.some(openPr) : Option.none();
       }
     ),
-    createDraftPullRequest: Effect.fn("createDraftPullRequest")(
+    createPullRequest: Effect.fn("createPullRequest")(
       function* (args: {
         repo: string;
         base: string;
         head: string;
         title: string;
         body: string;
+        draft: boolean;
       }) {
         calls.push({ kind: "create", ...args });
+        if (args.draft && opts.draftsSupported === false) {
+          return yield* new FailedPullRequestCommandError({
+            message: "Draft pull requests are not supported",
+          });
+        }
         openPr = {
           number: 7,
           url: "https://github.com/student/course/pull/7",
@@ -151,6 +161,11 @@ const makeFakeGitHub = (
     markPullRequestAsDraft: Effect.fn("markPullRequestAsDraft")(
       function* (args: { repo: string; number: number }) {
         calls.push({ kind: "draft", ...args });
+        if (opts.draftsSupported === false) {
+          return yield* new FailedPullRequestCommandError({
+            message: "Draft pull requests are not supported",
+          });
+        }
       }
     ),
   });
@@ -321,8 +336,10 @@ describe("create-pr (e2e)", () => {
             head: "pr/add-arrays",
             title: "Arrays intro",
             body: "Why arrays matter.",
+            draft: true,
           },
         ]);
+        expect(result.isDraft).toBe(true);
       })
   );
 
@@ -599,6 +616,62 @@ describe("create-pr (e2e)", () => {
           },
           { kind: "draft", repo: "student/course", number: 7 },
         ]);
+      })
+  );
+
+  it.effect(
+    "opens a ready-for-review PR when the repo's plan has no drafts",
+    () =>
+      Effect.gen(function* () {
+        const repo = buildRepo();
+        const github = makeFakeGitHub({ draftsSupported: false });
+
+        const result = yield* run(
+          repo.dir,
+          "add-arrays",
+          noPrompts,
+          github.service
+        );
+
+        expect(github.calls.map((c) => c.kind === "create" && c.draft)).toEqual([
+          true,
+          false,
+        ]);
+        expect(result.isDraft).toBe(false);
+        expect(result.prUrl).toBe(
+          "https://github.com/student/course/pull/7"
+        );
+      })
+  );
+
+  it.effect(
+    "still refreshes an existing PR when it can't be turned back into a draft",
+    () =>
+      Effect.gen(function* () {
+        const repo = buildRepo();
+        const github = makeFakeGitHub({
+          draftsSupported: false,
+          openPr: {
+            number: 3,
+            url: "https://github.com/student/course/pull/3",
+          },
+        });
+
+        const result = yield* run(
+          repo.dir,
+          "add-arrays",
+          noPrompts,
+          github.service
+        );
+
+        expect(github.calls.map((c) => c.kind)).toEqual([
+          "edit",
+          "draft",
+        ]);
+        expect(result.isDraft).toBe(false);
+        expect(result.prUrl).toBe(
+          "https://github.com/student/course/pull/3"
+        );
       })
   );
 

@@ -23,6 +23,9 @@ import { cwdOption } from "./options.js";
 import { PromptService } from "./prompt-service.js";
 import { withUpstreamCleanup } from "./upstream-cleanup.js";
 
+export const DRAFTS_UNAVAILABLE_NOTE =
+  "Note: the PR was opened ready-for-review because draft pull requests aren't available on this repo's GitHub plan.";
+
 /** The remote the student's PR is opened against. */
 const ORIGIN = "origin";
 
@@ -60,7 +63,7 @@ export class LessonHasNoParentError extends Data.TaggedError(
  * Also returns the title and body `gh pr create --fill` would derive
  * from the resulting single-commit branch: its subject and its body.
  * They're passed to gh explicitly rather than via `--fill`, which depends
- * on local remote-tracking refs (see createDraftPullRequest).
+ * on local remote-tracking refs (see GitHubService.createPullRequest).
  */
 export const toPrCommitMessage = (
   lessonId: string,
@@ -258,6 +261,12 @@ export const runCreatePr = ({
         head: prBranch,
       });
 
+      // Draft PRs on private repos need a paid GitHub plan, and `fork`
+      // creates private repos — so on GitHub Free both `--draft` and
+      // `ready --undo` fail. Fall back to a ready-for-review PR rather
+      // than leave the student with pushed branches and no PR.
+      let isDraft: boolean;
+
       if (Option.isSome(existingPr)) {
         yield* Console.log(
           `Updating existing pull request #${existingPr.value.number}...`
@@ -269,18 +278,39 @@ export const runCreatePr = ({
           body,
           base: prBaseBranch,
         });
-        yield* github.markPullRequestAsDraft({
-          repo,
-          number: existingPr.value.number,
-        });
+        isDraft = yield* github
+          .markPullRequestAsDraft({
+            repo,
+            number: existingPr.value.number,
+          })
+          .pipe(
+            Effect.as(true),
+            Effect.catchTag("FailedPullRequestCommandError", () =>
+              Effect.succeed(false)
+            )
+          );
       } else {
-        yield* github.createDraftPullRequest({
+        const createArgs = {
           repo,
           base: prBaseBranch,
           head: prBranch,
           title,
           body,
-        });
+        };
+        isDraft = yield* github
+          .createPullRequest({ ...createArgs, draft: true })
+          .pipe(
+            Effect.as(true),
+            Effect.catchTag("FailedPullRequestCommandError", () =>
+              github
+                .createPullRequest({ ...createArgs, draft: false })
+                .pipe(Effect.as(false))
+            )
+          );
+      }
+
+      if (!isDraft) {
+        yield* Console.log(DRAFTS_UNAVAILABLE_NOTE);
       }
 
       const pr = yield* github.findOpenPullRequest({
@@ -292,12 +322,12 @@ export const runCreatePr = ({
         : `https://github.com/${repo}/pulls`;
 
       yield* Console.log(
-        `\n✓ Draft PR for ${selectedLessonId}: ${prUrl}\n\n` +
+        `\n✓ ${isDraft ? "Draft PR" : "PR"} for ${selectedLessonId}: ${prUrl}\n\n` +
           "Next step: ask your agent to rewrite the PR body, e.g.\n" +
           `  "Read ${prUrl} and rewrite its description to explain the change."`
       );
 
-      return { prUrl, prBranch, prBaseBranch };
+      return { prUrl, prBranch, prBaseBranch, isDraft };
     })
   );
 
