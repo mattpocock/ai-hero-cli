@@ -108,8 +108,8 @@ describe("fork (e2e)", () => {
       ) {
         return existingRepos.includes(fullName);
       }),
-      createPrivateRepoFromCwd: Effect.fn(
-        "createPrivateRepoFromCwd"
+      createPublicRepoFromCwd: Effect.fn(
+        "createPublicRepoFromCwd"
       )(function* (name: string) {
         onCreate?.(name);
       }),
@@ -165,7 +165,7 @@ describe("fork (e2e)", () => {
     });
 
   it.effect(
-    "creates a fresh single-commit main branch and creates the private repo",
+    "creates a fresh single-commit main branch and creates the public repo",
     () =>
       Effect.gen(function* () {
         const repo = buildRepo();

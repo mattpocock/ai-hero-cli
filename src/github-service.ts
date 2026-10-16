@@ -221,18 +221,18 @@ export const makeGitHubService = Effect.gen(function* () {
     }),
 
     /**
-     * Creates a private repo named `name` from the current directory,
+     * Creates a public repo named `name` from the current directory,
      * wiring up `origin` and pushing the current branch.
      */
-    createPrivateRepoFromCwd: Effect.fn(
-      "createPrivateRepoFromCwd"
+    createPublicRepoFromCwd: Effect.fn(
+      "createPublicRepoFromCwd"
     )(function* (name: string) {
       const exitCode = yield* runInheritExitCode(
         "gh",
         "repo",
         "create",
         name,
-        "--private",
+        "--public",
         "--source=.",
         "--remote=origin",
         "--push"

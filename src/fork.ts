@@ -32,7 +32,7 @@ export const sanitizeRepoName = (name: string): string => {
 /**
  * Core fork logic, extracted for testability.
  *
- * Turns the student's current course clone into a fresh private GitHub
+ * Turns the student's current course clone into a fresh public GitHub
  * repository they own: resets local history, creates the repo via the
  * GitHub CLI, and pushes the working copy to it as `origin`.
  */
@@ -83,7 +83,7 @@ export const runFork = (opts: {
     yield* Console.log(
       "\nThis will:\n" +
         "  • replace this folder's git history with a single fresh commit\n" +
-        `  • create a new PRIVATE GitHub repo: ${fullName}\n` +
+        `  • create a new PUBLIC GitHub repo: ${fullName}\n` +
         '  • push your current files to it as "origin"\n'
     );
     yield* promptService.confirmContinue(
@@ -106,14 +106,14 @@ export const runFork = (opts: {
     yield* git.commit("Initial commit");
     yield* git.renameCurrentBranchTo("main");
 
-    // 7. Create the private repo and push to it as origin.
+    // 7. Create the public repo and push to it as origin.
     yield* Console.log(
-      `Creating private repo ${fullName} and pushing...\n`
+      `Creating public repo ${fullName} and pushing...\n`
     );
-    yield* github.createPrivateRepoFromCwd(repoName);
+    yield* github.createPublicRepoFromCwd(repoName);
 
     yield* Console.log(
-      `\n✓ Done! Your private repo is ready:\n` +
+      `\n✓ Done! Your public repo is ready:\n` +
         `  https://github.com/${fullName}\n\n` +
         "GitHub Issues are enabled by default — your agent can now use it as a backlog."
     );
@@ -213,6 +213,6 @@ export const fork = CLICommand.make(
   /* v8 ignore stop */
 ).pipe(
   CLICommand.withDescription(
-    "Turn your course clone into a fresh private GitHub repo you own"
+    "Turn your course clone into a fresh public GitHub repo you own"
   )
 );
