@@ -1,5 +1,11 @@
 # ai-hero-cli
 
+## 0.11.0
+
+### Minor Changes
+
+- 3987e34: `ai-hero fork` now always creates a **public** GitHub repo instead of a private one. The confirmation prompt, progress messages and command description now say "public".
+
 ## 0.10.1
 
 ### Patch Changes
