@@ -261,10 +261,11 @@ export const runCreatePr = ({
         head: prBranch,
       });
 
-      // Draft PRs on private repos need a paid GitHub plan, and `fork`
-      // creates private repos — so on GitHub Free both `--draft` and
-      // `ready --undo` fail. Fall back to a ready-for-review PR rather
-      // than leave the student with pushed branches and no PR.
+      // Draft PRs on private repos need a paid GitHub plan. `fork` now
+      // creates public repos, but older forks (and repos made private by
+      // hand) are still private — on GitHub Free both `--draft` and
+      // `ready --undo` fail there. Fall back to a ready-for-review PR
+      // rather than leave the student with pushed branches and no PR.
       let isDraft: boolean;
 
       if (Option.isSome(existingPr)) {
