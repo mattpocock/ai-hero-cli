@@ -1,5 +1,12 @@
 # ai-hero-cli
 
+## 0.11.1
+
+### Patch Changes
+
+- caf5ea8: `ai-hero fork` now asks for a name for your new **public** GitHub repo — the prompt still said "private" after the fork switched to creating public repos.
+- 3130c25: `ai-hero pull` now works on `main` straight after `ai-hero fork`. Forking starts a fresh history with a single root commit, so the first pull used to fail with "refusing to merge unrelated histories". `pull` now allows unrelated histories when the current branch shares no common ancestor with `upstream/main`; when it does share history, `main` keeps refusing unrelated merges as before.
+
 ## 0.11.0
 
 ### Minor Changes
