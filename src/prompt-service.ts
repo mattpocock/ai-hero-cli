@@ -778,7 +778,7 @@ export class PromptService extends Effect.Service<PromptService>()(
               {
                 type: "text",
                 name: "repoName",
-                message: "Name for your new private GitHub repo:",
+                message: "Name for your new public GitHub repo:",
                 initial: defaultName,
               },
             ])
