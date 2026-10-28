@@ -44,14 +44,26 @@ export const runPull = (opts: { upstream: string }) =>
       yield* Console.log("Fetching main from upstream...");
       yield* git.fetch("upstream", "main");
 
-      // Merge upstream/main into current branch. main itself now shares
-      // real ancestry with upstream/main (it's the same branch the
-      // student cloned and has been committing on directly), so we no
-      // longer need --allow-unrelated-histories to paper over a fresh
-      // dev branch's history — dropping it here means a genuinely wrong
-      // --upstream fails loudly instead of silently two-root-merging.
+      // Merge upstream/main into current branch. Normally main shares
+      // real ancestry with upstream/main (the student cloned it and has
+      // been committing on it directly), so on main we refuse
+      // --allow-unrelated-histories: a genuinely wrong --upstream then
+      // fails loudly instead of silently two-root-merging.
+      //
+      // The exception is a repo made by `fork`, which wipes .git and
+      // starts over with a single fresh root commit - its main has no
+      // common ancestor with upstream/main at all, so the first pull
+      // after a fork must allow unrelated histories or it can never
+      // succeed. Once that merge lands, a merge-base exists and the
+      // protection applies again.
+      const sharesHistory = yield* git.hasMergeBase(
+        "HEAD",
+        "upstream/main"
+      );
+
       yield* git.merge("upstream/main", {
-        allowUnrelatedHistories: workingBranch !== "main",
+        allowUnrelatedHistories:
+          workingBranch !== "main" || !sharesHistory,
       });
 
       yield* Console.log(
