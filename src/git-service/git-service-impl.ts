@@ -963,6 +963,23 @@ export const makeGitService = Effect.gen(function* () {
             name
           );
         }),
+        /**
+         * `git merge-base a b`: do the two refs share any common
+         * ancestor? False when the histories are unrelated (exit 1) —
+         * e.g. a freshly forked repo whose only commit is a new root.
+         */
+        hasMergeBase: Effect.fn("hasMergeBase")(function* (
+          a: string,
+          b: string
+        ) {
+          const exitCode = yield* runCommandSilentExitCode(
+            "git",
+            "merge-base",
+            a,
+            b
+          );
+          return exitCode === 0;
+        }),
         hasLocalBranch: Effect.fn("hasLocalBranch")(function* (
           name: string
         ) {

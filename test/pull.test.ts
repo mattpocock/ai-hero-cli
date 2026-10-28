@@ -210,7 +210,7 @@ describe("pull on main branch", () => {
   );
 
   it.effect(
-    "should reject unrelated histories when merging into main (no --allow-unrelated-histories)",
+    "should allow unrelated histories on a freshly forked main with no merge-base",
     () =>
       Effect.gen(function* () {
         const repo = createTestRepo()
@@ -224,42 +224,109 @@ describe("pull on main branch", () => {
 
         cleanup = repo.cleanup;
 
-        // Simulate a misconfigured --upstream: local main's history has
-        // no common ancestor with upstream's main at all. Previously this
-        // never surfaced because pulling on main always redirected onto a
-        // fresh branch derived from the same history; now that main is
-        // merged into directly, and no longer shares that guaranteed
-        // ancestry, this should fail loudly rather than silently
-        // two-root-merging.
+        // Simulate `ai-hero fork`: .git is wiped and main restarts as a
+        // single fresh root commit holding the same files, so it shares
+        // no common ancestor with upstream/main.
         git(
           repo.workingDir,
           "checkout",
           "--orphan",
-          "unrelated-main"
+          "forked-main"
         );
-        git(
-          repo.workingDir,
-          "commit",
-          "--allow-empty",
-          "-m",
-          "unrelated root"
-        );
+        git(repo.workingDir, "add", "-A");
+        git(repo.workingDir, "commit", "-m", "Initial commit");
         git(repo.workingDir, "branch", "-D", "main");
         git(repo.workingDir, "branch", "-m", "main");
+
+        pushToUpstream(
+          repo.workingDir,
+          { "src/02.ts": "// new lesson" },
+          "02.01 - Lesson"
+        );
 
         const mockPromptService =
           fromPartial<PromptService>({});
 
-        const result = yield* runPull({
+        yield* runPull({
           upstream: getBareRepoPath(repo.workingDir),
         }).pipe(
           Effect.provide(
             makeLayer(repo.workingDir, mockPromptService)
-          ),
-          Effect.flip
+          )
         );
 
-        expect(result._tag).toBe("MergeConflictError");
+        expect(
+          git(repo.workingDir, "branch", "--show-current")
+        ).toBe("main");
+        expect(
+          fs.readFileSync(
+            `${repo.workingDir}/src/02.ts`,
+            "utf-8"
+          )
+        ).toBe("// new lesson");
+        // A real two-parent merge, joining the fork's root to upstream
+        expect(
+          git(repo.workingDir, "log", "-1", "--format=%P").split(" ")
+        ).toHaveLength(2);
+      })
+  );
+});
+
+describe("pull: allowUnrelatedHistories on main", () => {
+  const runWithMockGit = (sharesHistory: boolean) =>
+    Effect.gen(function* () {
+      const mergeCalls: Array<
+        { allowUnrelatedHistories?: boolean } | undefined
+      > = [];
+
+      const mockGit = fromPartial<GitService>({
+        ensureIsGitRepo: () => Effect.void,
+        getCurrentBranch: () => Effect.succeed("main"),
+        getUncommittedChanges: () =>
+          Effect.succeed({
+            hasUncommittedChanges: false,
+            statusOutput: "",
+          }),
+        setUpstreamRemote: () => Effect.void,
+        fetch: () => Effect.void,
+        hasMergeBase: () => Effect.succeed(sharesHistory),
+        merge: (
+          _ref: string,
+          options?: { allowUnrelatedHistories?: boolean }
+        ) => {
+          mergeCalls.push(options);
+          return Effect.void;
+        },
+        hasRemote: () => Effect.succeed(false),
+        removeRemote: () => Effect.void,
+      });
+
+      yield* runPull({ upstream: "/some/upstream" }).pipe(
+        Effect.provideService(GitService, mockGit)
+      );
+
+      return mergeCalls;
+    });
+
+  it.effect(
+    "allows unrelated histories when main has no merge-base with upstream/main (fresh fork)",
+    () =>
+      Effect.gen(function* () {
+        const calls = yield* runWithMockGit(false);
+        expect(calls).toEqual([
+          { allowUnrelatedHistories: true },
+        ]);
+      })
+  );
+
+  it.effect(
+    "keeps refusing unrelated histories when main already shares a merge-base",
+    () =>
+      Effect.gen(function* () {
+        const calls = yield* runWithMockGit(true);
+        expect(calls).toEqual([
+          { allowUnrelatedHistories: false },
+        ]);
       })
   );
 });
