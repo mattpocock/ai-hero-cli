@@ -548,6 +548,79 @@ describe("reset (e2e)", () => {
     );
 
     it.effect(
+      "should remove untracked files (but not ignored ones) when user confirms",
+      () =>
+        Effect.gen(function* () {
+          const repo = createTestRepo()
+            .withRemote("upstream")
+            .withBranch("live-run-through", [
+              commit("01.01.01: Arrays intro", {
+                ".gitignore": "*.db\n",
+                "src/01.ts": "// original",
+              }),
+              commit("01.01.02: Arrays solution", {
+                "src/01.ts": "// solution",
+              }),
+            ])
+            .withWorkingBranch("my-branch", {
+              from: "live-run-through",
+              atCommit: 0,
+            })
+            .build();
+
+          cleanup = repo.cleanup;
+          configureGitUser(repo.workingDir);
+
+          // Untracked work from a previous lesson, plus an ignored local db
+          fs.mkdirSync(`${repo.workingDir}/src/extra`);
+          fs.writeFileSync(
+            `${repo.workingDir}/src/extra/leftover.ts`,
+            "// untracked"
+          );
+          fs.writeFileSync(`${repo.workingDir}/local.db`, "data");
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectLessonCommit: Effect.fn("selectLessonCommit")(
+              function* () {
+                return "01.01.02";
+              }
+            ),
+            selectResetAction: Effect.fn("selectResetAction")(
+              function* () {
+                return "reset-current" as const;
+              }
+            ),
+            confirmResetWithUncommittedChanges: Effect.fn(
+              "confirmResetWithUncommittedChanges"
+            )(function* () {
+              // User confirms YES
+            }),
+          });
+
+          yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.none(),
+            unstaged: false,
+            upstream: getBareRepoPath(repo.workingDir),
+          }).pipe(
+            Effect.provide(
+              makeLayer(repo.workingDir, mockPromptService)
+            )
+          );
+
+          expect(
+            fs.existsSync(`${repo.workingDir}/src/extra`)
+          ).toBe(false);
+          expect(
+            fs.existsSync(`${repo.workingDir}/local.db`)
+          ).toBe(true);
+          expect(
+            git(repo.workingDir, "status", "--porcelain")
+          ).toBe("");
+        })
+    );
+
+    it.effect(
       "should cancel reset when user declines with real dirty working tree",
       () =>
         Effect.gen(function* () {
@@ -980,6 +1053,68 @@ describe("reset (e2e)", () => {
             "utf-8"
           );
           expect(content).toBe("// uncommitted changes");
+        })
+    );
+
+    it.effect(
+      "should remove untracked files but keep the lesson's new files as unstaged",
+      () =>
+        Effect.gen(function* () {
+          const repo = createTestRepo()
+            .withRemote("upstream")
+            .withBranch("live-run-through", [
+              commit("01.01.01: Arrays intro", {
+                "src/01.ts": "// problem",
+              }),
+              commit("01.01.02: Arrays solution", {
+                "src/01.ts": "// solution",
+                "src/02.ts": "// added by lesson",
+              }),
+            ])
+            .withWorkingBranch("my-branch", {
+              from: "live-run-through",
+              atCommit: 0,
+            })
+            .build();
+
+          cleanup = repo.cleanup;
+          configureGitUser(repo.workingDir);
+
+          fs.writeFileSync(
+            `${repo.workingDir}/src/leftover.ts`,
+            "// untracked"
+          );
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectLessonCommit: Effect.fn("selectLessonCommit")(
+              function* () {
+                return "01.01.02";
+              }
+            ),
+            confirmResetWithUncommittedChanges: Effect.fn(
+              "confirmResetWithUncommittedChanges"
+            )(function* () {
+              // User confirms YES
+            }),
+          });
+
+          yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.none(),
+            unstaged: true,
+            upstream: getBareRepoPath(repo.workingDir),
+          }).pipe(
+            Effect.provide(
+              makeLayer(repo.workingDir, mockPromptService)
+            )
+          );
+
+          expect(
+            fs.existsSync(`${repo.workingDir}/src/leftover.ts`)
+          ).toBe(false);
+          expect(
+            fs.readFileSync(`${repo.workingDir}/src/02.ts`, "utf-8")
+          ).toBe("// added by lesson");
         })
     );
   });

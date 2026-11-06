@@ -181,6 +181,13 @@ export const runReset = ({
         yield* Console.log(statusOutput);
 
         yield* promptService.confirmResetWithUncommittedChanges();
+
+        // `git status --porcelain` lists untracked files too, so the user
+        // just agreed to lose them — but `git reset --hard` leaves them
+        // behind. Clean before resetting rather than after: in --unstaged
+        // mode the lesson's own new files are untracked once HEAD moves to
+        // the parent, and a later clean would delete them.
+        yield* git.clean();
       }
 
       // Reset to target commit
