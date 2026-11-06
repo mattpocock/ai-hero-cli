@@ -15,6 +15,7 @@ import {
   FailedToPushError,
   FailedToRemoveGitDirError,
   FailedToRenameBranchError,
+  FailedToCleanError,
   FailedToResetError,
   FailedToTrackBranchError,
   InvalidRefError,
@@ -117,11 +118,21 @@ export const makeGitService = Effect.gen(function* () {
         yield* runCommandWithExitCode("git", "reset", "HEAD^");
       });
 
+      // Plain `-fd` (not `-ffd`) skips nested repos, so a student's own
+      // `git init` history is never deleted.
       const clean = Effect.fn("clean")(function* () {
-        yield* runCommandWithExitCode(
+        const exitCode = yield* runCommandWithExitCode(
           "git",
           "clean",
           "-fd"
+        );
+
+        yield* mapExitCode(
+          exitCode,
+          (code) =>
+            new FailedToCleanError({
+              message: `Failed to remove untracked files (exit code: ${code})`,
+            })
         );
       });
 
@@ -218,8 +229,17 @@ export const makeGitService = Effect.gen(function* () {
 
         applyAsUnstagedChanges: Effect.fn(
           "applyAsUnstagedChanges"
-        )(function* (sha: string) {
+        )(function* (
+          sha: string,
+          opts: { clean?: boolean } = {}
+        ) {
           yield* resetHard(sha);
+          // Clean while the lesson's new files are still tracked — once
+          // HEAD moves to the parent they become untracked and a clean
+          // would delete them.
+          if (opts.clean) {
+            yield* clean();
+          }
           yield* resetHead();
           yield* restoreStaged();
         }),
@@ -849,7 +869,11 @@ export const makeGitService = Effect.gen(function* () {
           const statusOutput = yield* runCommandWithString(
             "git",
             "status",
-            "--porcelain"
+            "--porcelain",
+            // Override `status.showUntrackedFiles` and list files inside
+            // untracked directories, so the warning shows everything
+            // `git clean` is about to delete.
+            "--untracked-files=all"
           );
           return {
             hasUncommittedChanges: statusOutput !== "",

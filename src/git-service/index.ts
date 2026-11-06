@@ -8,6 +8,7 @@ export {
 export {
   CherryPickConflictError,
   FailedToCheckoutError,
+  FailedToCleanError,
   FailedToCommitError,
   FailedToCreateBranchError,
   FailedToDeleteBranchError,

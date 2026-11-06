@@ -181,14 +181,12 @@ export const runReset = ({
         yield* Console.log(statusOutput);
 
         yield* promptService.confirmResetWithUncommittedChanges();
-
-        // `git status --porcelain` lists untracked files too, so the user
-        // just agreed to lose them — but `git reset --hard` leaves them
-        // behind. Clean before resetting rather than after: in --unstaged
-        // mode the lesson's own new files are untracked once HEAD moves to
-        // the parent, and a later clean would delete them.
-        yield* git.clean();
       }
+
+      // The warning lists untracked files too, so the user just agreed to
+      // lose them — but `git reset --hard` leaves them behind. Clean only
+      // after the reset succeeds, so a failed reset never destroys them.
+      const shouldClean = hasUncommittedChanges;
 
       // Reset to target commit
       yield* Console.log(
@@ -196,13 +194,18 @@ export const runReset = ({
       );
 
       if (unstaged) {
-        yield* git.applyAsUnstagedChanges(commitToUse);
+        yield* git.applyAsUnstagedChanges(commitToUse, {
+          clean: shouldClean,
+        });
 
         yield* Console.log(
           `✓ Reset to ${selectedLessonId} with unstaged changes`
         );
       } else {
         yield* git.resetHard(commitToUse);
+        if (shouldClean) {
+          yield* git.clean();
+        }
 
         yield* Console.log(
           `✓ Reset to ${selectedLessonId}`
@@ -279,6 +282,14 @@ export const reset = CLICommand.make(
         FailedToResetError: (error) => {
           return Effect.gen(function* () {
             yield* Console.error(`Error: ${error.message}`);
+            process.exitCode = 1;
+          });
+        },
+        FailedToCleanError: (error) => {
+          return Effect.gen(function* () {
+            yield* Console.error(
+              `Error: Reset succeeded, but some untracked files could not be removed. ${error.message}`
+            );
             process.exitCode = 1;
           });
         },

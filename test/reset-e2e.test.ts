@@ -621,6 +621,85 @@ describe("reset (e2e)", () => {
     );
 
     it.effect(
+      "should list untracked files in the warning even when status.showUntrackedFiles=no",
+      () =>
+        Effect.gen(function* () {
+          const repo = createTestRepo()
+            .withRemote("upstream")
+            .withBranch("live-run-through", [
+              commit("01.01.01: Arrays intro", {
+                "src/01.ts": "// original",
+              }),
+              commit("01.01.02: Arrays solution", {
+                "src/01.ts": "// solution",
+              }),
+            ])
+            .withWorkingBranch("my-branch", {
+              from: "live-run-through",
+              atCommit: 0,
+            })
+            .build();
+
+          cleanup = repo.cleanup;
+          configureGitUser(repo.workingDir);
+          git(
+            repo.workingDir,
+            "config",
+            "status.showUntrackedFiles",
+            "no"
+          );
+
+          fs.mkdirSync(`${repo.workingDir}/src/extra`);
+          fs.writeFileSync(
+            `${repo.workingDir}/src/extra/leftover.ts`,
+            "// untracked"
+          );
+
+          const logSpy = vi
+            .spyOn(console, "log")
+            .mockImplementation(() => {});
+          const confirmSpy = vi.fn();
+
+          const mockPromptService = fromPartial<PromptService>({
+            selectLessonCommit: Effect.fn("selectLessonCommit")(
+              function* () {
+                return "01.01.02";
+              }
+            ),
+            selectResetAction: Effect.fn("selectResetAction")(
+              function* () {
+                return "reset-current" as const;
+              }
+            ),
+            confirmResetWithUncommittedChanges: Effect.fn(
+              "confirmResetWithUncommittedChanges"
+            )(function* () {
+              confirmSpy();
+            }),
+          });
+
+          yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.none(),
+            unstaged: false,
+            upstream: getBareRepoPath(repo.workingDir),
+          }).pipe(
+            Effect.provide(
+              makeLayer(repo.workingDir, mockPromptService)
+            )
+          );
+
+          const logged = logSpy.mock.calls.flat().join("\n");
+          logSpy.mockRestore();
+          expect(confirmSpy).toHaveBeenCalledTimes(1);
+          expect(logged).toContain("?? src/extra/leftover.ts");
+          expect(
+            fs.existsSync(`${repo.workingDir}/src/extra`)
+          ).toBe(false);
+        })
+    );
+
+    it.effect(
       "should cancel reset when user declines with real dirty working tree",
       () =>
         Effect.gen(function* () {
@@ -1115,6 +1194,9 @@ describe("reset (e2e)", () => {
           expect(
             fs.readFileSync(`${repo.workingDir}/src/02.ts`, "utf-8")
           ).toBe("// added by lesson");
+          expect(
+            git(repo.workingDir, "status", "--porcelain")
+          ).toBe("M src/01.ts\n?? src/02.ts");
         })
     );
   });

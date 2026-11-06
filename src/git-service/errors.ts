@@ -99,6 +99,15 @@ export class FailedToResetError extends Data.TaggedError(
 }> {}
 
 /**
+ * Error thrown when `git clean` fails, e.g. a file is locked on Windows.
+ */
+export class FailedToCleanError extends Data.TaggedError(
+  "FailedToCleanError"
+)<{
+  message: string;
+}> {}
+
+/**
  * Error thrown when git commit fails.
  * Common causes: nothing to commit, pre-commit hook failure, or git configuration issues.
  */
