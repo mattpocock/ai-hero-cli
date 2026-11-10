@@ -1,6 +1,7 @@
 import {
   Args,
   Command as CLICommand,
+  Options,
 } from "@effect/cli";
 import { Console, Effect, Option } from "effect";
 import * as path from "node:path";
@@ -9,8 +10,10 @@ import {
   GitServiceConfig,
 } from "./git-service.js";
 import {
+  FailedToCreateRepoError,
   GhRepoAlreadyExistsError,
   GitHubService,
+  type RepoVisibility,
 } from "./github-service.js";
 import { cwdOption } from "./options.js";
 import { PromptService } from "./prompt-service.js";
@@ -53,18 +56,23 @@ export const forkSymlinksWarning = (
 /**
  * Core fork logic, extracted for testability.
  *
- * Turns the student's current course clone into a fresh public GitHub
- * repository they own: resets local history, creates the repo via the
- * GitHub CLI, and pushes the working copy to it as `origin`.
+ * Turns the student's current course clone into a fresh GitHub
+ * repository they own (public, or private with `--private`): resets
+ * local history, creates the repo via the GitHub CLI, and pushes the
+ * working copy to it as `origin`.
  */
 export const runFork = (opts: {
   name: Option.Option<string>;
+  private: boolean;
 }) =>
   Effect.gen(function* () {
     const git = yield* GitService;
     const github = yield* GitHubService;
     const promptService = yield* PromptService;
     const config = yield* GitServiceConfig;
+    const visibility: RepoVisibility = opts.private
+      ? "private"
+      : "public";
 
     // 1. GitHub CLI must be installed and authenticated.
     yield* github.ensureInstalled();
@@ -81,7 +89,7 @@ export const runFork = (opts: {
     const repoName = sanitizeRepoName(
       Option.isSome(opts.name)
         ? opts.name.value
-        : yield* promptService.inputRepoName(defaultName)
+        : yield* promptService.inputRepoName(defaultName, visibility)
     );
 
     // 4. Guard against clobbering / re-running: fail early if a repo
@@ -118,7 +126,7 @@ export const runFork = (opts: {
     yield* Console.log(
       "\nThis will:\n" +
         "  • replace this folder's git history with a single fresh commit\n" +
-        `  • create a new PUBLIC GitHub repo: ${fullName}\n` +
+        `  • create a new ${visibility.toUpperCase()} GitHub repo: ${fullName}\n` +
         '  • push your current files to it as "origin"\n'
     );
     yield* promptService.confirmContinue(
@@ -141,14 +149,28 @@ export const runFork = (opts: {
     yield* git.commit("Initial commit");
     yield* git.renameCurrentBranchTo("main");
 
-    // 8. Create the public repo and push to it as origin.
+    // 8. Create the repo and push to it as origin. History is already
+    //    reset by now, so if the create fails, say how to finish by hand.
     yield* Console.log(
-      `Creating public repo ${fullName} and pushing...\n`
+      `Creating ${visibility} repo ${fullName} and pushing...\n`
     );
-    yield* github.createPublicRepoFromCwd(repoName);
+    yield* github.createRepoFromCwd(repoName, visibility).pipe(
+      Effect.mapError(
+        (error) =>
+          new FailedToCreateRepoError({
+            name: error.name,
+            message:
+              `${error.message}\n\n` +
+              "Your local git history was already reset, but your files are still here, " +
+              "committed as a single \"Initial commit\" on main. Fix the problem above " +
+              "(gh prints the reason), then finish by hand from this folder:\n" +
+              `  gh repo create ${repoName} --${visibility} --source=. --remote=origin --push`,
+          })
+      )
+    );
 
     yield* Console.log(
-      `\n✓ Done! Your public repo is ready:\n` +
+      `\n✓ Done! Your ${visibility} repo is ready:\n` +
         `  https://github.com/${fullName}\n\n` +
         "GitHub Issues are enabled by default — your agent can now use it as a backlog."
     );
@@ -158,11 +180,16 @@ export const fork = CLICommand.make(
   "fork",
   {
     name: Args.text({ name: "repo-name" }).pipe(Args.optional),
+    private: Options.boolean("private").pipe(
+      Options.withDescription(
+        "Create a private repo instead of a public one. The course's GitHub Actions are free only on public repos; private repos use your account's Actions minutes"
+      )
+    ),
     cwd: cwdOption,
   },
   /* v8 ignore start - CLI error handlers are presentation logic */
-  ({ cwd, name }) =>
-    runFork({ name }).pipe(
+  ({ cwd, name, private: isPrivate }) =>
+    runFork({ name, private: isPrivate }).pipe(
       Effect.provideService(
         GitServiceConfig,
         GitServiceConfig.of({ cwd })
@@ -248,6 +275,6 @@ export const fork = CLICommand.make(
   /* v8 ignore stop */
 ).pipe(
   CLICommand.withDescription(
-    "Turn your course clone into a fresh public GitHub repo you own"
+    "Turn your course clone into a fresh GitHub repo you own (public by default, or --private)"
   )
 );

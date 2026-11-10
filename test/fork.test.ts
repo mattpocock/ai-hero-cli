@@ -22,6 +22,7 @@ import {
   makeGitService,
 } from "../src/git-service.js";
 import {
+  FailedToCreateRepoError,
   GhNotAuthenticatedError,
   GhNotInstalledError,
   GitHubService,
@@ -70,11 +71,16 @@ describe("fork (e2e)", () => {
     authenticated?: boolean;
     user?: string;
     existingRepos?: Array<string>;
-    onCreate?: (name: string) => void;
+    onCreate?: (
+      name: string,
+      visibility: "public" | "private"
+    ) => void;
+    failCreate?: boolean;
   }) => {
     const {
       authenticated = true,
       existingRepos = [],
+      failCreate = false,
       installed = true,
       onCreate,
       user = "student",
@@ -109,11 +115,20 @@ describe("fork (e2e)", () => {
       ) {
         return existingRepos.includes(fullName);
       }),
-      createPublicRepoFromCwd: Effect.fn(
-        "createPublicRepoFromCwd"
-      )(function* (name: string) {
-        onCreate?.(name);
-      }),
+      createRepoFromCwd: Effect.fn("createRepoFromCwd")(
+        function* (
+          name: string,
+          visibility: "public" | "private"
+        ) {
+          onCreate?.(name, visibility);
+          if (failCreate) {
+            return yield* new FailedToCreateRepoError({
+              name,
+              message: `Failed to create the GitHub repository "${name}" (exit code: 1).`,
+            });
+          }
+        }
+      ),
     });
   };
 
@@ -180,6 +195,7 @@ describe("fork (e2e)", () => {
 
         yield* runFork({
           name: Option.some("my-agent-repo"),
+          private: false,
         }).pipe(
           Effect.provide(
             makeLayer(
@@ -237,6 +253,7 @@ describe("fork (e2e)", () => {
         try {
           yield* runFork({
             name: Option.some("no-identity-repo"),
+            private: false,
           }).pipe(
             Effect.provide(
               makeLayer(
@@ -279,7 +296,7 @@ describe("fork (e2e)", () => {
         const repo = buildRepo();
         const created: Array<string> = [];
 
-        yield* runFork({ name: Option.none() }).pipe(
+        yield* runFork({ name: Option.none(), private: false }).pipe(
           Effect.provide(
             makeLayer(
               repo.workingDir,
@@ -304,6 +321,7 @@ describe("fork (e2e)", () => {
 
         const result = yield* runFork({
           name: Option.some("x"),
+          private: false,
         }).pipe(
           Effect.provide(
             makeLayer(
@@ -335,6 +353,7 @@ describe("fork (e2e)", () => {
 
         const result = yield* runFork({
           name: Option.some("x"),
+          private: false,
         }).pipe(
           Effect.provide(
             makeLayer(
@@ -366,6 +385,7 @@ describe("fork (e2e)", () => {
 
         const result = yield* runFork({
           name: Option.some("x"),
+          private: false,
         }).pipe(
           Effect.provide(
             makeLayer(
@@ -390,6 +410,7 @@ describe("fork (e2e)", () => {
 
         const result = yield* runFork({
           name: Option.some("taken"),
+          private: false,
         }).pipe(
           Effect.provide(
             makeLayer(
@@ -459,6 +480,7 @@ describe("fork (e2e)", () => {
 
           const result = yield* runFork({
             name: Option.some("x"),
+            private: false,
           }).pipe(
             Effect.provide(
               makeLayer(
@@ -509,7 +531,7 @@ describe("fork (e2e)", () => {
               events.push(String(line));
             });
 
-          yield* runFork({ name: Option.some("x") }).pipe(
+          yield* runFork({ name: Option.some("x"), private: false }).pipe(
             Effect.provide(
               makeLayer(
                 repo.workingDir,
@@ -526,6 +548,118 @@ describe("fork (e2e)", () => {
               line.includes("core.symlinks=false")
             )
           ).toBe(false);
+        })
+    );
+  });
+
+  describe("visibility", () => {
+    const captureLogs = () => {
+      const lines: Array<string> = [];
+      const spy = vi
+        .spyOn(console, "log")
+        .mockImplementation((line: unknown) => {
+          lines.push(String(line));
+        });
+      return { lines, restore: () => spy.mockRestore() };
+    };
+
+    it.effect("creates a public repo by default", () =>
+      Effect.gen(function* () {
+        const repo = buildRepo();
+        const created: Array<[string, string]> = [];
+        const logs = captureLogs();
+
+        yield* runFork({
+          name: Option.some("course"),
+          private: false,
+        }).pipe(
+          Effect.provide(
+            makeLayer(
+              repo.workingDir,
+              confirmingPrompt(),
+              makeFakeGitHub({
+                onCreate: (name, visibility) =>
+                  created.push([name, visibility]),
+              })
+            )
+          )
+        );
+        logs.restore();
+
+        expect(created).toEqual([["course", "public"]]);
+        expect(logs.lines.join("\n")).toContain(
+          "create a new PUBLIC GitHub repo"
+        );
+      })
+    );
+
+    it.effect(
+      "creates a private repo with --private, and says so",
+      () =>
+        Effect.gen(function* () {
+          const repo = buildRepo();
+          const created: Array<[string, string]> = [];
+          const logs = captureLogs();
+
+          yield* runFork({
+            name: Option.some("course"),
+            private: true,
+          }).pipe(
+            Effect.provide(
+              makeLayer(
+                repo.workingDir,
+                confirmingPrompt(),
+                makeFakeGitHub({
+                  onCreate: (name, visibility) =>
+                    created.push([name, visibility]),
+                })
+              )
+            )
+          );
+          logs.restore();
+
+          expect(created).toEqual([["course", "private"]]);
+          const output = logs.lines.join("\n");
+          expect(output).toContain(
+            "create a new PRIVATE GitHub repo"
+          );
+          expect(output).toContain("Your private repo is ready");
+          expect(output).not.toMatch(/public/i);
+        })
+    );
+
+    it.effect(
+      "says how to finish by hand when the create fails after history was reset",
+      () =>
+        Effect.gen(function* () {
+          const repo = buildRepo();
+
+          const result = yield* runFork({
+            name: Option.some("course"),
+            private: true,
+          }).pipe(
+            Effect.provide(
+              makeLayer(
+                repo.workingDir,
+                confirmingPrompt(),
+                makeFakeGitHub({ failCreate: true })
+              )
+            ),
+            Effect.flip
+          );
+
+          expect(result._tag).toBe("FailedToCreateRepoError");
+          expect(result.message).toContain(
+            "gh repo create course --private --source=. --remote=origin --push"
+          );
+          expect(result.message).toContain(
+            "files are still here"
+          );
+
+          // The fresh commit is in place, ready to push by hand.
+          expect(
+            git(repo.workingDir, "log", "-1", "--format=%s")
+          ).toBe("Initial commit");
         })
     );
   });
@@ -552,6 +686,7 @@ describe("fork (e2e)", () => {
 
         const result = yield* runFork({
           name: Option.none(),
+          private: false,
         }).pipe(
           Effect.provide(
             makeLayer(
