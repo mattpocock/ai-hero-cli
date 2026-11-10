@@ -7,6 +7,7 @@ import {
   describe,
   expect,
   it,
+  vi,
 } from "@effect/vitest";
 import { fromPartial } from "@total-typescript/shoehorn";
 import { Effect, Layer, Option } from "effect";
@@ -412,6 +413,122 @@ describe("fork (e2e)", () => {
         ).toContain("01.01 - Lesson");
       })
   );
+
+  describe("symlinks disabled (core.symlinks=false)", () => {
+    /** A clone whose HEAD tracks a symlink, as the course repos do. */
+    const buildRepoWithSymlink = () => {
+      const repo = buildRepo();
+      fs.mkdirSync(path.join(repo.workingDir, ".claude"));
+      fs.symlinkSync(
+        "../.agents/skills",
+        path.join(repo.workingDir, ".claude/skills")
+      );
+      git(repo.workingDir, "add", ".claude/skills");
+      git(repo.workingDir, "commit", "-m", "01.02 - Skills");
+      return repo;
+    };
+
+    const recordingPrompt = (events: Array<string>) =>
+      fromPartial<PromptService>({
+        inputRepoName: Effect.fn("inputRepoName")(function* (
+          defaultName: string
+        ) {
+          return defaultName;
+        }),
+        confirmContinue: Effect.fn("confirmContinue")(
+          function* () {
+            events.push("confirm");
+            return yield* new PromptCancelledError();
+          }
+        ),
+      });
+
+    it.effect(
+      "warns, naming the symlinks and how to restore them, before asking to wipe history",
+      () =>
+        Effect.gen(function* () {
+          const repo = buildRepoWithSymlink();
+          git(repo.workingDir, "config", "core.symlinks", "false");
+
+          const events: Array<string> = [];
+          const consoleSpy = vi
+            .spyOn(console, "log")
+            .mockImplementation((line: unknown) => {
+              events.push(String(line));
+            });
+
+          const result = yield* runFork({
+            name: Option.some("x"),
+          }).pipe(
+            Effect.provide(
+              makeLayer(
+                repo.workingDir,
+                recordingPrompt(events),
+                makeFakeGitHub({})
+              )
+            ),
+            Effect.flip
+          );
+          consoleSpy.mockRestore();
+
+          expect(result._tag).toBe("PromptCancelledError");
+
+          const warningIndex = events.findIndex((line) =>
+            line.includes("core.symlinks=false")
+          );
+          expect(warningIndex).toBeGreaterThanOrEqual(0);
+          expect(warningIndex).toBeLessThan(
+            events.indexOf("confirm")
+          );
+
+          const warning = events[warningIndex]!;
+          expect(warning).toContain(".claude/skills");
+          expect(warning).toContain("plain");
+          expect(warning).toContain("git config core.symlinks true");
+          expect(warning).toContain(
+            "git checkout -- .claude/skills"
+          );
+
+          // Declining still leaves the course history intact.
+          expect(
+            git(repo.workingDir, "log", "--oneline")
+          ).toContain("01.01 - Lesson");
+        })
+    );
+
+    it.effect(
+      "does not warn when symlinks are enabled",
+      () =>
+        Effect.gen(function* () {
+          const repo = buildRepoWithSymlink();
+
+          const events: Array<string> = [];
+          const consoleSpy = vi
+            .spyOn(console, "log")
+            .mockImplementation((line: unknown) => {
+              events.push(String(line));
+            });
+
+          yield* runFork({ name: Option.some("x") }).pipe(
+            Effect.provide(
+              makeLayer(
+                repo.workingDir,
+                recordingPrompt(events),
+                makeFakeGitHub({})
+              )
+            ),
+            Effect.flip
+          );
+          consoleSpy.mockRestore();
+
+          expect(
+            events.some((line) =>
+              line.includes("core.symlinks=false")
+            )
+          ).toBe(false);
+        })
+    );
+  });
 
   it.effect(
     "stops without touching history when the user declines confirmation",

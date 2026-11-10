@@ -3,7 +3,7 @@ import {
   Command as CLICommand,
   Options,
 } from "@effect/cli";
-import { Console, Effect, Option } from "effect";
+import { Console, Data, Effect, Option } from "effect";
 import { selectLessonCommit } from "./commit-utils.js";
 import { DEFAULT_PROJECT_TARGET_BRANCH } from "./constants.js";
 import {
@@ -14,6 +14,45 @@ import { GitService, GitServiceConfig } from "./git-service.js";
 import { cwdOption } from "./options.js";
 import { PromptService } from "./prompt-service.js";
 import { withUpstreamCleanup } from "./upstream-cleanup.js";
+
+/**
+ * Reset stopped because tracked paths carry a hidden-change index flag
+ * (assume-unchanged or skip-worktree). The CLI never clears the flag
+ * itself: it names the paths and prints the command that does.
+ */
+export class IndexFlaggedPathsError extends Data.TaggedError(
+  "IndexFlaggedPathsError"
+)<{
+  paths: Array<string>;
+  message: string;
+}> {}
+
+/** Quotes a path for the printed command only when it needs it. */
+export const quotePathForShell = (p: string): string =>
+  /^[\w./@+-]+$/.test(p) ? p : `"${p.replace(/(["\\$`])/g, "\\$1")}"`;
+
+export const indexFlaggedPathsMessage = (opts: {
+  paths: Array<string>;
+  ignoreStat: boolean;
+}): string => {
+  const quoted = opts.paths.map(quotePathForShell).join(" ");
+  return (
+    "Reset stopped. Git is hiding changes to these paths " +
+    "(they're flagged assume-unchanged or skip-worktree):\n" +
+    opts.paths.map((p) => `  ${p}\n`).join("") +
+    "A hard reset can't update a flagged path once it has changed on " +
+    "disk, and the flag hides it from the uncommitted-work check, so " +
+    "reset won't touch them.\n\n" +
+    "Check those paths for anything you want to keep, then clear the " +
+    "flag and run reset again:\n" +
+    `  git update-index --no-assume-unchanged --no-skip-worktree -- ${quoted}\n` +
+    (opts.ignoreStat
+      ? "core.ignorestat is on, which sets the flag again on every " +
+        "`git add`. To stop that, also run:\n" +
+        "  git config --unset core.ignorestat\n"
+      : "")
+  );
+};
 
 /**
  * Core reset logic, extracted for testability.
@@ -140,6 +179,22 @@ export const runReset = ({
           `✓ Created and checked out branch: ${branchName}`
         );
         return;
+      }
+
+      // A hidden-change flag on a changed path makes `git reset --hard`
+      // fail ("Entry '…' not uptodate. Cannot merge.") and hides the
+      // change from the uncommitted-work warning below. Stop before
+      // asking anything else, and leave clearing the flag to the user.
+      const flaggedPaths = yield* git.listIndexFlaggedPaths();
+      if (flaggedPaths.length > 0) {
+        const ignoreStat = yield* git.hasIgnoreStatEnabled();
+        return yield* new IndexFlaggedPathsError({
+          paths: flaggedPaths,
+          message: indexFlaggedPathsMessage({
+            paths: flaggedPaths,
+            ignoreStat,
+          }),
+        });
       }
 
       // Reset current branch - warn about work this would discard.
@@ -272,6 +327,12 @@ export const reset = CLICommand.make(
         FailedToResetError: (error) => {
           return Effect.gen(function* () {
             yield* Console.error(`Error: ${error.message}`);
+            process.exitCode = 1;
+          });
+        },
+        IndexFlaggedPathsError: (error) => {
+          return Effect.gen(function* () {
+            yield* Console.error(`\n${error.message}`);
             process.exitCode = 1;
           });
         },

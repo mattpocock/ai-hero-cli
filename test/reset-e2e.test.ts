@@ -5,7 +5,11 @@ import { Effect, Layer, Option } from "effect";
 import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { runReset } from "../src/reset.js";
+import { parseIndexFlaggedPaths } from "../src/git-service/git-service-impl.js";
+import {
+  indexFlaggedPathsMessage,
+  runReset,
+} from "../src/reset.js";
 import {
   PromptCancelledError,
   PromptService,
@@ -846,6 +850,306 @@ describe("reset (e2e)", () => {
           ).toBe(false);
         })
     );
+  });
+
+  describe("hidden index flags (assume-unchanged / skip-worktree)", () => {
+    /**
+     * A student's clone with a hidden-change flag on a tracked path that
+     * they've changed on disk. Git won't hard-reset over such a path
+     * ("Entry '…' not uptodate. Cannot merge."), and `git status` hides
+     * the change from the uncommitted-work warning.
+     */
+    const buildFlaggedRepo = (
+      flag: "--assume-unchanged" | "--skip-worktree"
+    ) => {
+      const repo = createTestRepo()
+        .withRemote("upstream")
+        .withBranch("live-run-through", [
+          commit("01.01.01: Arrays intro", {
+            "src/01.ts": "// arrays intro",
+            "src/skills": "../.agents/skills",
+          }),
+          commit("01.01.02: Arrays solution", {
+            "src/01.ts": "// arrays solution",
+          }),
+        ])
+        .withWorkingBranch("my-branch", {
+          from: "live-run-through",
+          atCommit: 0,
+        })
+        .build();
+
+      cleanup = repo.cleanup;
+      configureGitUser(repo.workingDir);
+
+      git(repo.workingDir, "update-index", flag, "src/skills");
+      fs.writeFileSync(
+        `${repo.workingDir}/src/skills`,
+        "// my hidden local edit"
+      );
+      return repo;
+    };
+
+    const resetCurrentPrompt = () =>
+      fromPartial<PromptService>({
+        selectResetAction: Effect.fn("selectResetAction")(
+          function* () {
+            return "reset-current" as const;
+          }
+        ),
+        confirmResetWithUncommittedChanges: Effect.fn(
+          "confirmResetWithUncommittedChanges"
+        )(function* () {}),
+        confirmContinue: Effect.fn("confirmContinue")(
+          function* () {}
+        ),
+      });
+
+    it.effect(
+      "should stop before resetting when a path is assume-unchanged, naming it and the command that clears it",
+      () =>
+        Effect.gen(function* () {
+          const repo = buildFlaggedRepo("--assume-unchanged");
+
+          const result = yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.some("01.01.02"),
+            unstaged: false,
+            upstream: getBareRepoPath(repo.workingDir),
+          }).pipe(
+            Effect.provide(
+              makeLayer(repo.workingDir, resetCurrentPrompt())
+            ),
+            Effect.flip
+          );
+
+          expect(result._tag).toBe("IndexFlaggedPathsError");
+          if (result._tag !== "IndexFlaggedPathsError") return;
+          expect(result.paths).toEqual(["src/skills"]);
+          expect(result.message).toContain("src/skills");
+          expect(result.message).toContain(
+            "git update-index --no-assume-unchanged --no-skip-worktree -- src/skills"
+          );
+
+          // Nothing moved: still at the first lesson, the edit survives,
+          // and the CLI did not clear the flag itself.
+          expect(
+            fs.readFileSync(
+              `${repo.workingDir}/src/01.ts`,
+              "utf-8"
+            )
+          ).toBe("// arrays intro");
+          expect(
+            fs.readFileSync(
+              `${repo.workingDir}/src/skills`,
+              "utf-8"
+            )
+          ).toBe("// my hidden local edit");
+          expect(
+            git(repo.workingDir, "ls-files", "-v", "src/skills")
+          ).toBe("h src/skills");
+        })
+    );
+
+    it.effect(
+      "should stop when a path is skip-worktree outside a sparse checkout",
+      () =>
+        Effect.gen(function* () {
+          const repo = buildFlaggedRepo("--skip-worktree");
+
+          const result = yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.some("01.01.02"),
+            unstaged: true,
+            upstream: getBareRepoPath(repo.workingDir),
+          }).pipe(
+            Effect.provide(
+              makeLayer(repo.workingDir, resetCurrentPrompt())
+            ),
+            Effect.flip
+          );
+
+          expect(result._tag).toBe("IndexFlaggedPathsError");
+          expect(
+            git(repo.workingDir, "ls-files", "-v", "src/skills")
+          ).toBe("S src/skills");
+        })
+    );
+
+    it.effect(
+      "should also print the ignorestat unset when core.ignorestat is on, without changing config",
+      () =>
+        Effect.gen(function* () {
+          const repo = buildFlaggedRepo("--assume-unchanged");
+          git(repo.workingDir, "config", "core.ignorestat", "true");
+
+          const result = yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.some("01.01.02"),
+            unstaged: false,
+            upstream: getBareRepoPath(repo.workingDir),
+          }).pipe(
+            Effect.provide(
+              makeLayer(repo.workingDir, resetCurrentPrompt())
+            ),
+            Effect.flip
+          );
+
+          expect(result._tag).toBe("IndexFlaggedPathsError");
+          expect(result.message).toContain(
+            "git config --unset core.ignorestat"
+          );
+          expect(
+            git(repo.workingDir, "config", "core.ignorestat")
+          ).toBe("true");
+        })
+    );
+
+    it.effect(
+      "should not stop for skip-worktree paths in a sparse checkout",
+      () =>
+        Effect.gen(function* () {
+          const repo = createTestRepo()
+            .withRemote("upstream")
+            .withBranch("live-run-through", [
+              commit("01.01.01: Arrays intro", {
+                "src/01.ts": "// arrays intro",
+                "docs/notes.md": "# notes",
+              }),
+              commit("01.01.02: Arrays solution", {
+                "src/01.ts": "// arrays solution",
+              }),
+            ])
+            .withWorkingBranch("my-branch", {
+              from: "live-run-through",
+              atCommit: 0,
+            })
+            .build();
+
+          cleanup = repo.cleanup;
+          configureGitUser(repo.workingDir);
+
+          git(
+            repo.workingDir,
+            "sparse-checkout",
+            "set",
+            "--no-cone",
+            "/src/"
+          );
+          expect(
+            git(repo.workingDir, "ls-files", "-v", "docs/notes.md")
+          ).toBe("S docs/notes.md");
+
+          yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.some("01.01.02"),
+            unstaged: false,
+            upstream: getBareRepoPath(repo.workingDir),
+          }).pipe(
+            Effect.provide(
+              makeLayer(repo.workingDir, resetCurrentPrompt())
+            )
+          );
+
+          expect(
+            fs.readFileSync(
+              `${repo.workingDir}/src/01.ts`,
+              "utf-8"
+            )
+          ).toBe("// arrays solution");
+        })
+    );
+
+    it.effect(
+      "should not check flags when creating a new branch instead",
+      () =>
+        Effect.gen(function* () {
+          const repo = createTestRepo()
+            .withRemote("upstream")
+            .withBranch("live-run-through", [
+              commit("01.01.01: Arrays intro", {
+                "src/01.ts": "// arrays intro",
+                "src/other.ts": "// other",
+              }),
+              commit("01.01.02: Arrays solution", {
+                "src/01.ts": "// arrays solution",
+              }),
+            ])
+            .withWorkingBranch("my-branch", {
+              from: "live-run-through",
+              atCommit: 0,
+            })
+            .build();
+
+          cleanup = repo.cleanup;
+          configureGitUser(repo.workingDir);
+          git(
+            repo.workingDir,
+            "update-index",
+            "--assume-unchanged",
+            "src/other.ts"
+          );
+
+          yield* runReset({
+            branch: "live-run-through",
+            lessonId: Option.some("01.01.02"),
+            unstaged: false,
+            upstream: getBareRepoPath(repo.workingDir),
+          }).pipe(
+            Effect.provide(
+              makeLayer(
+                repo.workingDir,
+                fromPartial<PromptService>({
+                  selectResetAction: Effect.fn(
+                    "selectResetAction"
+                  )(function* () {
+                    return "create-branch" as const;
+                  }),
+                  inputBranchName: Effect.fn("inputBranchName")(
+                    function* () {
+                      return "fresh";
+                    }
+                  ),
+                })
+              )
+            )
+          );
+
+          expect(
+            git(repo.workingDir, "branch", "--show-current")
+          ).toBe("fresh");
+        })
+    );
+  });
+
+  describe("hidden index flag helpers", () => {
+    it("quotes only paths that need it in the printed command", () => {
+      expect(
+        indexFlaggedPathsMessage({
+          paths: [".claude/skills", "my notes.md"],
+          ignoreStat: false,
+        })
+      ).toContain(
+        'git update-index --no-assume-unchanged --no-skip-worktree -- .claude/skills "my notes.md"'
+      );
+    });
+
+    it("reads assume-unchanged and skip-worktree tags from ls-files -v", () => {
+      const output = [
+        "H plain.ts",
+        "h assumed.ts",
+        "S skipped.ts",
+        "s both.ts",
+        "",
+      ].join("\0");
+
+      expect(
+        parseIndexFlaggedPaths(output, { sparseCheckout: false })
+      ).toEqual(["assumed.ts", "skipped.ts", "both.ts"]);
+      expect(
+        parseIndexFlaggedPaths(output, { sparseCheckout: true })
+      ).toEqual(["assumed.ts", "both.ts"]);
+    });
   });
 
   describe("unstaged mode", () => {
