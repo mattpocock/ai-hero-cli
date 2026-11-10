@@ -35,6 +35,9 @@ export class GhRepoAlreadyExistsError extends Data.TaggedError(
   message: string;
 }> {}
 
+/** Visibility of the repo `fork` creates. */
+export type RepoVisibility = "public" | "private";
+
 /**
  * Error thrown when `gh repo create` fails for any other reason.
  */
@@ -221,18 +224,20 @@ export const makeGitHubService = Effect.gen(function* () {
     }),
 
     /**
-     * Creates a public repo named `name` from the current directory,
-     * wiring up `origin` and pushing the current branch.
+     * Creates a repo named `name` with the given visibility from the
+     * current directory, wiring up `origin` and pushing the current
+     * branch.
      */
-    createPublicRepoFromCwd: Effect.fn(
-      "createPublicRepoFromCwd"
-    )(function* (name: string) {
+    createRepoFromCwd: Effect.fn("createRepoFromCwd")(function* (
+      name: string,
+      visibility: RepoVisibility
+    ) {
       const exitCode = yield* runInheritExitCode(
         "gh",
         "repo",
         "create",
         name,
-        "--public",
+        `--${visibility}`,
         "--source=.",
         "--remote=origin",
         "--push"

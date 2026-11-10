@@ -766,11 +766,15 @@ export class PromptService extends Effect.Service<PromptService>()(
        * suggested default (typically the current directory name).
        *
        * @param defaultName - The suggested repo name
+       * @param visibility - Whether the new repo will be public or private
        * @returns The entered repo name (falls back to the default if empty)
        * @throws PromptCancelledError if user presses Ctrl+C
        */
       const inputRepoName = Effect.fn("inputRepoName")(
-        function* (defaultName: string) {
+        function* (
+          defaultName: string,
+          visibility: "public" | "private" = "public"
+        ) {
           const { repoName } = yield* runPrompt<{
             repoName: string;
           }>(() =>
@@ -778,7 +782,7 @@ export class PromptService extends Effect.Service<PromptService>()(
               {
                 type: "text",
                 name: "repoName",
-                message: "Name for your new public GitHub repo:",
+                message: `Name for your new ${visibility} GitHub repo:`,
                 initial: defaultName,
               },
             ])
