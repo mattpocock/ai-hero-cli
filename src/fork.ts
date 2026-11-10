@@ -29,6 +29,27 @@ export const sanitizeRepoName = (name: string): string => {
   return cleaned === "" ? "my-course-repo" : cleaned;
 };
 
+const quoteIfNeeded = (p: string) =>
+  /^[\w./@+-]+$/.test(p) ? p : `"${p}"`;
+
+/** The warning `fork` prints when symlinks are checked out as files. */
+export const forkSymlinksWarning = (
+  symlinkPaths: Array<string>
+): string =>
+  "\n⚠ Symlinks are disabled for this repo (core.symlinks=false), " +
+  "which Windows sets automatically when Developer Mode is off and " +
+  "you're not running as Administrator. This course has symlinks:\n" +
+  symlinkPaths.map((p) => `    ${p}\n`).join("") +
+  "Here they're plain text files, so if you continue they'll be " +
+  "published to your new repo as plain files, and the course will " +
+  "look broken there.\n" +
+  "  Fix: answer no below, turn on Developer Mode (Settings > " +
+  "Privacy & security > For developers), or re-run your terminal as " +
+  "Administrator, then:\n" +
+  "    git config core.symlinks true\n" +
+  `    git checkout -- ${symlinkPaths.map(quoteIfNeeded).join(" ")}\n` +
+  "  and run fork again.\n";
+
 /**
  * Core fork logic, extracted for testability.
  *
@@ -79,7 +100,21 @@ export const runFork = (opts: {
       });
     }
 
-    // 5. Confirm before touching local history (destructive).
+    // 5. With core.symlinks=false (Windows without Developer Mode),
+    //    the course's symlinks are checked out as plain text files, and
+    //    the fresh commit below would publish them that way. Warn while
+    //    the history is still there to restore them from.
+    const symlinksDisabled = yield* git.hasSymlinksDisabled();
+    if (symlinksDisabled) {
+      const symlinkPaths = yield* git.listSymlinkPaths("HEAD");
+      if (symlinkPaths.length > 0) {
+        yield* Console.log(
+          forkSymlinksWarning(symlinkPaths)
+        );
+      }
+    }
+
+    // 6. Confirm before touching local history (destructive).
     yield* Console.log(
       "\nThis will:\n" +
         "  • replace this folder's git history with a single fresh commit\n" +
@@ -91,7 +126,7 @@ export const runFork = (opts: {
       false
     );
 
-    // 6. Fresh history: disconnect from the course repo and re-init.
+    // 7. Fresh history: disconnect from the course repo and re-init.
     yield* Console.log("Resetting local git history...");
     yield* git.removeGitDirectory();
     yield* git.initRepo();
@@ -106,7 +141,7 @@ export const runFork = (opts: {
     yield* git.commit("Initial commit");
     yield* git.renameCurrentBranchTo("main");
 
-    // 7. Create the public repo and push to it as origin.
+    // 8. Create the public repo and push to it as origin.
     yield* Console.log(
       `Creating public repo ${fullName} and pushing...\n`
     );

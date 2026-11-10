@@ -34,6 +34,29 @@ export const defaultGitServiceConfigLayer = Layer.succeed(
   })
 );
 
+/**
+ * Parses `git ls-files -v -z` into the paths with a hidden-change
+ * flag. Each entry is "<tag> <path>": a lowercase tag means
+ * assume-unchanged, "S" means skip-worktree. In a sparse checkout,
+ * skip-worktree is expected and not reported.
+ */
+export const parseIndexFlaggedPaths = (
+  lsFilesOutput: string,
+  opts: { sparseCheckout: boolean }
+): Array<string> =>
+  lsFilesOutput
+    .split("\0")
+    .filter((entry) => entry.length > 2)
+    .filter((entry) => {
+      const tag = entry[0]!;
+      const assumeUnchanged = tag !== tag.toUpperCase();
+      const skipWorktree = tag === "S";
+      return (
+        assumeUnchanged || (skipWorktree && !opts.sparseCheckout)
+      );
+    })
+    .map((entry) => entry.slice(2));
+
 const mapExitCode = <E>(
   exitCode: number,
   makeError: (exitCode: number) => E
@@ -1021,6 +1044,65 @@ export const makeGitService = Effect.gen(function* () {
             return output
               .split("\n")
               .some((line) => line.startsWith("120000 "));
+          }
+        ),
+        /** Paths of the git-tracked symlinks (mode 120000) in `ref`'s tree. */
+        listSymlinkPaths: Effect.fn("listSymlinkPaths")(
+          function* (ref: string) {
+            const output = yield* runCommandWithString(
+              "git",
+              "ls-tree",
+              "-r",
+              "-z",
+              ref
+            ).pipe(Effect.catchAll(() => Effect.succeed("")));
+            return output
+              .split("\0")
+              .filter((entry) => entry.startsWith("120000 "))
+              .map((entry) => entry.slice(entry.indexOf("\t") + 1));
+          }
+        ),
+        /**
+         * Tracked paths carrying a hidden-change index flag:
+         * assume-unchanged, or skip-worktree outside a sparse checkout
+         * (where skip-worktree is how git marks paths left out on
+         * purpose). Git won't hard-reset over such a path once it has
+         * changed on disk, and `git status` hides the change.
+         */
+        listIndexFlaggedPaths: Effect.fn("listIndexFlaggedPaths")(
+          function* () {
+            const sparse = yield* runCommandWithString(
+              "git",
+              "config",
+              "--bool",
+              "--get",
+              "core.sparseCheckout"
+            ).pipe(Effect.catchAll(() => Effect.succeed("")));
+            const output = yield* runCommandWithString(
+              "git",
+              "ls-files",
+              "-v",
+              "-z"
+            ).pipe(Effect.catchAll(() => Effect.succeed("")));
+            return parseIndexFlaggedPaths(output, {
+              sparseCheckout: sparse.trim() === "true",
+            });
+          }
+        ),
+        /**
+         * True when `core.ignorestat` is on, which makes every
+         * `git add` mark the added paths assume-unchanged.
+         */
+        hasIgnoreStatEnabled: Effect.fn("hasIgnoreStatEnabled")(
+          function* () {
+            const value = yield* runCommandWithString(
+              "git",
+              "config",
+              "--bool",
+              "--get",
+              "core.ignorestat"
+            ).pipe(Effect.catchAll(() => Effect.succeed("")));
+            return value.trim() === "true";
           }
         ),
       };
