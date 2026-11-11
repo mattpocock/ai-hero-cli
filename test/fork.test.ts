@@ -54,9 +54,12 @@ const git = (cwd: string, ...args: Array<string>) =>
 /**
  * E2E tests for the fork command.
  *
- * Uses the REAL GitService against a temp repo — so the destructive
- * history-reset flow (rm .git / init / commit / rename) actually runs —
- * with a FAKE GitHubService (no network) and a mocked PromptService.
+ * Uses the REAL GitService against a temp clone of a course repo, with
+ * a FAKE GitHubService (no network) whose `createRepoFromCwd` does what
+ * `gh repo create --source=. --remote=origin --push` does to the local
+ * repo: add the new repo as "origin" (failing if that remote exists)
+ * and `git push --set-upstream origin HEAD`, here to a local bare repo.
+ * The PromptService is mocked.
  */
 describe("fork (e2e)", () => {
   let cleanup: (() => void) | undefined;
@@ -76,12 +79,15 @@ describe("fork (e2e)", () => {
       visibility: "public" | "private"
     ) => void;
     failCreate?: boolean;
+    /** Bare repo standing in for the new GitHub repo. */
+    newRepoDir?: string;
   }) => {
     const {
       authenticated = true,
       existingRepos = [],
       failCreate = false,
       installed = true,
+      newRepoDir,
       onCreate,
       user = "student",
     } = opts;
@@ -127,6 +133,19 @@ describe("fork (e2e)", () => {
               message: `Failed to create the GitHub repository "${name}" (exit code: 1).`,
             });
           }
+          if (newRepoDir !== undefined) {
+            const cwd = yield* GitServiceConfig;
+            fs.mkdirSync(newRepoDir);
+            git(newRepoDir, "init", "--bare");
+            git(cwd.cwd, "remote", "add", "origin", newRepoDir);
+            git(
+              cwd.cwd,
+              "push",
+              "--set-upstream",
+              "origin",
+              "HEAD"
+            );
+          }
         }
       ),
     });
@@ -153,17 +172,39 @@ describe("fork (e2e)", () => {
     );
   };
 
+  /**
+   * A student's clone of the course: `origin` is the course repo, `main`
+   * is checked out, and there's another course branch, a local backup
+   * branch and a tag that must not be published.
+   */
   const buildRepo = () => {
     const repo = createTestRepo()
+      .withRemote("origin")
       .withBranch("main", [
         commit("01.01 - Lesson", {
           "src/01.ts": "// original",
           "README.md": "# Course",
         }),
+        commit("01.02 - Lesson", {
+          "src/02.ts": "// second",
+        }),
+      ])
+      .withBranch("live-run-through", [
+        commit("01.01.01 - Live", { "src/live.ts": "// live" }),
       ])
       .build();
+    git(repo.workingDir, "branch", "backup/main", "main");
+    git(repo.workingDir, "tag", "v1", "main");
+    const newRepoDir = path.join(
+      path.dirname(repo.workingDir),
+      "new-repo.git"
+    );
     cleanup = repo.cleanup;
-    return repo;
+    return {
+      ...repo,
+      newRepoDir,
+      courseUrl: git(repo.workingDir, "remote", "get-url", "origin"),
+    };
   };
 
   const confirmingPrompt = (repoName?: string) =>
@@ -181,16 +222,11 @@ describe("fork (e2e)", () => {
     });
 
   it.effect(
-    "creates a fresh single-commit main branch and creates the public repo",
+    "keeps main's history and pushes only main to the new repo as origin",
     () =>
       Effect.gen(function* () {
         const repo = buildRepo();
-
-        // Sanity: the clone starts with the course history.
-        expect(
-          git(repo.workingDir, "log", "--oneline")
-        ).toContain("01.01 - Lesson");
-
+        const mainSha = git(repo.workingDir, "rev-parse", "main");
         const created: Array<string> = [];
 
         yield* runFork({
@@ -203,91 +239,226 @@ describe("fork (e2e)", () => {
               confirmingPrompt(),
               makeFakeGitHub({
                 user: "student",
+                newRepoDir: repo.newRepoDir,
                 onCreate: (name) => created.push(name),
               })
             )
           )
         );
 
-        // History was reset to a single "Initial commit" on main.
+        expect(created).toEqual(["my-agent-repo"]);
+
+        // Local main is untouched: same commit, course history intact,
+        // no fresh "Initial commit".
         expect(
           git(repo.workingDir, "branch", "--show-current")
         ).toBe("main");
+        expect(git(repo.workingDir, "rev-parse", "HEAD")).toBe(
+          mainSha
+        );
         expect(
-          git(repo.workingDir, "rev-list", "--count", "HEAD")
-        ).toBe("1");
-        expect(
-          git(repo.workingDir, "log", "-1", "--format=%s")
-        ).toBe("Initial commit");
+          git(repo.workingDir, "log", "--format=%s", "main")
+        ).toBe("01.02 - Lesson\n01.01 - Lesson\ninitial");
 
-        // The old course history is gone.
+        // The new repo has main, at the same commit, and nothing else:
+        // no other course branch, no backup branch, no tags.
         expect(
-          git(repo.workingDir, "log", "--oneline")
-        ).not.toContain("01.01 - Lesson");
-
-        // Files are preserved.
-        expect(
-          fs.existsSync(
-            path.join(repo.workingDir, "src/01.ts")
+          git(
+            repo.newRepoDir,
+            "for-each-ref",
+            "--format=%(refname) %(objectname)"
           )
-        ).toBe(true);
+        ).toBe(`refs/heads/main ${mainSha}`);
 
-        // The repo was created with the requested name.
-        expect(created).toEqual(["my-agent-repo"]);
+        // origin is the new repo; the course remote is gone; main
+        // tracks the new repo.
+        expect(git(repo.workingDir, "remote")).toBe("origin");
+        expect(
+          git(repo.workingDir, "remote", "get-url", "origin")
+        ).toBe(repo.newRepoDir);
+        expect(
+          git(repo.workingDir, "rev-parse", "--abbrev-ref", "main@{upstream}")
+        ).toBe("origin/main");
+
+        // Other local branches and tags are left alone, locally.
+        expect(
+          git(
+            repo.workingDir,
+            "branch",
+            "--format=%(refname:short)"
+          )
+            .split("\n")
+            .sort()
+        ).toEqual(["backup/main", "live-run-through", "main"]);
+        expect(git(repo.workingDir, "tag")).toBe("v1");
       })
   );
 
   it.effect(
-    "commits successfully even with no configured git identity",
+    "publishes untracked files nowhere, and doesn't refuse over them",
     () =>
       Effect.gen(function* () {
         const repo = buildRepo();
+        fs.writeFileSync(
+          path.join(repo.workingDir, "notes.txt"),
+          "scratch"
+        );
 
-        // Simulate a fresh machine with no global/system git identity
-        // (as in CI, or a student who never ran `git config --global`).
-        const prevGlobal = process.env.GIT_CONFIG_GLOBAL;
-        const prevSystem = process.env.GIT_CONFIG_SYSTEM;
-        process.env.GIT_CONFIG_GLOBAL = "/dev/null";
-        process.env.GIT_CONFIG_SYSTEM = "/dev/null";
-
-        try {
-          yield* runFork({
-            name: Option.some("no-identity-repo"),
-            private: false,
-          }).pipe(
-            Effect.provide(
-              makeLayer(
-                repo.workingDir,
-                confirmingPrompt(),
-                makeFakeGitHub({ user: "octocat" })
-              )
+        yield* runFork({
+          name: Option.some("repo"),
+          private: false,
+        }).pipe(
+          Effect.provide(
+            makeLayer(
+              repo.workingDir,
+              confirmingPrompt(),
+              makeFakeGitHub({ newRepoDir: repo.newRepoDir })
             )
-          );
+          )
+        );
 
-          // The commit landed and picked up the fallback identity.
-          expect(
-            git(repo.workingDir, "rev-list", "--count", "HEAD")
-          ).toBe("1");
-          expect(
-            git(repo.workingDir, "log", "-1", "--format=%an")
-          ).toBe("octocat");
-          expect(
-            git(repo.workingDir, "log", "-1", "--format=%ae")
-          ).toBe("octocat@users.noreply.github.com");
-        } finally {
-          if (prevGlobal === undefined) {
-            delete process.env.GIT_CONFIG_GLOBAL;
-          } else {
-            process.env.GIT_CONFIG_GLOBAL = prevGlobal;
-          }
-          if (prevSystem === undefined) {
-            delete process.env.GIT_CONFIG_SYSTEM;
-          } else {
-            process.env.GIT_CONFIG_SYSTEM = prevSystem;
-          }
-        }
+        expect(
+          git(repo.newRepoDir, "ls-tree", "-r", "--name-only", "main")
+        ).not.toContain("notes.txt");
+        expect(
+          fs.existsSync(path.join(repo.workingDir, "notes.txt"))
+        ).toBe(true);
       })
   );
+
+  describe("refuses, changing nothing, when main can't be published as-is", () => {
+    const expectRefused = (
+      repo: ReturnType<typeof buildRepo>,
+      messageParts: Array<string>
+    ) =>
+      Effect.gen(function* () {
+        const created: Array<string> = [];
+        const prompted: Array<string> = [];
+
+        const result = yield* runFork({
+          name: Option.none(),
+          private: false,
+        }).pipe(
+          Effect.provide(
+            makeLayer(
+              repo.workingDir,
+              fromPartial<PromptService>({
+                inputRepoName: Effect.fn("inputRepoName")(
+                  function* (defaultName: string) {
+                    prompted.push("name");
+                    return defaultName;
+                  }
+                ),
+                confirmContinue: Effect.fn("confirmContinue")(
+                  function* () {
+                    prompted.push("confirm");
+                  }
+                ),
+              }),
+              makeFakeGitHub({
+                newRepoDir: repo.newRepoDir,
+                onCreate: (name) => created.push(name),
+              })
+            )
+          ),
+          Effect.flip
+        );
+
+        expect(result._tag).toBe("ForkNotReadyError");
+        for (const part of messageParts) {
+          expect(result.message).toContain(part);
+        }
+        // Refused before asking anything or creating anything, and
+        // still connected to the course.
+        expect(prompted).toEqual([]);
+        expect(created).toEqual([]);
+        expect(
+          git(repo.workingDir, "remote", "get-url", "origin")
+        ).toBe(repo.courseUrl);
+      });
+
+    it.effect("on a branch other than main", () =>
+      Effect.gen(function* () {
+        const repo = buildRepo();
+        git(repo.workingDir, "checkout", "live-run-through");
+
+        yield* expectRefused(repo, [
+          'You\'re on "live-run-through"',
+          "git checkout main",
+        ]);
+      })
+    );
+
+    it.effect("on a detached HEAD", () =>
+      Effect.gen(function* () {
+        const repo = buildRepo();
+        git(repo.workingDir, "checkout", "--detach", "main");
+
+        yield* expectRefused(repo, [
+          "You're not on a branch",
+          "git checkout main",
+        ]);
+      })
+    );
+
+    it.effect("with uncommitted changes to tracked files", () =>
+      Effect.gen(function* () {
+        const repo = buildRepo();
+        fs.writeFileSync(
+          path.join(repo.workingDir, "src/01.ts"),
+          "// edited"
+        );
+        fs.writeFileSync(
+          path.join(repo.workingDir, "src/new.ts"),
+          "// staged"
+        );
+        git(repo.workingDir, "add", "src/new.ts");
+
+        yield* expectRefused(repo, [
+          "uncommitted changes",
+          "src/01.ts",
+          "src/new.ts",
+        ]);
+        // The changes are still there.
+        expect(
+          fs.readFileSync(
+            path.join(repo.workingDir, "src/01.ts"),
+            "utf8"
+          )
+        ).toBe("// edited");
+      })
+    );
+
+    it.effect("in a shallow clone", () =>
+      Effect.gen(function* () {
+        const course = buildRepo();
+        const shallowDir = path.join(
+          path.dirname(course.workingDir),
+          "shallow"
+        );
+        execFileSync(
+          "git",
+          [
+            "clone",
+            "--depth",
+            "1",
+            `file://${course.courseUrl}`,
+            shallowDir,
+          ],
+          { stdio: "pipe" }
+        );
+
+        yield* expectRefused(
+          {
+            ...course,
+            workingDir: shallowDir,
+            courseUrl: `file://${course.courseUrl}`,
+          },
+          ["shallow clone", "git fetch --unshallow"]
+        );
+      })
+    );
+  });
 
   it.effect(
     "uses the name from the prompt when no arg is given",
@@ -435,122 +606,49 @@ describe("fork (e2e)", () => {
       })
   );
 
-  describe("symlinks disabled (core.symlinks=false)", () => {
-    /** A clone whose HEAD tracks a symlink, as the course repos do. */
-    const buildRepoWithSymlink = () => {
-      const repo = buildRepo();
-      fs.mkdirSync(path.join(repo.workingDir, ".claude"));
-      fs.symlinkSync(
-        "../.agents/skills",
-        path.join(repo.workingDir, ".claude/skills")
-      );
-      git(repo.workingDir, "add", ".claude/skills");
-      git(repo.workingDir, "commit", "-m", "01.02 - Skills");
-      return repo;
-    };
+  it.effect(
+    "publishes the course's symlinks as symlinks even with core.symlinks=false",
+    () =>
+      Effect.gen(function* () {
+        const repo = buildRepo();
+        fs.mkdirSync(path.join(repo.workingDir, ".claude"));
+        fs.symlinkSync(
+          "../.agents/skills",
+          path.join(repo.workingDir, ".claude/skills")
+        );
+        git(repo.workingDir, "add", ".claude/skills");
+        git(repo.workingDir, "commit", "-m", "01.03 - Skills");
 
-    const recordingPrompt = (events: Array<string>) =>
-      fromPartial<PromptService>({
-        inputRepoName: Effect.fn("inputRepoName")(function* (
-          defaultName: string
-        ) {
-          return defaultName;
-        }),
-        confirmContinue: Effect.fn("confirmContinue")(
-          function* () {
-            events.push("confirm");
-            return yield* new PromptCancelledError();
-          }
-        ),
-      });
+        // As on Windows without Developer Mode: the link is checked out
+        // as a plain text file.
+        git(repo.workingDir, "config", "core.symlinks", "false");
+        fs.rmSync(path.join(repo.workingDir, ".claude/skills"));
+        git(repo.workingDir, "checkout", "--", ".claude/skills");
+        expect(
+          fs
+            .lstatSync(path.join(repo.workingDir, ".claude/skills"))
+            .isSymbolicLink()
+        ).toBe(false);
 
-    it.effect(
-      "warns, naming the symlinks and how to restore them, before asking to wipe history",
-      () =>
-        Effect.gen(function* () {
-          const repo = buildRepoWithSymlink();
-          git(repo.workingDir, "config", "core.symlinks", "false");
-
-          const events: Array<string> = [];
-          const consoleSpy = vi
-            .spyOn(console, "log")
-            .mockImplementation((line: unknown) => {
-              events.push(String(line));
-            });
-
-          const result = yield* runFork({
-            name: Option.some("x"),
-            private: false,
-          }).pipe(
-            Effect.provide(
-              makeLayer(
-                repo.workingDir,
-                recordingPrompt(events),
-                makeFakeGitHub({})
-              )
-            ),
-            Effect.flip
-          );
-          consoleSpy.mockRestore();
-
-          expect(result._tag).toBe("PromptCancelledError");
-
-          const warningIndex = events.findIndex((line) =>
-            line.includes("core.symlinks=false")
-          );
-          expect(warningIndex).toBeGreaterThanOrEqual(0);
-          expect(warningIndex).toBeLessThan(
-            events.indexOf("confirm")
-          );
-
-          const warning = events[warningIndex]!;
-          expect(warning).toContain(".claude/skills");
-          expect(warning).toContain("plain");
-          expect(warning).toContain("git config core.symlinks true");
-          expect(warning).toContain(
-            "git checkout -- .claude/skills"
-          );
-
-          // Declining still leaves the course history intact.
-          expect(
-            git(repo.workingDir, "log", "--oneline")
-          ).toContain("01.01 - Lesson");
-        })
-    );
-
-    it.effect(
-      "does not warn when symlinks are enabled",
-      () =>
-        Effect.gen(function* () {
-          const repo = buildRepoWithSymlink();
-
-          const events: Array<string> = [];
-          const consoleSpy = vi
-            .spyOn(console, "log")
-            .mockImplementation((line: unknown) => {
-              events.push(String(line));
-            });
-
-          yield* runFork({ name: Option.some("x"), private: false }).pipe(
-            Effect.provide(
-              makeLayer(
-                repo.workingDir,
-                recordingPrompt(events),
-                makeFakeGitHub({})
-              )
-            ),
-            Effect.flip
-          );
-          consoleSpy.mockRestore();
-
-          expect(
-            events.some((line) =>
-              line.includes("core.symlinks=false")
+        yield* runFork({
+          name: Option.some("repo"),
+          private: false,
+        }).pipe(
+          Effect.provide(
+            makeLayer(
+              repo.workingDir,
+              confirmingPrompt(),
+              makeFakeGitHub({ newRepoDir: repo.newRepoDir })
             )
-          ).toBe(false);
-        })
-    );
-  });
+          )
+        );
+
+        // The pushed commit still records it as a symlink (mode 120000).
+        expect(
+          git(repo.newRepoDir, "ls-tree", "main", ".claude/skills")
+        ).toMatch(/^120000 /);
+      })
+  );
 
   describe("visibility", () => {
     const captureLogs = () => {
@@ -629,7 +727,7 @@ describe("fork (e2e)", () => {
     );
 
     it.effect(
-      "says how to finish by hand when the create fails after history was reset",
+      "says how to finish by hand when the create fails after the course remote was removed",
       () =>
         Effect.gen(function* () {
           const repo = buildRepo();
@@ -653,13 +751,14 @@ describe("fork (e2e)", () => {
             "gh repo create course --private --source=. --remote=origin --push"
           );
           expect(result.message).toContain(
-            "files are still here"
+            "git history are untouched"
           );
 
-          // The fresh commit is in place, ready to push by hand.
+          // History is untouched and origin is free for the gh command.
           expect(
             git(repo.workingDir, "log", "-1", "--format=%s")
-          ).toBe("Initial commit");
+          ).toBe("01.02 - Lesson");
+          expect(git(repo.workingDir, "remote")).toBe("");
         })
     );
   });
