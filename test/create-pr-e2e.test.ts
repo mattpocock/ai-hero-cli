@@ -248,7 +248,7 @@ describe("create-pr (e2e)", () => {
     // The student's own GitHub repo.
     const originBare = originBareOf(dir);
     fs.mkdirSync(originBare);
-    git(originBare, "init", "--bare");
+    git(originBare, "init", "--bare", "--initial-branch=main");
 
     const originUrl =
       opts.originUrl === undefined ? ORIGIN_URL : opts.originUrl;

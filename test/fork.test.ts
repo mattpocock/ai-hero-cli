@@ -136,7 +136,7 @@ describe("fork (e2e)", () => {
           if (newRepoDir !== undefined) {
             const cwd = yield* GitServiceConfig;
             fs.mkdirSync(newRepoDir);
-            git(newRepoDir, "init", "--bare");
+            git(newRepoDir, "init", "--bare", "--initial-branch=main");
             git(cwd.cwd, "remote", "add", "origin", newRepoDir);
             git(
               cwd.cwd,
