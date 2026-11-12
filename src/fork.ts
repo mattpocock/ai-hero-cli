@@ -13,6 +13,7 @@ import {
   FailedToCreateRepoError,
   GhRepoAlreadyExistsError,
   GitHubService,
+  parseGitHubRemoteUrl,
   type RepoVisibility,
 } from "./github-service.js";
 import { cwdOption } from "./options.js";
@@ -43,6 +44,39 @@ export class ForkNotReadyError extends Data.TaggedError(
 }> {}
 
 /**
+ * `fork` has already been run in this folder: its `origin` is a
+ * github.com repo the authenticated user owns. Nothing has been changed
+ * when this is raised.
+ */
+export class AlreadyForkedError extends Data.TaggedError(
+  "AlreadyForkedError"
+)<{
+  fullName: string;
+  message: string;
+}> {}
+
+/**
+ * The `OWNER/REPO` that `originUrl` points at, if it's a github.com
+ * repo owned by `login` (GitHub logins are case-insensitive). Remotes
+ * on other hosts (GitLab, GitHub Enterprise) never match: `gh api user`
+ * answers for github.com, so an owner name elsewhere may be someone
+ * else.
+ */
+export const ownForkOf = (
+  originUrl: string,
+  login: string
+): string | null => {
+  const repo = parseGitHubRemoteUrl(originUrl);
+  const parts = repo?.split("/") ?? [];
+  if (parts.length !== 2) {
+    return null;
+  }
+  return parts[0]!.toLowerCase() === login.toLowerCase()
+    ? repo
+    : null;
+};
+
+/**
  * Core fork logic, extracted for testability.
  *
  * Turns the student's current course clone into a GitHub repository
@@ -71,7 +105,31 @@ export const runFork = (opts: {
     // 2. Must be run from inside the student's clone.
     yield* git.ensureIsGitRepo();
 
-    // 3. The clone's main is what gets published, so it must be on
+    // 3. Refuse to fork a folder that's already forked: its origin is
+    //    the student's own repo, not the course's, so going on would
+    //    mean removing the remote for their own work. Checked before the
+    //    readiness checks, since none of their fixes would help here.
+    //    No origin (a create that failed after the course remote was
+    //    removed) or someone else's origin (the course org) goes on.
+    const login = yield* github.getAuthenticatedUser();
+    const originUrl = yield* git.getRemoteUrl("origin");
+    const ownRepo = Option.isSome(originUrl)
+      ? ownForkOf(originUrl.value, login)
+      : null;
+    if (ownRepo !== null) {
+      return yield* new AlreadyForkedError({
+        fullName: ownRepo,
+        message:
+          `This folder is already forked to ${ownRepo}:\n` +
+          `  https://github.com/${ownRepo}\n` +
+          "Its \"origin\" remote is your own repo, so there's nothing to fork. " +
+          "Nothing was changed.\n" +
+          "Keep working here, and publish your commits with:\n" +
+          "  git push",
+      });
+    }
+
+    // 4. The clone's main is what gets published, so it must be on
     //    main, with every tracked change committed, and its whole
     //    history present. Refuse (changing nothing) otherwise.
     const currentBranch = yield* git.getCurrentBranch();
@@ -113,7 +171,7 @@ export const runFork = (opts: {
       });
     }
 
-    // 4. Work out the repo name (flag > prompt, defaulting to the
+    // 5. Work out the repo name (flag > prompt, defaulting to the
     //    current directory name).
     const defaultName = sanitizeRepoName(
       path.basename(config.cwd)
@@ -124,9 +182,10 @@ export const runFork = (opts: {
         : yield* promptService.inputRepoName(defaultName, visibility)
     );
 
-    // 5. Guard against clobbering / re-running: fail early if a repo
-    //    with this name already exists on the user's account.
-    const login = yield* github.getAuthenticatedUser();
+    // 6. Guard against clobbering: fail early if a repo with this name
+    //    already exists on the user's account. It isn't this folder's
+    //    (step 3 caught that), so it may well be their work from another
+    //    folder: suggest another name, never deleting it.
     const fullName = `${login}/${repoName}`;
 
     const exists = yield* github.repoExists(fullName);
@@ -135,12 +194,12 @@ export const runFork = (opts: {
         fullName,
         message:
           `A repository named "${fullName}" already exists on your GitHub account.\n` +
-          "Choose a different name, or delete the existing repo first:\n" +
-          `  gh repo delete ${fullName}`,
+          "It isn't this folder's repo, so leave it be: run fork again " +
+          "with a different name.",
       });
     }
 
-    // 6. Confirm before disconnecting from the course repo.
+    // 7. Confirm before disconnecting from the course repo.
     yield* Console.log(
       "\nThis will:\n" +
         '  • disconnect this folder from the course repo (remove the "origin" remote)\n' +
@@ -149,11 +208,11 @@ export const runFork = (opts: {
     );
     yield* promptService.confirmContinue("Continue?", false);
 
-    // 7. Disconnect from the course repo, so `gh repo create` can add
+    // 8. Disconnect from the course repo, so `gh repo create` can add
     //    the new repo as origin. History and branches stay as they are.
     yield* git.removeRemote("origin");
 
-    // 8. Create the repo and push to it as origin. `gh repo create
+    // 9. Create the repo and push to it as origin. `gh repo create
     //    --push` pushes only the current branch (main). The course remote
     //    is already gone by now, so if the create fails, say how to
     //    finish by hand.
@@ -214,6 +273,12 @@ export const fork = CLICommand.make(
           });
         },
         FailedToGetGhUserError: (error) => {
+          return Effect.gen(function* () {
+            yield* Console.error(`Error: ${error.message}`);
+            process.exitCode = 1;
+          });
+        },
+        AlreadyForkedError: (error) => {
           return Effect.gen(function* () {
             yield* Console.error(`Error: ${error.message}`);
             process.exitCode = 1;
