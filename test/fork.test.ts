@@ -15,7 +15,11 @@ import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { runFork, sanitizeRepoName } from "../src/fork.js";
+import {
+  ownForkOf,
+  runFork,
+  sanitizeRepoName,
+} from "../src/fork.js";
 import {
   GitService,
   GitServiceConfig,
@@ -460,6 +464,191 @@ describe("fork (e2e)", () => {
     );
   });
 
+  describe("in a folder that's already forked", () => {
+    /**
+     * Runs fork with prompts and GitHub calls recorded, and returns the
+     * error it fails with.
+     */
+    const runRecorded = (
+      workingDir: string,
+      opts: {
+        user?: string;
+        name?: Option.Option<string>;
+        existingRepos?: Array<string>;
+      } = {}
+    ) =>
+      Effect.gen(function* () {
+        const created: Array<string> = [];
+        const prompted: Array<string> = [];
+        const exit = yield* runFork({
+          name: opts.name ?? Option.none(),
+          private: false,
+        }).pipe(
+          Effect.provide(
+            makeLayer(
+              workingDir,
+              fromPartial<PromptService>({
+                inputRepoName: Effect.fn("inputRepoName")(
+                  function* (defaultName: string) {
+                    prompted.push("name");
+                    return defaultName;
+                  }
+                ),
+                confirmContinue: Effect.fn("confirmContinue")(
+                  function* () {
+                    prompted.push("confirm");
+                  }
+                ),
+              }),
+              makeFakeGitHub({
+                user: opts.user ?? "student",
+                existingRepos: opts.existingRepos ?? [],
+                onCreate: (name) => created.push(name),
+              })
+            )
+          ),
+          Effect.exit
+        );
+        return { exit, created, prompted };
+      });
+
+    /** Everything fork could change in the local repo. */
+    const snapshot = (workingDir: string) => ({
+      remotes: git(workingDir, "remote", "-v"),
+      head: git(workingDir, "rev-parse", "HEAD"),
+      refs: git(
+        workingDir,
+        "for-each-ref",
+        "--format=%(refname) %(objectname)"
+      ),
+      config: git(workingDir, "config", "--local", "--list"),
+    });
+
+    it.each([
+      ["an SSH remote", "git@github.com:student/my-agent-repo.git"],
+      ["an HTTPS remote", "https://github.com/student/my-agent-repo.git"],
+      ["a differently-cased login", "https://github.com/Student/my-agent-repo"],
+    ])(
+      "refuses before any prompt, changing nothing, with %s",
+      (_label, originUrl) =>
+        Effect.runPromise(
+          Effect.gen(function* () {
+            const repo = buildRepo();
+            git(repo.workingDir, "remote", "set-url", "origin", originUrl);
+            // Readiness checks don't get a say: the folder is already
+            // forked, so that's the only thing worth telling them.
+            git(repo.workingDir, "checkout", "live-run-through");
+            const before = snapshot(repo.workingDir);
+
+            for (const name of [
+              Option.none<string>(),
+              Option.some("my-agent-repo"),
+              Option.some("another-name"),
+            ]) {
+              const { created, exit, prompted } = yield* runRecorded(
+                repo.workingDir,
+                {
+                  name,
+                  existingRepos: ["student/my-agent-repo"],
+                }
+              );
+
+              expect(exit._tag).toBe("Failure");
+              const error =
+                exit._tag === "Failure" && exit.cause._tag === "Fail"
+                  ? exit.cause.error
+                  : undefined;
+              expect(error?._tag).toBe("AlreadyForkedError");
+              const message = (error as { message: string }).message;
+              expect(message).toContain(
+                "already forked to " +
+                  originUrl
+                    .replace(/^.*github\.com[:/]/, "")
+                    .replace(/\.git$/, "")
+              );
+              expect(message).toContain(
+                "https://github.com/" +
+                  originUrl
+                    .replace(/^.*github\.com[:/]/, "")
+                    .replace(/\.git$/, "")
+              );
+              expect(message).toContain("Nothing was changed");
+              expect(message).toContain("git push");
+              expect(message).not.toContain("gh repo delete");
+              expect(prompted).toEqual([]);
+              expect(created).toEqual([]);
+            }
+
+            expect(snapshot(repo.workingDir)).toEqual(before);
+          })
+        )
+    );
+
+    it.effect(
+      "forks as usual when origin is the course org's repo (someone else's)",
+      () =>
+        Effect.gen(function* () {
+          const repo = buildRepo();
+          git(
+            repo.workingDir,
+            "remote",
+            "set-url",
+            "origin",
+            "git@github.com:ai-hero-dev/cohort-005-project.git"
+          );
+
+          const { created, exit, prompted } = yield* runRecorded(
+            repo.workingDir,
+            { name: Option.some("my-agent-repo") }
+          );
+
+          expect(exit._tag).toBe("Success");
+          expect(prompted).toEqual(["confirm"]);
+          expect(created).toEqual(["my-agent-repo"]);
+        })
+    );
+
+    it.effect(
+      "forks as usual when there's no origin (e.g. after a failed create)",
+      () =>
+        Effect.gen(function* () {
+          const repo = buildRepo();
+          git(repo.workingDir, "remote", "remove", "origin");
+
+          const { created, exit } = yield* runRecorded(
+            repo.workingDir,
+            { name: Option.some("my-agent-repo") }
+          );
+
+          expect(exit._tag).toBe("Success");
+          expect(created).toEqual(["my-agent-repo"]);
+        })
+    );
+
+    it.effect(
+      "forks as usual when origin isn't on github.com, even under the same owner name",
+      () =>
+        Effect.gen(function* () {
+          const repo = buildRepo();
+          git(
+            repo.workingDir,
+            "remote",
+            "set-url",
+            "origin",
+            "git@gitlab.com:student/my-agent-repo.git"
+          );
+
+          const { created, exit } = yield* runRecorded(
+            repo.workingDir,
+            { name: Option.some("my-agent-repo") }
+          );
+
+          expect(exit._tag).toBe("Success");
+          expect(created).toEqual(["my-agent-repo"]);
+        })
+    );
+  });
+
   it.effect(
     "uses the name from the prompt when no arg is given",
     () =>
@@ -598,6 +787,11 @@ describe("fork (e2e)", () => {
         );
 
         expect(result._tag).toBe("GhRepoAlreadyExistsError");
+        // That repo isn't this folder's (origin is still the course), so
+        // it's likely the student's work from another folder: don't
+        // suggest deleting it.
+        expect(result.message).toContain("student/taken");
+        expect(result.message).not.toContain("gh repo delete");
         // Nothing was created and history is untouched.
         expect(created).toEqual([]);
         expect(
@@ -824,5 +1018,19 @@ describe("sanitizeRepoName", () => {
     expect(sanitizeRepoName("")).toBe("my-course-repo");
     expect(sanitizeRepoName("   ")).toBe("my-course-repo");
     expect(sanitizeRepoName("!!!")).toBe("my-course-repo");
+  });
+});
+
+describe("ownForkOf", () => {
+  it.each([
+    ["git@github.com:student/repo.git", "student/repo"],
+    ["https://github.com/STUDENT/repo", "STUDENT/repo"],
+    ["ssh://git@github.com/student/repo.git", "student/repo"],
+    ["git@github.com:ai-hero-dev/cohort-005-project.git", null],
+    ["git@ghe.example.com:student/repo.git", null],
+    ["https://gitlab.com/student/repo", null],
+    ["/tmp/student/repo", null],
+  ])("%j for login \"student\" -> %j", (url, expected) => {
+    expect(ownForkOf(url, "student")).toBe(expected);
   });
 });
