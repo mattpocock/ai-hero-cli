@@ -1,5 +1,17 @@
 # ai-hero-cli
 
+## 0.13.0
+
+### Minor Changes
+
+- 51fe1bf: `ai-hero fork` now keeps the course's git history instead of squashing it into a single "Initial commit". It removes the course's `origin` remote, creates your GitHub repo, and pushes your `main` branch, with its history, to it as `origin`. Only `main` is pushed: other branches and tags stay on your machine. Because your `main` now shares history with the course, a later `reset` or `pull` lines up with it instead of reporting that the branches have diverged.
+
+  `fork` now stops, changing nothing, if you're not on `main`, if you have uncommitted changes to tracked files, or if the clone is shallow, and says how to fix each. The symlink warning is gone: the push publishes the course's commits, which record symlinks as symlinks even where they're checked out as plain files.
+
+### Patch Changes
+
+- ccf551c: `ai-hero fork` now refuses, changing nothing, when the folder is already forked (its `origin` is a GitHub repo you own), and says which repo it's forked to. Before, it offered to "disconnect this folder from the course repo" when `origin` was really your own repo. The "already exists" error no longer suggests `gh repo delete`: the repo it names isn't this folder's, and may be your work from another folder.
+
 ## 0.12.0
 
 ### Minor Changes
