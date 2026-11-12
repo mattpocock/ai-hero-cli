@@ -3,7 +3,7 @@ import {
   Command as CLICommand,
   Options,
 } from "@effect/cli";
-import { Console, Effect, Option } from "effect";
+import { Console, Data, Effect, Option } from "effect";
 import * as path from "node:path";
 import {
   GitService,
@@ -32,34 +32,24 @@ export const sanitizeRepoName = (name: string): string => {
   return cleaned === "" ? "my-course-repo" : cleaned;
 };
 
-const quoteIfNeeded = (p: string) =>
-  /^[\w./@+-]+$/.test(p) ? p : `"${p}"`;
-
-/** The warning `fork` prints when symlinks are checked out as files. */
-export const forkSymlinksWarning = (
-  symlinkPaths: Array<string>
-): string =>
-  "\n⚠ Symlinks are disabled for this repo (core.symlinks=false), " +
-  "which Windows sets automatically when Developer Mode is off and " +
-  "you're not running as Administrator. This course has symlinks:\n" +
-  symlinkPaths.map((p) => `    ${p}\n`).join("") +
-  "Here they're plain text files, so if you continue they'll be " +
-  "published to your new repo as plain files, and the course will " +
-  "look broken there.\n" +
-  "  Fix: answer no below, turn on Developer Mode (Settings > " +
-  "Privacy & security > For developers), or re-run your terminal as " +
-  "Administrator, then:\n" +
-  "    git config core.symlinks true\n" +
-  `    git checkout -- ${symlinkPaths.map(quoteIfNeeded).join(" ")}\n` +
-  "  and run fork again.\n";
+/**
+ * `fork` can't run yet: the clone isn't in a state whose `main` can be
+ * published as-is. Nothing has been changed when this is raised.
+ */
+export class ForkNotReadyError extends Data.TaggedError(
+  "ForkNotReadyError"
+)<{
+  message: string;
+}> {}
 
 /**
  * Core fork logic, extracted for testability.
  *
- * Turns the student's current course clone into a fresh GitHub
- * repository they own (public, or private with `--private`): resets
- * local history, creates the repo via the GitHub CLI, and pushes the
- * working copy to it as `origin`.
+ * Turns the student's current course clone into a GitHub repository
+ * they own (public, or private with `--private`), keeping the course's
+ * history: disconnects the course remote, creates the repo via the
+ * GitHub CLI, and pushes `main` to it as `origin`. Only `main` is
+ * pushed; other local branches and tags stay local.
  */
 export const runFork = (opts: {
   name: Option.Option<string>;
@@ -81,7 +71,49 @@ export const runFork = (opts: {
     // 2. Must be run from inside the student's clone.
     yield* git.ensureIsGitRepo();
 
-    // 3. Work out the repo name (flag > prompt, defaulting to the
+    // 3. The clone's main is what gets published, so it must be on
+    //    main, with every tracked change committed, and its whole
+    //    history present. Refuse (changing nothing) otherwise.
+    const currentBranch = yield* git.getCurrentBranch();
+    if (currentBranch !== "main") {
+      return yield* new ForkNotReadyError({
+        message:
+          (currentBranch === ""
+            ? "You're not on a branch. "
+            : `You're on "${currentBranch}". `) +
+          "fork publishes your main branch, so switch to it first:\n" +
+          "  git checkout main\n" +
+          "then run fork again.",
+      });
+    }
+
+    const trackedChanges = yield* git.getTrackedChanges();
+    if (trackedChanges !== "") {
+      return yield* new ForkNotReadyError({
+        message:
+          "You have uncommitted changes:\n" +
+          trackedChanges
+            .split("\n")
+            .map((line) => `  ${line}\n`)
+            .join("") +
+          "fork publishes your commits, not these changes. Commit them " +
+          "(git commit -am \"<message>\") or discard them " +
+          "(git restore .), then run fork again.",
+      });
+    }
+
+    if (yield* git.isShallowRepository()) {
+      return yield* new ForkNotReadyError({
+        message:
+          "This is a shallow clone (made with --depth), so part of the " +
+          "course history is missing and can't be pushed to a new repo. " +
+          "Fetch the rest first:\n" +
+          "  git fetch --unshallow\n" +
+          "then run fork again.",
+      });
+    }
+
+    // 4. Work out the repo name (flag > prompt, defaulting to the
     //    current directory name).
     const defaultName = sanitizeRepoName(
       path.basename(config.cwd)
@@ -92,7 +124,7 @@ export const runFork = (opts: {
         : yield* promptService.inputRepoName(defaultName, visibility)
     );
 
-    // 4. Guard against clobbering / re-running: fail early if a repo
+    // 5. Guard against clobbering / re-running: fail early if a repo
     //    with this name already exists on the user's account.
     const login = yield* github.getAuthenticatedUser();
     const fullName = `${login}/${repoName}`;
@@ -108,51 +140,25 @@ export const runFork = (opts: {
       });
     }
 
-    // 5. With core.symlinks=false (Windows without Developer Mode),
-    //    the course's symlinks are checked out as plain text files, and
-    //    the fresh commit below would publish them that way. Warn while
-    //    the history is still there to restore them from.
-    const symlinksDisabled = yield* git.hasSymlinksDisabled();
-    if (symlinksDisabled) {
-      const symlinkPaths = yield* git.listSymlinkPaths("HEAD");
-      if (symlinkPaths.length > 0) {
-        yield* Console.log(
-          forkSymlinksWarning(symlinkPaths)
-        );
-      }
-    }
-
-    // 6. Confirm before touching local history (destructive).
+    // 6. Confirm before disconnecting from the course repo.
     yield* Console.log(
       "\nThis will:\n" +
-        "  • replace this folder's git history with a single fresh commit\n" +
+        '  • disconnect this folder from the course repo (remove the "origin" remote)\n' +
         `  • create a new ${visibility.toUpperCase()} GitHub repo: ${fullName}\n` +
-        '  • push your current files to it as "origin"\n'
+        '  • push your main branch, with its history, to it as "origin"\n'
     );
-    yield* promptService.confirmContinue(
-      "Continue? Your local git history will be reset.",
-      false
-    );
+    yield* promptService.confirmContinue("Continue?", false);
 
-    // 7. Fresh history: disconnect from the course repo and re-init.
-    yield* Console.log("Resetting local git history...");
-    yield* git.removeGitDirectory();
-    yield* git.initRepo();
-    // Guarantee a committer identity so the first commit succeeds even if
-    // the user has never configured git globally. Falls back to the
-    // authenticated GitHub user; existing config is left untouched.
-    yield* git.ensureCommitterIdentity({
-      name: login,
-      email: `${login}@users.noreply.github.com`,
-    });
-    yield* git.stageAll();
-    yield* git.commit("Initial commit");
-    yield* git.renameCurrentBranchTo("main");
+    // 7. Disconnect from the course repo, so `gh repo create` can add
+    //    the new repo as origin. History and branches stay as they are.
+    yield* git.removeRemote("origin");
 
-    // 8. Create the repo and push to it as origin. History is already
-    //    reset by now, so if the create fails, say how to finish by hand.
+    // 8. Create the repo and push to it as origin. `gh repo create
+    //    --push` pushes only the current branch (main). The course remote
+    //    is already gone by now, so if the create fails, say how to
+    //    finish by hand.
     yield* Console.log(
-      `Creating ${visibility} repo ${fullName} and pushing...\n`
+      `Creating ${visibility} repo ${fullName} and pushing main...\n`
     );
     yield* github.createRepoFromCwd(repoName, visibility).pipe(
       Effect.mapError(
@@ -161,9 +167,9 @@ export const runFork = (opts: {
             name: error.name,
             message:
               `${error.message}\n\n` +
-              "Your local git history was already reset, but your files are still here, " +
-              "committed as a single \"Initial commit\" on main. Fix the problem above " +
-              "(gh prints the reason), then finish by hand from this folder:\n" +
+              "Your files and git history are untouched, but this folder is no longer " +
+              "connected to the course repo. Fix the problem above (gh prints the reason), " +
+              "then finish by hand from this folder:\n" +
               `  gh repo create ${repoName} --${visibility} --source=. --remote=origin --push`,
           })
       )
@@ -233,27 +239,7 @@ export const fork = CLICommand.make(
             process.exitCode = 1;
           });
         },
-        FailedToRemoveGitDirError: (error) => {
-          return Effect.gen(function* () {
-            yield* Console.error(`Error: ${error.message}`);
-            process.exitCode = 1;
-          });
-        },
-        FailedToInitRepoError: (error) => {
-          return Effect.gen(function* () {
-            yield* Console.error(`Error: ${error.message}`);
-            process.exitCode = 1;
-          });
-        },
-        FailedToCommitError: () => {
-          return Effect.gen(function* () {
-            yield* Console.error(
-              "Error: Nothing to commit — is this folder empty? Run `ai-hero fork` from inside your cloned course folder."
-            );
-            process.exitCode = 1;
-          });
-        },
-        FailedToRenameBranchError: (error) => {
+        ForkNotReadyError: (error) => {
           return Effect.gen(function* () {
             yield* Console.error(`Error: ${error.message}`);
             process.exitCode = 1;
@@ -275,6 +261,6 @@ export const fork = CLICommand.make(
   /* v8 ignore stop */
 ).pipe(
   CLICommand.withDescription(
-    "Turn your course clone into a fresh GitHub repo you own (public by default, or --private)"
+    "Turn your course clone into a GitHub repo you own, keeping the course history (public by default, or --private)"
   )
 );

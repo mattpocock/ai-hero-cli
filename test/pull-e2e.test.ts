@@ -360,7 +360,7 @@ describe("pull (e2e)", () => {
           // Create a completely separate repo (simulating: clone, rm -rf .git, git init)
           const localTmpDir = `${upstreamRepo.workingDir}/../local-unrelated`;
           fs.mkdirSync(localTmpDir);
-          git(localTmpDir, "init");
+          git(localTmpDir, "init", "--initial-branch=main");
           git(localTmpDir, "config", "user.name", "Test");
           git(
             localTmpDir,

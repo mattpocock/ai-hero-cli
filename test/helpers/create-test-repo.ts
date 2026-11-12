@@ -81,13 +81,21 @@ export const createTestRepo = (): TestRepoBuilder => {
       const bareDir = path.join(tmpRoot, "bare.git");
       const workDir = path.join(tmpRoot, "work");
 
-      // Create bare repo as the "remote"
+      // Create bare repo as the "remote". Name the initial branch
+      // explicitly so the result never depends on the machine's
+      // init.defaultBranch (CI runners default to "master"): the bare's
+      // HEAD is the first branch, so a clone of it checks that out.
       fs.mkdirSync(bareDir);
-      git(bareDir, "init", "--bare");
+      git(
+        bareDir,
+        "init",
+        "--bare",
+        `--initial-branch=${branches[0]?.name ?? "main"}`
+      );
 
       // Create working repo and add remote
       fs.mkdirSync(workDir);
-      git(workDir, "init");
+      git(workDir, "init", "--initial-branch=main");
       git(workDir, "config", "user.name", "Test");
       git(workDir, "config", "user.email", "test@test.com");
       git(workDir, "remote", "add", remoteName, bareDir);
